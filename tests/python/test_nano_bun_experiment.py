@@ -41,6 +41,22 @@ class ExperimentTests(unittest.TestCase):
             with self.assertRaises(adapter.Error):
                 experiment.verify_cache(root, seal)
 
+    def test_npm_metadata_restored_even_on_inventory_failure(self):
+        with tempfile.TemporaryDirectory() as temp:
+            job = Path(temp)
+            project = job / 'project'
+            modules = project / 'node_modules'
+            modules.mkdir(parents=True)
+            hidden = modules / '.package-lock.json'
+            hidden.write_text('{}')
+            def reject(*args):
+                self.assertFalse(hidden.exists())
+                raise adapter.Error('bad package graph')
+            with mock.patch.object(adapter, 'validate_inventory', side_effect=reject):
+                with self.assertRaisesRegex(adapter.Error, 'bad package graph'):
+                    experiment.npm_inventory(project, job, {'package-lock.json': b'{}'})
+            self.assertEqual(hidden.read_bytes(), b'{}')
+
     def test_wrong_lock_stops_before_execution(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

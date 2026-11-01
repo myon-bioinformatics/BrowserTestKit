@@ -32,6 +32,10 @@ Cold means package-manager cache empty, not OS page cache or network cold.
 Node setup and baseline npm preparation precede the experiment and are excluded
 from install comparisons; Bun preparation is recorded explicitly. Single sequential samples are reproducibility evidence, not a speed claim.
 
+npm's hidden installed lock metadata is temporarily moved out of the package
+inventory scan and restored in a finally block; package contents are still
+validated with the same identity/edge checks. Its hash is recorded.
+
 The original two browserless cases must each pass once without skips/retries.
 Four relative output paths and exact SHA-256 hashes must agree across all three
 conditions. Playwright report timing/path metadata is retained but is not itself

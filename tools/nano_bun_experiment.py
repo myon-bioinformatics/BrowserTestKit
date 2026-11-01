@@ -63,6 +63,20 @@ def prepare(root):
     return module.prepare(source, root / 'prepared', feature=adapter.FEATURE)
 
 
+def npm_inventory(project, job, snapshot):
+    # npm's standard hidden lock is metadata, not an installed package. Preserve
+    # it as evidence while using the unchanged Bun inventory validator.
+    hidden_lock = project / 'node_modules/.package-lock.json'
+    adapter.require(hidden_lock.is_file() and not hidden_lock.is_symlink(), 'missing npm installed lock')
+    saved_lock = job / 'npm-installed-lock.json'
+    hidden_lock.rename(saved_lock)
+    try:
+        inventory = adapter.validate_inventory(project, json.loads(snapshot['package-lock.json']))
+    finally:
+        saved_lock.rename(hidden_lock)
+    return inventory
+
+
 def baseline(root, prepared, node, npm):
     job = root / 'npm-baseline'
     job.mkdir(mode=0o700)
@@ -86,7 +100,7 @@ def baseline(root, prepared, node, npm):
                      '--registry=https://registry.npmjs.org/', '--fetch-retries=0', '--fetch-timeout=30000',
                      f'--userconfig={config}', f'--globalconfig={global_config}', f'--cache={cache}'],
                     project, env, job, 'install')
-    adapter.validate_inventory(project, json.loads(snapshot['package-lock.json']))
+    inventory = npm_inventory(project, job, snapshot)
     adapter.execute([node, project / 'node_modules/@playwright/test/cli.js', 'test', '--config',
                      project / 'playwright.browserless.config.ts', 'tests/browserless/mirror.spec.ts',
                      '--grep', '(' + '|'.join(adapter.TITLES) + ')$', '--workers=1', '--reporter=json',
@@ -94,7 +108,9 @@ def baseline(root, prepared, node, npm):
     result = adapter.validate_test_report(json.loads((job / 'test.stdout').read_text()))
     adapter.require(all((project / n).read_bytes() == d for n, d in snapshot.items()), 'npm changed inputs')
     adapter.require(not any((job / 'browsers').iterdir()), 'unexpected browser files')
+    result.update(inventory)
     result['artifact_sha256'] = artifacts(job)
+    result['npm_installed_lock_sha256'] = adapter.sha256(hidden_lock.read_bytes())
     (job / 'receipt.json').write_text(json.dumps(result, indent=2))
     return job
 
