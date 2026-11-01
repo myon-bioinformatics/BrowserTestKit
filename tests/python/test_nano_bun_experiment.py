@@ -57,6 +57,31 @@ class ExperimentTests(unittest.TestCase):
                     experiment.npm_inventory(project, job, {'package-lock.json': b'{}'})
             self.assertEqual(hidden.read_bytes(), b'{}')
 
+    def test_npm_baseline_receipt_includes_metadata_hash(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            snapshot = {'package.json': b'{}', 'package-lock.json': b'{"packages": {}}'}
+            def execute(command, project, env, job, label):
+                if label == 'install':
+                    modules = project / 'node_modules'
+                    modules.mkdir()
+                    (modules / '.package-lock.json').write_bytes(b'{}')
+                else:
+                    (job / 'test.stdout').write_text('{}')
+                    outputs = job / 'test-results'
+                    outputs.mkdir()
+                    for i in range(4):
+                        (outputs / f'{i}.json').write_text('{}')
+            with mock.patch.object(adapter, 'read_prepared', return_value=snapshot), \
+                 mock.patch.object(adapter, 'execute', side_effect=execute), \
+                 mock.patch.object(adapter, 'validate_inventory', return_value={'package_copies': 30}), \
+                 mock.patch.object(adapter, 'validate_test_report', return_value={'passed': 2}):
+                job = experiment.baseline(root, root, Path('/bin/true'), Path('/bin/true'))
+            result = json.loads((job / 'receipt.json').read_text())
+            self.assertEqual(result['npm_installed_lock_sha256'], adapter.sha256(b'{}'))
+            self.assertEqual(result['package_copies'], 30)
+            self.assertEqual(len(result['artifact_sha256']), 4)
+
     def test_wrong_lock_stops_before_execution(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

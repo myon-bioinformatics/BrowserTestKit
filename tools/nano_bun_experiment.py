@@ -110,7 +110,7 @@ def baseline(root, prepared, node, npm):
     adapter.require(not any((job / 'browsers').iterdir()), 'unexpected browser files')
     result.update(inventory)
     result['artifact_sha256'] = artifacts(job)
-    result['npm_installed_lock_sha256'] = adapter.sha256(hidden_lock.read_bytes())
+    result['npm_installed_lock_sha256'] = adapter.sha256((project / 'node_modules/.package-lock.json').read_bytes())
     (job / 'receipt.json').write_text(json.dumps(result, indent=2))
     return job
 
