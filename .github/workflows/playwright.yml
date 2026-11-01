@@ -47,7 +47,108 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with: { node-version: '26' }
-      - run: npm ci
+      - name: Prepare and install the fixed 30-package Node browser environment
+        env:
+          NANO_PARENT_REV: dd2f4dcf64cfc8246003c4423e40a19ae88e86e1
+          NANO_HELPER_SHA256: 9aa7e8a6bd99e385f3157490b8e91aa50e4c781b5eb23f449aaad5fa9f6d06dc
+        run: |
+          python3 -I -B -S - <<'PY'
+          import hashlib
+          import importlib.util
+          import json
+          import os
+          from pathlib import Path
+          import re
+          import shutil
+          import subprocess
+          import tempfile
+          import time
+          import urllib.request
+          
+          started = time.perf_counter()
+          checkout = Path(os.environ['GITHUB_WORKSPACE']).resolve()
+          target = checkout / 'node_modules'
+          if target.exists() or target.is_symlink():
+              raise RuntimeError('refusing to replace existing checkout node_modules')
+          revision = os.environ['NANO_PARENT_REV']
+          digest = os.environ['NANO_HELPER_SHA256']
+          if not re.fullmatch('[0-9a-f]{40}', revision) or not re.fullmatch('[0-9a-f]{64}', digest):
+              raise ValueError('expected fixed parent commit and helper SHA-256')
+          work = Path(tempfile.mkdtemp(prefix='btk-node-deps-', dir=os.environ['RUNNER_TEMP'])).resolve()
+          url = f'https://raw.githubusercontent.com/myon-bioinformatics/myon-bioinformatics/{revision}/tools/nano_node.py'
+          with urllib.request.urlopen(url, timeout=60) as response:
+              data = response.read(2 * 1024 * 1024 + 1)
+          if len(data) > 2 * 1024 * 1024 or hashlib.sha256(data).hexdigest() != digest:
+              raise ValueError('parent helper download differs from its fixed hash')
+          tool = work / 'nano_node.py'
+          tool.write_bytes(data)
+          spec = importlib.util.spec_from_file_location('nano_node', tool)
+          nano = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(nano)
+          prepared = nano.prepare(checkout, work / 'prepared',
+                                  feature=nano.BTK_FEATURE, dependencies_only=True)
+          project = prepared / 'browser-test-kit'
+          receipt = json.loads((prepared / 'receipt.json').read_bytes())
+          if (receipt.get('dependencies_only') is not True
+                  or receipt.get('application_source_staged') is not False
+                  or receipt['candidate_locked_package_records'] != 30
+                  or set(receipt['source_git_blobs']) != {'package.json', 'package-lock.json'}
+                  or {p.name for p in project.iterdir()} != {'package.json', 'package-lock.json'}):
+              raise ValueError('expected dependency-only preparation with no copied application/tests')
+          snapshot = nano.read_snapshot(checkout, blobs={name: nano.BTK_SOURCE_BLOBS[name]
+                                       for name in ('package.json', 'package-lock.json')})
+          original = json.loads(snapshot['package-lock.json'])
+          manifest = json.loads(snapshot['package.json'])
+          manifest['devDependencies'] = nano.BTK_SELECTED
+          if json.loads((project / 'package.json').read_bytes()) != manifest:
+              raise ValueError('unexpected projected manifest')
+          nano.validate_projection(original, json.loads((project / 'package-lock.json').read_bytes()),
+                                   feature=nano.BTK_FEATURE)
+          preparation_seconds = time.perf_counter() - started
+          for name in ('home', 'config', 'tmp', 'cache'):
+              (work / name).mkdir()
+          for name in ('user.npmrc', 'global.npmrc'):
+              (work / name).write_text('')
+          env = {'PATH': os.environ['PATH'], 'HOME': str(work / 'home'),
+                 'XDG_CONFIG_HOME': str(work / 'config'), 'TMPDIR': str(work / 'tmp'),
+                 'PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD': '1'}
+          npm = shutil.which('npm')
+          if not npm:
+              raise RuntimeError('existing npm executable is required')
+          options = ['--userconfig', str(work / 'user.npmrc'), '--globalconfig', str(work / 'global.npmrc'),
+                     '--cache', str(work / 'cache')]
+          install_started = time.perf_counter()
+          subprocess.run([npm, 'ci', '--ignore-scripts', '--no-audit', '--no-fund', '--no-update-notifier',
+                          '--registry', 'https://registry.npmjs.org/', '--fetch-retries=0',
+                          '--fetch-timeout=30000', *options], cwd=project, env=env, check=True, timeout=300)
+          install_seconds = time.perf_counter() - install_started
+          for name, field in [('package.json', 'projected_manifest_sha256'),
+                              ('package-lock.json', 'projected_lock_sha256')]:
+              if hashlib.sha256((project / name).read_bytes()).hexdigest() != receipt[field]:
+                  raise ValueError('npm changed a prepared input')
+          listed = subprocess.run([npm, 'ls', '--all', '--parseable', '--offline', *options],
+                                  cwd=project, env=env, check=True, capture_output=True, text=True, timeout=60)
+          installed = {Path(line).resolve() for line in listed.stdout.splitlines() if line.strip()} - {project.resolve()}
+          expected = {(project / path).resolve() for path in nano.BTK_EXPECTED_PATHS}
+          if installed != expected or len(installed) != 30:
+              raise ValueError('installed paths differ from the reviewed 30-record closure')
+          lock = json.loads((project / 'package-lock.json').read_bytes())
+          for path in nano.BTK_EXPECTED_PATHS:
+              if json.loads((project / path / 'package.json').read_bytes())['version'] != lock['packages'][path]['version']:
+                  raise ValueError('installed package version differs from the lock')
+          apparent_bytes = sum(p.stat().st_size for p in (project / 'node_modules').rglob('*')
+                               if p.is_file() and not p.is_symlink())
+          if nano.read_snapshot(checkout, blobs={name: nano.BTK_SOURCE_BLOBS[name] for name in snapshot}) != snapshot:
+              raise ValueError('checkout package inputs changed during setup')
+          target.symlink_to(project / 'node_modules', target_is_directory=True)
+          print(json.dumps({'schema': 'nano-ci-setup/1', 'feature': nano.BTK_FEATURE,
+                            'dependency_only': True, 'live_checkout_tests': True,
+                            'installed_package_paths': len(installed),
+                            'node_modules_apparent_regular_bytes': apparent_bytes,
+                            'preparation_seconds': preparation_seconds, 'npm_ci_seconds': install_seconds,
+                            'setup_seconds': time.perf_counter() - started,
+                            'browser_bytes_included': False, 'shared_runtime_bytes_included': False}, sort_keys=True))
+          PY
       - name: Check system libraries (dry run, no changes)
         id: deps_check
         continue-on-error: true
