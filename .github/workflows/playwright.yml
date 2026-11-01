@@ -204,7 +204,7 @@ jobs:
         run: python -S .vendor-sync-tools/vendor_sync.py check --manifest vendor.lock.json
       - name: Run Python tests with JUnit
         env:
-          BTK_FAILURE_EVIDENCE: test-results/controlled-failure
+          FAILURE_EVIDENCE_DIR: test-results/controlled-failure
         run: uv run --locked python -m pytest tests/python -q -m "not browser" --junitxml=test-results/junit/python-3.15.xml
       - name: Preserve junit-python-3.15
         if: always()
