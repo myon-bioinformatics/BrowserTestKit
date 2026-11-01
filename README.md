@@ -405,3 +405,7 @@ The same request guard applies to page resources; HTTP redirects are refused
 without following them. Service workers are blocked. This is a browser request
 boundary, not an OS-level sandbox. Storage records key names and SHA-256
 fingerprints only. See [REA observation](docs/rea-observation.md).
+
+## Optional nano environment
+
+[Opt-in Markdown/HTML nano environment](docs/nano-environment.md): both parsers and the existing browserless runner, with isolated outputs and no browser download; full XLSX/browser lanes stay unchanged.
