@@ -26,9 +26,9 @@ function fixture(overrides = {}) {
   return {nodes, queried, sandbox, click: id => nodes.get(id).listeners.click()};
 }
 
-test('workspace selects Node 24 and this test uses a supported runtime', () => {
-  assert.equal(readFileSync(new URL('../../.nvmrc', import.meta.url), 'utf8').trim(), '24');
-  assert.ok(Number(process.versions.node.split('.')[0]) >= 24);
+test('workspace selects Node 26 and this test uses a supported runtime', () => {
+  assert.equal(readFileSync(new URL('../../.nvmrc', import.meta.url), 'utf8').trim(), '26');
+  assert.ok(Number(process.versions.node.split('.')[0]) >= 26);
 });
 
 test('notification and location queries do not request location coordinates', async () => {
