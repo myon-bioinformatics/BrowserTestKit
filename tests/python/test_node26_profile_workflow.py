@@ -15,7 +15,7 @@ def test_live_browser_workflow_keeps_pins_and_exact_node26_guards():
     }
     script = step['run']
     for suffix in ('FEATURE', 'SOURCE_BLOBS', 'SELECTED', 'EXPECTED_PATHS'):
-        assert 'nano.BTK_NODE26_MARKED_' + suffix in script
+        assert 'nano.BTK_NODE26_PARSERS_' + suffix in script
         assert 'nano.BTK_' + suffix not in script
     assert 'hashlib.sha256(data).hexdigest() != digest' in script
     assert 'dependencies_only=True' in script

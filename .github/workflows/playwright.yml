@@ -86,7 +86,7 @@ jobs:
           nano = importlib.util.module_from_spec(spec)
           spec.loader.exec_module(nano)
           prepared = nano.prepare(checkout, work / 'prepared',
-                                  feature=nano.BTK_NODE26_MARKED_FEATURE, dependencies_only=True)
+                                  feature=nano.BTK_NODE26_PARSERS_FEATURE, dependencies_only=True)
           project = prepared / 'browser-test-kit'
           receipt = json.loads((prepared / 'receipt.json').read_bytes())
           if (receipt.get('dependencies_only') is not True
@@ -95,15 +95,15 @@ jobs:
                   or set(receipt['source_git_blobs']) != {'package.json', 'package-lock.json'}
                   or {p.name for p in project.iterdir()} != {'package.json', 'package-lock.json'}):
               raise ValueError('expected dependency-only preparation with no copied application/tests')
-          snapshot = nano.read_snapshot(checkout, blobs={name: nano.BTK_NODE26_MARKED_SOURCE_BLOBS[name]
+          snapshot = nano.read_snapshot(checkout, blobs={name: nano.BTK_NODE26_PARSERS_SOURCE_BLOBS[name]
                                        for name in ('package.json', 'package-lock.json')})
           original = json.loads(snapshot['package-lock.json'])
           manifest = json.loads(snapshot['package.json'])
-          manifest['devDependencies'] = nano.BTK_NODE26_MARKED_SELECTED
+          manifest['devDependencies'] = nano.BTK_NODE26_PARSERS_SELECTED
           if json.loads((project / 'package.json').read_bytes()) != manifest:
               raise ValueError('unexpected projected manifest')
           nano.validate_projection(original, json.loads((project / 'package-lock.json').read_bytes()),
-                                   feature=nano.BTK_NODE26_MARKED_FEATURE)
+                                   feature=nano.BTK_NODE26_PARSERS_FEATURE)
           preparation_seconds = time.perf_counter() - started
           for name in ('home', 'config', 'tmp', 'cache'):
               (work / name).mkdir()
@@ -129,19 +129,19 @@ jobs:
           listed = subprocess.run([npm, 'ls', '--all', '--parseable', '--offline', *options],
                                   cwd=project, env=env, check=True, capture_output=True, text=True, timeout=60)
           installed = {Path(line).resolve() for line in listed.stdout.splitlines() if line.strip()} - {project.resolve()}
-          expected = {(project / path).resolve() for path in nano.BTK_NODE26_MARKED_EXPECTED_PATHS}
+          expected = {(project / path).resolve() for path in nano.BTK_NODE26_PARSERS_EXPECTED_PATHS}
           if installed != expected or len(installed) != 30:
               raise ValueError('installed paths differ from the reviewed 30-record closure')
           lock = json.loads((project / 'package-lock.json').read_bytes())
-          for path in nano.BTK_NODE26_MARKED_EXPECTED_PATHS:
+          for path in nano.BTK_NODE26_PARSERS_EXPECTED_PATHS:
               if json.loads((project / path / 'package.json').read_bytes())['version'] != lock['packages'][path]['version']:
                   raise ValueError('installed package version differs from the lock')
           apparent_bytes = sum(p.stat().st_size for p in (project / 'node_modules').rglob('*')
                                if p.is_file() and not p.is_symlink())
-          if nano.read_snapshot(checkout, blobs={name: nano.BTK_NODE26_MARKED_SOURCE_BLOBS[name] for name in snapshot}) != snapshot:
+          if nano.read_snapshot(checkout, blobs={name: nano.BTK_NODE26_PARSERS_SOURCE_BLOBS[name] for name in snapshot}) != snapshot:
               raise ValueError('checkout package inputs changed during setup')
           target.symlink_to(project / 'node_modules', target_is_directory=True)
-          print(json.dumps({'schema': 'nano-ci-setup/1', 'feature': nano.BTK_NODE26_MARKED_FEATURE,
+          print(json.dumps({'schema': 'nano-ci-setup/1', 'feature': nano.BTK_NODE26_PARSERS_FEATURE,
                             'dependency_only': True, 'live_checkout_tests': True,
                             'installed_package_paths': len(installed),
                             'node_modules_apparent_regular_bytes': apparent_bytes,
