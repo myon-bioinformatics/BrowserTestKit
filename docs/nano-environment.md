@@ -164,6 +164,75 @@ not selected and remains in the full environment, not removed or called passing.
 
 ## Evidence, limits and normal CI
 
+### Optional cached Bun installation, still executing with Node
+
+`tools/nano_bun.py` is a local, opt-in adapter for **this exact prepared snapshot**.
+It does not replace the parent preparation helper, the full environment, or any
+CI job. Bun materializes `node_modules` from its package cache; Node does **not**
+read Bun's cache directly. The JavaScript algorithms, readers and two test cases
+still execute under the explicit Node binary. Installer improvements therefore
+do not imply faster algorithm execution under Node or a Bun runtime migration.
+
+The reviewed adapter currently supports Linux x86_64 and the official
+`bun-linux-x64` **1.4.4** executable (its bytes are verified), existing Node 24+
+and a Python 3.9+ comparator. Node 24.22.1 was exercised locally; other Node
+versions are separated by cache key, not claimed to have been benchmarked.
+The adapter downloads or upgrades **no runtime**. Use the preparation from
+section 1 above and already available, explicitly selected executables:
+
+```sh
+# BUN, NODE and PYTHON are absolute paths to existing executables.
+# PREPARED is the verified parent-helper output from section 1.
+python3 -I -B -S tools/nano_bun.py \
+  --prepared "$PREPARED" --work-root "$WORK/bun-jobs" \
+  --cache-root "$HOME/.cache/btk-nano-bun" \
+  --bun "$BUN" --node "$NODE" --python "$PYTHON"
+```
+
+The default is **offline**, with no fallback. For an explicitly authorized first
+cache population, add `--allow-network`; only the fixed package installation is
+enabled, not browser downloads or new package versions. Both modes use the
+frozen reviewed Bun lock and disable all lifecycle scripts. Existing CA-file
+settings are retained, but npm/Node options and arbitrary configuration are not
+inherited. TLS and package-integrity verification are never disabled.
+
+The cache key includes OS/architecture, Bun version and executable hash, both
+lock identities, Node version, executable hash and module ABI. A new key cannot
+silently consume another runtime's cache. The migration has **32 lock records
+and up to 32 installed copies for the same 30 unique package identities**: Bun
+duplicates the already locked `domelementtype@3.0.0` at two additional paths.
+The exact migrated lock hash, package identities and dependency-resolution edges
+are checked; no generic dependency deduplication or version adjustment is made.
+
+Each invocation creates a mode-0700 job outside the checkout/prepared inputs,
+with private `node_modules`, HOME/config/temp, browser path, logs and test outputs.
+Only the package cache is shared. It must be mode 0700, owned by the same trusted
+user, and must not be a symlink. Do not share it with untrusted users or jobs,
+edit package files through hardlinks, or mutate/clean it with other tools.
+This is a trusted-user cache, **not** a sandbox that authenticates arbitrary
+tampered cache contents. New downloads retain Bun's integrity checks.
+
+An exclusive nonblocking lock is held through **installation and tests**, since
+Bun can hardlink cache files into a job. Concurrent users of the same key get a
+clear `cache busy` error; use separate cache roots for parallel jobs. Timeouts,
+SIGINT and SIGTERM stop/reap the child process group. Any failed/interrupted job
+leaves an `active.json` quarantine marker; subsequent reuse fails closed. After
+SIGKILL or a machine failure, inspect surviving processes and the cache before
+any manual recovery, or use a fresh cache root. No automatic marker removal,
+cache deletion, npm fallback or unrestricted re-resolution is attempted.
+
+The printed job directory retains command timings, raw logs, runtime/key details,
+four document-output hashes, and a receipt requiring **two passes, zero skips**.
+A cache miss, changed source/lock, wrong runtime, missing dependency or runner
+error is failure, not a partial success. The XLSX case and all browser/platform
+tests remain unchanged in the full environment; this command does not select them.
+
+Offline helper regression tests require only the Python standard library:
+
+```sh
+python3 -B -m unittest discover -s tests/python -p test_nano_bun.py -v
+```
+
 The [bounded results](https://github.com/myon-bioinformatics/myon-bioinformatics/blob/3128b4019b9949a6ccc80c686cd84c93f04af119/docs/nano-client-mirror-environments.md) retain
 all six installation samples, 12 two-job batches and complete fact checks,
 including Unicode and intentional dialect disagreement. Two unique original
