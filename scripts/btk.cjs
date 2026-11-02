@@ -116,7 +116,7 @@ function explicitPort(target) {
 function helpText() {
   return `btk.cjs — observe a loopback page, rank locators, and run declared steps.
 
-Commands delegate to btk.py through vendor/py_launch.cjs (Node 24+).
+Commands delegate to btk.py through vendor/py_launch.cjs (Node 26+).
 offline: node scripts/btk.cjs locate SNAPSHOT --query TEXT --json
 live:    node scripts/btk.cjs observe http://127.0.0.1:PORT/page --json
 steps:   node scripts/btk.cjs observe http://127.0.0.1:PORT/page --viewport 390x844 --step focus:id:search --step type:id:search=env:SEARCH --out obs.json --out-dir DIR

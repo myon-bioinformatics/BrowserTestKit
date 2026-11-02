@@ -69,7 +69,7 @@ def test_navigation_error_call_logs_omit_arbitrary_url_values():
 def run_cli(entrypoint, args):
     if entrypoint == "node":
         node = shutil.which("node")
-        assert node, "Node 24+ is required for the URL privacy parity checks"
+        assert node, "Node 26+ is required for the URL privacy parity checks"
         command = [node, str(ROOT / "scripts" / "btk.cjs")]
     else:
         command = [sys.executable, str(ROOT / "scripts" / "btk.py")]

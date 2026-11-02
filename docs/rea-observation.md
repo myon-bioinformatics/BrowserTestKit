@@ -22,7 +22,7 @@ Failure stages remain `input`, `launch`, `navigate`, `inspect`, and `cleanup`. A
 
 This repository does not vendor the `cli_args` toolkit. The Python CLI uses argparse with no abbreviations, no shell, exit `0` / `1` / `2`, and `--json`. The Node side is CommonJS. The bridge is the existing `py_launch.cjs` from `myon-bioinformatics/myon-bioinformatics`, copied into `vendor/` and recorded in `vendor.lock.json`. A second bridge was not added. Python does not call back into Node during that spawn.
 
-The launcher is pinned to parent commit `1116d5c4f55d25af4d21cfe9b3c88f49d3a476fa`, with matching blob and SHA-256 provenance. Its interpreter probe now honors opt-in `noSite` / `isolated` flags, and its asynchronous `main` forwards repeated signals while the child is alive. The page-inspect wrapper remains synchronous and does not opt into those startup flags; Node remains 24 or later with no upper bound.
+The launcher is pinned to parent commit `1116d5c4f55d25af4d21cfe9b3c88f49d3a476fa`, with matching blob and SHA-256 provenance. Its interpreter probe now honors opt-in `noSite` / `isolated` flags, and its asynchronous `main` forwards repeated signals while the child is alive. The page-inspect wrapper remains synchronous and does not opt into those startup flags; Node remains 26 or later with no upper bound.
 
 ## Where Playwright still runs code
 
@@ -122,7 +122,7 @@ The existing `compare` reads two scenario snapshots and applies `evidence_relati
 `scenario`, `environment_settings`, and `network` sections. A missing or truncated
 section is `unknown`, not `same`. See [detailed contract](page-inspect-platform-scenarios.md)
 for loopback/origin controls, event caps, short-circuit behaviors and privacy limits.
-Node 24 is selected by `.nvmrc`, but existing CI workflows are not modified.
+Node 26 is selected by `.nvmrc`, but existing CI workflows are not modified.
 
 ### Page discovery limits
 

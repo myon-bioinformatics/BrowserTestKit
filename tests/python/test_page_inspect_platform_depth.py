@@ -171,8 +171,8 @@ def test_upload_reset_download_cleanup_and_node_bridge(server):
     if not node:
         pytest.skip("Node runtime is unavailable; file assertions already ran")
     version = subprocess.check_output([node, "-p", "process.versions.node"], text=True).strip()
-    if int(version.split(".")[0]) < 24:
-        pytest.skip("Node bridge needs 24+, found " + version)
+    if int(version.split(".")[0]) < 26:
+        pytest.skip("Node bridge needs 26+, found " + version)
     py = run(url, "offline")
     js = run(url, "offline", host="node")
     for key in ("scenario", "environment_settings", "network"):

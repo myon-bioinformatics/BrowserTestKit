@@ -305,7 +305,7 @@ The local test fixture is `fixtures/page_inspect_scenarios.html`, served with th
 `/api/probe` and `/scenario.txt` fixture routes. `scenario` can also test
 `http-error`, `latency`, `upload`, and `download`; see
 [platform scenario contract](docs/page-inspect-platform-scenarios.md).
-`.nvmrc` selects **Node 24**. Emulated phone profiles are not real devices.
+`.nvmrc` selects **Node 26**. Emulated phone profiles are not real devices.
 Only a complete section with an eligible digest can compare as `same`.
 
 ### Sequence status

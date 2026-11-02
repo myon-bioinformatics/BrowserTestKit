@@ -20,7 +20,7 @@ function listen() {
 
 test("the Node CLI observes Chromium through the Python bridge", async ({}, testInfo) => {
   test.skip(testInfo.project.name !== "chromium", "one CLI launch is enough; Firefox and WebKit have no CDP session");
-  test.skip(Number(process.versions.node.split(".")[0]) < 24, "py_launch requires Node 24+");
+  test.skip(Number(process.versions.node.split(".")[0]) < 26, "py_launch requires Node 26+");
   const python = existsSync(".venv/bin/python") ? resolve(".venv/bin/python") : (process.env.PYTHON || "python3");
   const probe = spawnSync(python, ["-c", "import playwright"], {encoding: "utf8"});
   test.skip(probe.status !== 0, "observe through py_launch needs the Python browser extra");
