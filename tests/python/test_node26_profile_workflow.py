@@ -10,12 +10,12 @@ def test_live_browser_workflow_keeps_pins_and_exact_node26_guards():
     step = next(s for s in workflow['jobs']['node']['steps']
                 if s.get('name') == 'Prepare and install the fixed 30-package Node browser environment')
     assert step['env'] == {
-        'NANO_PARENT_REV': '2ed1cbc5cc9f7ef23d42537356b3aa6e59741f28',
-        'NANO_HELPER_SHA256': '147ac0f0279c5ffaaf79732917774197fdfd29a565dcf315f9c99a0358956d02',
+        'NANO_PARENT_REV': '8ce289a78754cf8ca0ae2ca3889b52281929fdc4',
+        'NANO_HELPER_SHA256': '349921219cfdcd8a5054df962c7132324ac7134784f73147d1e8867ab6aa01b0',
     }
     script = step['run']
     for suffix in ('FEATURE', 'SOURCE_BLOBS', 'SELECTED', 'EXPECTED_PATHS'):
-        assert 'nano.BTK_NODE26_' + suffix in script
+        assert 'nano.BTK_NODE26_PARSERS_' + suffix in script
         assert 'nano.BTK_' + suffix not in script
     assert 'hashlib.sha256(data).hexdigest() != digest' in script
     assert 'dependencies_only=True' in script
