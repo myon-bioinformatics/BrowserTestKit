@@ -1,0 +1,45 @@
+name: Nano Bun private-cache fanout experiment
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26.0.0'
+      - name: Pin baseline npm independently of Node's bundled npm
+        run: npm install --global npm@11.9.0 --ignore-scripts --no-audit --no-fund
+      - name: Compare ten offline workers at concurrency 1, 2 and 4
+        run: python3 -I -B -c 'import runpy,sys; sys.path.insert(0,"tools"); runpy.run_path("tools/nano_bun_fanout.py",run_name="__main__")' --output "$RUNNER_TEMP/nano-bun-evidence"
+      - name: Preserve receipts and logs even on failure
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nano-bun-fanout-${{ github.run_id }}-${{ github.run_attempt }}
+          include-hidden-files: true
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/nano-bun-evidence/fanout-summary.json
+            ${{ runner.temp }}/nano-bun-evidence/**/batch.json
+            ${{ runner.temp }}/nano-bun-evidence/**/summary.json
+            ${{ runner.temp }}/nano-bun-evidence/summary.json
+            ${{ runner.temp }}/nano-bun-evidence/seed/cache-seal.json
+            ${{ runner.temp }}/nano-bun-evidence/**/*.stdout
+            ${{ runner.temp }}/nano-bun-evidence/**/*.stderr
+            ${{ runner.temp }}/nano-bun-evidence/**/failure.txt
+            ${{ runner.temp }}/nano-bun-evidence/**/receipt.json
+            ${{ runner.temp }}/nano-bun-evidence/**/runtime.json
+            ${{ runner.temp }}/nano-bun-evidence/**/install.json
+            ${{ runner.temp }}/nano-bun-evidence/**/test.json
+            ${{ runner.temp }}/nano-bun-evidence/**/migration.json
+            ${{ runner.temp }}/nano-bun-evidence/**/test-results/**
+            ${{ runner.temp }}/nano-bun-evidence/seed/source/**
+            ${{ runner.temp }}/nano-bun-evidence/seed/prepared/**/package*.json
+            ${{ runner.temp }}/nano-bun-evidence/seed/nano_node.py
