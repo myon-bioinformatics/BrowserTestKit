@@ -22,7 +22,7 @@ Failure stages remain `input`, `launch`, `navigate`, `inspect`, and `cleanup`. A
 
 This repository does not vendor the `cli_args` toolkit. The Python CLI uses argparse with no abbreviations, no shell, exit `0` / `1` / `2`, and `--json`. The Node side is CommonJS. The bridge is the existing `py_launch.cjs` from `myon-bioinformatics/myon-bioinformatics`, copied into `vendor/` and recorded in `vendor.lock.json`. A second bridge was not added. Python does not call back into Node during that spawn.
 
-The launcher is vendored from `myon-bioinformatics/Aoi` at merge commit `d90bf4df0cd69cf2b8357921af798c926d093c20` (`vendor/py_launch.cjs`), with matching blob and SHA-256 provenance. Its CLI form `--env-var BTK_PYTHON --site` replaces the former `btk.cjs` wrapper: `--site` drops `-S` so site-packages (Playwright) is importable. Its asynchronous `main` forwards repeated signals while the child is alive. Node remains 26 or later with no upper bound.
+The launcher is vendored from `myon-bioinformatics/myon-bioinformatics` at first-parent merge commit `384f5dd532076062f7833038764e9a62322c387c` (`py_launch.cjs`), with matching blob and SHA-256 provenance. Its CLI form `--env-var BTK_PYTHON --site` replaces the former `btk.cjs` wrapper: `--site` drops `-S` so site-packages (Playwright) is importable. Its asynchronous `main` forwards repeated signals while the child is alive. Node remains 26 or later with no upper bound.
 
 ## Where Playwright still runs code
 

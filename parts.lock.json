@@ -5,16 +5,16 @@
     "node": {
       "role": "Node runtime for vendor/py_launch.cjs: Node 26 or later, no upper bound",
       "npm_package": "node-linux-x64",
-      "version": "24.22.1",
-      "source": "https://registry.npmjs.org/node-linux-x64/-/node-linux-x64-24.22.1.tgz",
-      "integrity": "sha512-ogMoFZRQLCX7VpzQAtfs7q0DVFa7D79LKhmttHZNGJrz0Yp5/LtU0MISM7gvThSo6AbVelac9uVu9Jfm1464ow==",
+      "version": "26.13.0",
+      "source": "https://registry.npmjs.org/node-linux-x64/-/node-linux-x64-26.13.0.tgz",
+      "integrity": "sha512-htDjfwY7BoZVaScoMe5l9zaxHahkm1GWNjL/HYPNG+/W2b7b9tPoxDaPWogacLSPtTnsscW0AkOtZOZn/7XeyA==",
       "member": "package/bin/node",
       "bundled_alternative": "a Playwright driver may bundle a Node that meets the 26+ floor; the npm node part above is kept so the Node runtime is chosen separately and is not pinned to a Playwright release",
-      "minimum": "24.0.0",
+      "minimum": "26.0.0",
       "maximum": null,
       "verified_on": [
-        "24.22.1",
-        "26.12.1"
+        "26.12.1",
+        "26.13.0"
       ]
     },
     "python_playwright": {
