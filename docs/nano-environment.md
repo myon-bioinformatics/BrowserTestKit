@@ -18,7 +18,7 @@ Changed snapshots fail closed rather than silently resolving new versions.
 
 ## 1. Verify and prepare outside the checkout (no installation)
 
-Use an existing Python 3.12+, Node 24+ and npm 11.9.0. Nothing here installs or
+Use an existing Python 3.12+, Node 26+ and npm 11.9.0. Nothing here installs or
 upgrades those tools. Run the shell blocks in order in the same POSIX shell.
 Choose a TMPDIR outside the checkout. Source download needs GitHub access; lock-only preparation is offline. The
 helper is downloaded at the merged parent commit, SHA-256 checked **before

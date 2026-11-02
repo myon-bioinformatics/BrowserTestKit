@@ -191,7 +191,7 @@ def test_same_child_junit_xprobe_and_btk_bridge(tmp_path):
     ).replace("fixture setup boom", "SETUP_SENTINEL")
     test_file = tmp_path / "test_fixture.py"
     test_file.write_text(fixture, encoding="utf-8")
-    evidence = Path(os.environ.get("BTK_FAILURE_EVIDENCE", tmp_path / "evidence")).resolve()
+    evidence = Path(os.environ.get("FAILURE_EVIDENCE_DIR", tmp_path / "evidence")).resolve()
     evidence.mkdir(parents=True, exist_ok=True)
     events_path = evidence / "btk-events.jsonl"
     junit_path = evidence / "junit.xml"

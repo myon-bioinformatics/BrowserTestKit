@@ -56,7 +56,8 @@ def test_public_vendor_ci_verifies_lock_without_repository_writes():
     locked = jobs["test-locked"]["steps"]
     recreate = next(s for s in locked if s.get("name") == "Recreate locked vendor files from GitHub")
     assert recreate["shell"] == "bash"
-    assert "materialize" in recreate["run"]
+    assert recreate["run"].strip() == "python -S tools/recreate_locked_vendor.py"
+    assert "unlink" not in recreate["run"]
     assert not any(s.get("uses", "").startswith("actions/download-artifact@") for s in locked)
     stage = next(s for s in locked if s.get("name") == "Stage canonical vendor evidence")
     assert "--kind locked" in stage["run"]
