@@ -96,3 +96,16 @@ def test_a_named_part_from_the_lock_file_resolves_source_integrity_and_member(tm
         fetch_member.load_part(str(lock), "chromium")
     with pytest.raises(fetch_member.FetchError, match="no part named"):
         fetch_member.load_part(str(lock), "firefox")
+
+
+def test_checked_in_node_part_meets_workspace_and_launcher_floor():
+    import json
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[2]
+    floor = int((root / ".nvmrc").read_text().strip())
+    node = json.loads((root / "parts.lock.json").read_text())["parts"]["node"]
+    assert int(node["version"].split(".")[0]) >= floor
+    assert int(node["minimum"].split(".")[0]) == floor
+    assert node["maximum"] is None
+    assert node["source"].endswith(f"node-linux-x64-{node['version']}.tgz")
+    assert node["integrity"].startswith("sha512-")

@@ -8,13 +8,13 @@ The existing `btk.py scenario` adapter still returns
 `evidence_relation`. Its local page is an active, versioned **test fixture**,
 not an arbitrary application probe or a real device.
 
-## Node 24
+## Node 26
 
-The workspace `.nvmrc` selects major 24. With nvm, run `nvm install` followed
+The workspace `.nvmrc` selects major 26. With nvm, run `nvm install` followed
 by `nvm use`. The `vendor/py_launch.cjs --env-var BTK_PYTHON --site scripts/btk.py` launch
-requires Node 24 or newer. This change does not edit workflows, change their
+requires Node 26 or newer. This change does not edit workflows, change their
 existing newer Node pins, add a Node download during tests, or change permissions.
-A local Node 24 runtime can execute the dependency-free fixture contract suite:
+A local Node 26 runtime can execute the dependency-free fixture contract suite:
 
 ```sh
 node --version

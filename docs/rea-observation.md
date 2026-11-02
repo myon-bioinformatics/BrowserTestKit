@@ -16,13 +16,13 @@ Issue 116 is the spec for this probe. Issue 117 still tracks the phases that are
 | Loopback endpoints only | HTTP discovery accepts `127.0.0.1` or `[::1]` with an explicit port. Hostnames, credentials, and implicit ports are rejected. | `observe` and `act` accept only those URLs. The route handler aborts any other request and any redirect. |
 | Fixed action vocabulary | A scenario names click, wait, and similar steps. Unsupported tags fail before launch. | `observe --step` and `act` share one vocabulary (keyboard, mouse, form, page, and touch). A step Playwright does not implement is `unsupported` on Chromium, Firefox, and WebKit. `h:N` is rejected before the browser starts. |
 | Headless by default | Launch mode defaults to headless and owns a temporary profile. | Both commands default to headless so CI can install the shell build only. `--headed` is explicit. |
-| One result, two hosts | CLI and the other surface return the same evidence shape. | Python implements observe and act. Node runs that CLI through vendored `vendor/py_launch.cjs --env-var BTK_PYTHON --site` (Node 24+, one synchronous spawn, no resident channel). Score, loopback policy, storage fingerprints, and evidence relation have a single Python implementation. |
+| One result, two hosts | CLI and the other surface return the same evidence shape. | Python implements observe and act. Node runs that CLI through vendored `vendor/py_launch.cjs --env-var BTK_PYTHON --site` (Node 26+, one synchronous spawn, no resident channel). Score, loopback policy, storage fingerprints, and evidence relation have a single Python implementation. |
 
 Failure stages remain `input`, `launch`, `navigate`, `inspect`, and `cleanup`. A navigation failure is not reported as a bad flag. A cleanup failure does not replace an earlier error.
 
 This repository does not vendor the `cli_args` toolkit. The Python CLI uses argparse with no abbreviations, no shell, exit `0` / `1` / `2`, and `--json`. The Node side is CommonJS. The bridge is the existing `py_launch.cjs` from `myon-bioinformatics/myon-bioinformatics`, copied into `vendor/` and recorded in `vendor.lock.json`. A second bridge was not added. Python does not call back into Node during that spawn.
 
-The launcher is vendored from `myon-bioinformatics/Aoi` at merge commit `d90bf4df0cd69cf2b8357921af798c926d093c20` (`vendor/py_launch.cjs`), with matching blob and SHA-256 provenance. Its CLI form `--env-var BTK_PYTHON --site` replaces the former `btk.cjs` wrapper: `--site` drops `-S` so site-packages (Playwright) is importable. Its asynchronous `main` forwards repeated signals while the child is alive. Node remains 24 or later with no upper bound.
+The launcher is vendored from `myon-bioinformatics/myon-bioinformatics` at first-parent merge commit `384f5dd532076062f7833038764e9a62322c387c` (`py_launch.cjs`), with matching blob and SHA-256 provenance. Its CLI form `--env-var BTK_PYTHON --site` replaces the former `btk.cjs` wrapper: `--site` drops `-S` so site-packages (Playwright) is importable. Its asynchronous `main` forwards repeated signals while the child is alive. Node remains 26 or later with no upper bound.
 
 ## Where Playwright still runs code
 
@@ -122,7 +122,7 @@ The existing `compare` reads two scenario snapshots and applies `evidence_relati
 `scenario`, `environment_settings`, and `network` sections. A missing or truncated
 section is `unknown`, not `same`. See [detailed contract](page-inspect-platform-scenarios.md)
 for loopback/origin controls, event caps, short-circuit behaviors and privacy limits.
-Node 24 is selected by `.nvmrc`, but existing CI workflows are not modified.
+Node 26 is selected by `.nvmrc`, but existing CI workflows are not modified.
 
 ### Page discovery limits
 
