@@ -177,7 +177,7 @@ node scripts/hit_probe.mjs factorize test-results/hit-probe/map.json --rank 3
 node --test tests/node-unit/hit_probe.test.mjs
 ```
 
-- The Node ES module uses only Node standard modules (Node 24+); it exports `refine`, `exhaustive`, `factorize`, `boundary_pairs`, `ranges`, `render`, `rows_from_map`, and `to_json`. `await refine(width, height, probe, {stride: 8, margin: 0.25})` accepts a synchronous or asynchronous `probe(points)` returning one numeric score per integer `[x, y]` cell. `exhaustive` is also awaited. There is no Playwright runtime dependency in the module.
+- The Node ES module uses only Node standard modules (Node 26+); it exports `refine`, `exhaustive`, `factorize`, `boundary_pairs`, `ranges`, `render`, `rows_from_map`, and `to_json`. `await refine(width, height, probe, {stride: 8, margin: 0.25})` accepts a synchronous or asynchronous `probe(points)` returning one numeric score per integer `[x, y]` cell. `exhaustive` is also awaited. There is no Playwright runtime dependency in the module.
 - Python integer bitsets become Node `BigInt` rows/factor masks, including columns beyond 32/53 bits. Node scores are a `Map` keyed by `"x,y"`. Use `to_json(result, {rank: 3})` for JSON-safe `btk-hit-probe/1` evidence (same map strings, factor ranges, scale rounding, sorted/truncated uncertain cells and metadata as Python); raw BigInt results cannot be JSON-stringified. Node options use the Python names, including `max_probes`. The CLI accepts the same saved map and emits the same summary/ranges with exit 0 or 2.
 - Node validates dimensions/stride/budgets as safe integers, thresholds/margins and callback scores as finite numeric 0..1 values, and masks as non-negative BigInt values. It rejects coercible strings/booleans and malformed callback lengths; Python's existing coercion behavior is unchanged. Compatibility covers valid numeric inputs, not Python-specific permissive coercions.
 - Scale accumulation follows Python 3.12+ compensated `sum` (the reference CI uses Python 3.13), then Python's six-decimal rounding. Python 3.9–3.11 uses an older summation method, so arbitrary non-dyadic scores can differ at a six-decimal rounding boundary; quarter-step browser scores have identical results on both. A regression covers the modern summation boundary and importing from stdin/eval without running the CLI.
@@ -291,7 +291,7 @@ The local test fixture is `fixtures/page_inspect_scenarios.html`, served with th
 `/api/probe` and `/scenario.txt` fixture routes. `scenario` can also test
 `http-error`, `latency`, `upload`, and `download`; see
 [platform scenario contract](docs/page-inspect-platform-scenarios.md).
-`.nvmrc` selects **Node 24**. Emulated phone profiles are not real devices.
+`.nvmrc` selects **Node 26**. Emulated phone profiles are not real devices.
 Only a complete section with an eligible digest can compare as `same`.
 
 ### Sequence status
