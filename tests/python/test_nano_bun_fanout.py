@@ -24,11 +24,10 @@ class FanoutTests(unittest.TestCase):
             with self.subTest(changes=changes), self.assertRaises(fanout.adapter.Error):
                 fanout.check_receipts([dict(self.receipt(), **changes)], {'a': 'hash'}, 1)
 
-    def test_batch_executes_every_worker_and_checks_failure(self):
+    @patch.object(fanout.shutil, 'which', return_value='/dummy/node')
+    def test_batch_executes_every_worker_and_checks_failure(self, which):
         import tempfile
         import json
-        import subprocess
-        from types import SimpleNamespace
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)
             seed = root / 'seed'
@@ -37,22 +36,62 @@ class FanoutTests(unittest.TestCase):
             (seed / 'cache-seal.json').write_text(json.dumps(fanout.experiment.tree(seed / 'bun-cache')))
             (seed / 'summary.json').write_text(json.dumps({'status': 'passed', 'conditions': {'npm-cold': {'receipt': {'artifact_sha256': {'a': 'hash'}}}}}))
             calls = []
-            def run(command, **kwargs):
+            def run(command, private):
                 self.assertNotIn('--allow-network', command)
                 work = pathlib.Path(command[command.index('--work-root') + 1])
                 job = work / 'job'
                 job.mkdir(parents=True)
                 (job / 'receipt.json').write_text(json.dumps(self.receipt()))
                 calls.append(str(work))
-                return SimpleNamespace(returncode=0, stdout='', stderr='')
-            with patch.object(fanout.subprocess, 'run', side_effect=run):
+                return 0
+            with patch.object(fanout, 'run_worker', side_effect=run):
                 result = fanout.batch(seed, root / 'batch', workers=10, concurrency=4)
             self.assertEqual(len(set(calls)), 10)
             self.assertEqual(result['status'], 'passed')
-            with patch.object(fanout.subprocess, 'run', return_value=SimpleNamespace(returncode=1, stdout='', stderr='injected')):
+            which.assert_called_once_with('node')
+            with patch.object(fanout, 'run_worker', return_value=1):
                 with self.assertRaises(fanout.adapter.Error):
                     fanout.batch(seed, root / 'failed', workers=2, concurrency=2)
             self.assertEqual(json.loads((root / 'failed/batch.json').read_text())['status'], 'failed')
+            import subprocess
+            with patch.object(fanout, 'run_worker', side_effect=subprocess.TimeoutExpired('fake', 480)) as run:
+                with self.assertRaises(subprocess.TimeoutExpired):
+                    fanout.batch(seed, root / 'timeout', workers=10, concurrency=1)
+            self.assertEqual(run.call_count, 1)
+            report = json.loads((root / 'timeout/batch.json').read_text())
+            self.assertEqual(report['status'], 'failed')
+            self.assertIn('TimeoutExpired', report['error'])
+
+    def test_missing_node_is_controlled_and_reported_before_copy(self):
+        import tempfile
+        import json
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            with patch.object(fanout.shutil, 'which', return_value=None), \
+                    patch.object(fanout.shutil, 'copytree') as copy:
+                with self.assertRaisesRegex(fanout.adapter.Error, 'Node executable not found'):
+                    fanout.batch(root / 'unused-seed', root / 'batch')
+            copy.assert_not_called()
+            report = json.loads((root / 'batch/batch.json').read_text())
+            self.assertEqual(report['status'], 'failed')
+            self.assertIn('Node executable not found', report['error'])
+
+    @unittest.skipUnless(sys.platform == 'linux', 'Linux-only fanout process groups')
+    def test_timeout_retains_partial_logs_and_reaps_worker(self):
+        import tempfile
+        import subprocess
+        import os
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            command = [sys.executable, '-u', '-c',
+                       'import os,time; print(os.getpid(), flush=True); '
+                       'print("partial error", file=__import__("sys").stderr, flush=True); time.sleep(60)']
+            with self.assertRaises(subprocess.TimeoutExpired):
+                fanout.run_worker(command, root, timeout=0.5)
+            pid = int((root / 'worker.stdout').read_text().strip())
+            self.assertIn('partial error', (root / 'worker.stderr').read_text())
+            with self.assertRaises(ProcessLookupError):
+                os.kill(pid, 0)
 
     def test_copies_are_not_shared_inodes(self):
         import tempfile

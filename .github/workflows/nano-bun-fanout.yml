@@ -30,7 +30,7 @@ jobs:
             ${{ runner.temp }}/nano-bun-evidence/**/batch.json
             ${{ runner.temp }}/nano-bun-evidence/**/summary.json
             ${{ runner.temp }}/nano-bun-evidence/summary.json
-            ${{ runner.temp }}/nano-bun-evidence/cache-seal.json
+            ${{ runner.temp }}/nano-bun-evidence/seed/cache-seal.json
             ${{ runner.temp }}/nano-bun-evidence/**/*.stdout
             ${{ runner.temp }}/nano-bun-evidence/**/*.stderr
             ${{ runner.temp }}/nano-bun-evidence/**/failure.txt

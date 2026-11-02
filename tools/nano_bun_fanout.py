@@ -7,9 +7,11 @@ import json
 import os
 from pathlib import Path
 import shutil
+import signal
 import subprocess
 import sys
 import time
+from threading import Event
 import nano_bun_experiment as experiment
 import nano_bun as adapter
 
@@ -22,11 +24,40 @@ def check_receipts(receipts, expected, count):
                         and receipt.get('artifact_sha256') == expected, 'worker output/test mismatch')
 
 
+def run_worker(command, private, timeout=480):
+    """Bound each adapter and retain logs, including partial timeout output."""
+    with (private / 'worker.stdout').open('w') as out, (private / 'worker.stderr').open('w') as err:
+        process = subprocess.Popen(command, stdout=out, stderr=err, start_new_session=True)
+        try:
+            return process.wait(timeout=timeout)
+        except BaseException:
+            # SIGTERM lets the adapter clean up its separately sessioned test
+            # children while holding its cache lock. Bound that cleanup too.
+            try:
+                os.killpg(process.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+            try:
+                process.wait(timeout=15)
+            except subprocess.TimeoutExpired:
+                pass
+            finally:
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                process.wait(timeout=10)
+            raise
+
+
 def batch(seed, root, workers=10, concurrency=1):
     root.mkdir(mode=0o700)
     report = {'status': 'failed', 'workers': workers, 'concurrency': concurrency}
     started = time.monotonic()
     try:
+        node = shutil.which('node')
+        adapter.require(node is not None, 'Node executable not found on PATH; install the fixed Node runtime before fanout')
+        node = str(Path(node).resolve())
         summary = json.loads((seed / 'summary.json').read_text())
         adapter.require(summary['status'] == 'passed', 'seed experiment failed')
         expected = summary['conditions']['npm-cold']['receipt']['artifact_sha256']
@@ -44,16 +75,22 @@ def batch(seed, root, workers=10, concurrency=1):
             jobs.append(private)
         report['copy_seconds'] = time.monotonic() - copy_started
         report['cache_logical_bytes'] = seal['logical_bytes'] * workers
+        failed = Event()
         def execute(private):
+            adapter.require(not failed.is_set(), 'batch already failed; worker not started')
+            try:
+                return execute_one(private)
+            except BaseException:
+                failed.set()
+                raise
+        def execute_one(private):
             command = [sys.executable, '-I', '-B', str(Path(adapter.__file__).resolve()),
                        '--prepared', str(seed / 'prepared'), '--work-root', str(private / 'jobs'),
-                       '--cache-root', str(private / 'cache'), '--node', str(Path(shutil.which('node')).resolve()),
+                       '--cache-root', str(private / 'cache'), '--node', node,
                        '--bun', str(seed / 'bun'), '--python', str(Path(sys.executable).resolve())]
             begin = time.monotonic()
-            result = subprocess.run(command, capture_output=True, text=True)
-            (private / 'worker.stdout').write_text(result.stdout)
-            (private / 'worker.stderr').write_text(result.stderr)
-            adapter.require(result.returncode == 0, f'worker failed: {private.name}')
+            code = run_worker(command, private)
+            adapter.require(code == 0, f'worker failed: {private.name}')
             paths = list((private / 'jobs').glob('*/receipt.json'))
             adapter.require(len(paths) == 1, 'expected one worker receipt')
             receipt = json.loads(paths[0].read_text())

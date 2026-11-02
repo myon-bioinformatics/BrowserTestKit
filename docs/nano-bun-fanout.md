@@ -13,7 +13,9 @@ Ten workers run at concurrency 1, 2, and 4, each three times with rotated order.
 Copies are provisioned sequentially before the execution timer; copy time is separately
 reported and INCLUDED in total batch time. Every batch starts with fresh private copies.
 Seed preparation cost is recorded separately, not silently amortized into a speed claim.
-Artifacts contain seed evidence, batch reports, worker logs/receipts, and failure details.
+Workers have a 480-second outer timeout with bounded termination cleanup; partial stdout/stderr
+and a failed batch report are retained on timeout. Node is required on PATH before cache copies.
+Artifacts contain the seed cache seal, seed evidence, batch reports, worker logs/receipts, and failure details.
 Require fanout-summary.status=passed AND all 90 worker receipts with exact matching outputs.
 
 Use total_seconds to compare end-to-end batch wall, execution_seconds for worker scheduling,
