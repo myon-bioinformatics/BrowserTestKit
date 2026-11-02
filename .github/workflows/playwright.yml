@@ -22,7 +22,7 @@ jobs:
         with:
           persist-credentials: false
       - uses: actions/setup-node@v7
-        with: { node-version: '22' }
+        with: { node-version: '26' }
       - uses: actions/setup-python@v7
         with: { python-version: '3.13' }
       - run: npm ci --ignore-scripts
@@ -42,7 +42,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
-        with: { node-version: '22' }
+        with: { node-version: '26' }
       - run: npm ci
       - run: npx playwright install --with-deps --only-shell chromium firefox webkit
       - run: npm run test:node
