@@ -409,3 +409,9 @@ fingerprints only. See [REA observation](docs/rea-observation.md).
 ## Optional nano environment
 
 [Opt-in Markdown/HTML nano environment](docs/nano-environment.md): both parsers and the existing browserless runner, with isolated outputs and no browser download; full XLSX/browser lanes stay unchanged.
+
+## Focused test discovery
+
+See [standard-library discovery commands](docs/unittest-discovery.md) for
+validated `python -S -m unittest discover` recipes, filename/name filtering,
+and the boundary with the full pytest suite.

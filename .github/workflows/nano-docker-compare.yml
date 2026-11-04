@@ -19,6 +19,27 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Validate digest and require experiment implementation
+        env:
+          BASE_IMAGE: ${{ inputs.base_image }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/nano-docker-evidence"
+          mkdir -p "$evidence"
+          {
+            echo "source=$GITHUB_SHA"
+            if [[ ! "$BASE_IMAGE" =~ ^node:26\.0\.0-bookworm-slim@sha256:[0-9a-f]{64}$ ]]; then
+              echo "Invalid reviewed base image: a fixed lowercase SHA-256 digest is required."
+              exit 1
+            fi
+            for path in tools/nano_docker_compare.py tools/nano_docker_worker.py experiments/nano-docker/Dockerfile; do
+              if [[ ! -f "$path" ]]; then
+                echo "Registration only: missing $path. Select an approved ref containing PR #149."
+                exit 1
+              fi
+            done
+          } > >(tee "$evidence/preflight.stdout") 2> >(tee "$evidence/preflight.stderr" >&2)
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '26.0.0'
