@@ -18,6 +18,11 @@ source = { editable = "." }
 browser = [
     { name = "playwright" },
 ]
+browser-test = [
+    { name = "playwright" },
+    { name = "pytest" },
+    { name = "pyyaml" },
+]
 dev = [
     { name = "pip" },
     { name = "pytest" },
@@ -26,12 +31,18 @@ dev = [
 
 [package.group-requires-python]
 browser = ">=3.11"
+browser-test = ">=3.11,>=3.11"
 dev = ">=3.11"
 
 [package.metadata]
 
 [package.metadata.requires-dev]
 browser = [{ name = "playwright", marker = "python_full_version >= '3.11'", specifier = ">=1.64.1" }]
+browser-test = [
+    { name = "playwright", marker = "python_full_version >= '3.11'", specifier = ">=1.64.1" },
+    { name = "pytest", marker = "python_full_version >= '3.11'", specifier = ">=9.0.3" },
+    { name = "pyyaml", marker = "python_full_version >= '3.11'", specifier = ">=6.0.3" },
+]
 dev = [
     { name = "pip", marker = "python_full_version >= '3.11'", specifier = ">=26.2" },
     { name = "pytest", marker = "python_full_version >= '3.11'", specifier = ">=9.0.3" },

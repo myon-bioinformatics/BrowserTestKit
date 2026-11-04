@@ -9,6 +9,7 @@ description = "browser-test-kit's stdlib-only scripts, installed as top-level mo
 requires-python = ">=3.9"
 
 # Test-only. The default dev group is the browserless lane; browser adds Playwright.
+# browser-test retains collection dependencies but omits development-only pip.
 # Floors stay open-ended (>=). Resolved versions are pinned in uv.lock.
 [dependency-groups]
 dev = [
@@ -20,6 +21,12 @@ browser = [
     "playwright>=1.64.1",
 ]
 
+browser-test = [
+    { include-group = "browser" },
+    "pytest>=9.0.3",
+    "PyYAML>=6.0.3",
+]
+
 # The installed stdlib API remains 3.9+, but project/uv environments are 3.11+.
 [tool.uv]
 environments = ["python_version >= '3.11'"]
@@ -27,6 +34,7 @@ environments = ["python_version >= '3.11'"]
 [tool.uv.dependency-groups]
 dev = { requires-python = ">=3.11" }
 browser = { requires-python = ">=3.11" }
+browser-test = { requires-python = ">=3.11" }
 
 [tool.setuptools]
 # Every scripts/*.py becomes a top-level module (src-layout discovery), so

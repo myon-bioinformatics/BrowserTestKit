@@ -100,3 +100,22 @@ def test_module_smoke_still_checks_noneditable_install_outside_checkout():
         step = next(s for s in jobs[name]['steps'] if s.get('name') == 'Scripts install and run as modules (python -m)')
         assert 'cd "$RUNNER_TEMP"' in step['run']
         assert 'uv run --locked --no-dev --no-editable --project "$GITHUB_WORKSPACE" python -m btk --help' in step['run']
+
+
+def test_browser_jobs_use_test_dependencies_without_dev_pip():
+    import tomllib
+
+    project = tomllib.loads((ROOT / 'pyproject.toml').read_text())
+    assert project['dependency-groups']['browser-test'] == [
+        {'include-group': 'browser'}, 'pytest>=9.0.3', 'PyYAML>=6.0.3',
+    ]
+    assert project['tool']['uv']['dependency-groups']['browser-test'] == {
+        'requires-python': '>=3.11',
+    }
+    jobs = yaml.safe_load((ROOT / '.github/workflows/playwright.yml').read_text())['jobs']
+    for name in ('python-browser', 'python-browser-optional'):
+        commands = '\n'.join(step.get('run', '') for step in jobs[name]['steps'])
+        uv_commands = re.findall(r'uv run[^\n]*', commands)
+        assert uv_commands
+        assert all(command.startswith('uv run --locked --no-dev --group browser-test ')
+                   for command in uv_commands), name
