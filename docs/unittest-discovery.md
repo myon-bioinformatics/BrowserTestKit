@@ -1,14 +1,21 @@
 # Focused standard-library test discovery
 
-Run from this repository root with Python 3.11 or newer. These commands use
-Python’s built-in test runner; no pip, uv sync, pytest or browser installation
-is needed for the listed checks. `-S` keeps site-packages out of the interpreter.
+Run from this repository root. The stdlib support checks below support
+Python 3.9+; the nano development checks use Python 3.11+, matching the
+[development support floor](../README.md#python-support). These commands use
+Python’s built-in test runner; the listed checks need no third-party package
+or browser installation. `-S` disables automatic `site` initialization and its
+usual site-packages path additions; it is not a complete isolation boundary.
 
 ```sh
 python -S -m unittest discover -s tests/stdlib -p 'test*.py' -v
 ```
 
-Validated on Linux / CPython 3.12.14: **5 tests, exit 0** (2026-11-03).
+Validated on Linux / CPython 3.12.14: **5 collected tests: 4 passed, 1 skipped;
+exit 0** (2026-11-03). The skipped image-rejection check applies only to
+Python 3.9/3.10.
+
+Run the nano development checks on Linux with Python 3.11+:
 
 ```sh
 python -S -m unittest discover -s tests/python -p 'test_nano_bun*.py' -v
