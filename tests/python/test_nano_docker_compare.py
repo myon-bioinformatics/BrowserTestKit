@@ -95,7 +95,7 @@ class PreparedSnapshotTests(unittest.TestCase):
         sample = self.root / 'sample'
         sample.mkdir()
         (self.seed / 'bun-cache').mkdir()
-        (self.seed / 'cache-seal.json').write_text('{}')
+        (self.seed / 'cache-seal.json').write_text(json.dumps({'logical_bytes': 0, 'files': {}}))
         with mock.patch.object(experiment, 'verify_cache'), \
              mock.patch.object(compare, 'command', side_effect=adapter.Error('offline stop')) as command:
             with self.assertRaisesRegex(adapter.Error, 'offline stop'):
@@ -103,6 +103,72 @@ class PreparedSnapshotTests(unittest.TestCase):
         argv = command.call_args.args[0]
         self.assertEqual(argv[argv.index('--prepared') + 1], prepared)
         self.assertNotEqual(prepared, self.seed / 'prepared')
+
+
+class PrivateCacheTests(unittest.TestCase):
+    def test_absolute_and_relative_links_relocate_without_sharing_seed(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source, copied = root / 'seed-cache', root / 'private-cache'
+            package = source / 'packages/name@1'
+            package.mkdir(parents=True)
+            (package / 'index.js').write_text('original')
+            alias = source / 'packages/name'
+            alias.mkdir()
+            (alias / '1').symlink_to(package, target_is_directory=True)
+            (source / 'relative').symlink_to('packages/name@1', target_is_directory=True)
+            (source / 'file-link').symlink_to(package / 'index.js')
+            seal = experiment.tree(source)
+            relocated, copy_seconds = compare.copy_private_cache(source, copied, seal)
+            self.assertGreaterEqual(copy_seconds, 0)
+            self.assertEqual(experiment.tree(source), seal)
+            self.assertEqual(experiment.tree(copied), relocated)
+            self.assertEqual(relocated['logical_bytes'], seal['logical_bytes'])
+            for name in ('packages/name/1', 'relative', 'file-link'):
+                self.assertTrue((copied / name).is_symlink())
+                self.assertFalse(os.path.isabs(os.readlink(copied / name)))
+                self.assertTrue((copied / name).resolve().is_relative_to(copied))
+            self.assertNotEqual((copied / 'packages/name@1/index.js').stat().st_ino,
+                                (package / 'index.js').stat().st_ino)
+            (copied / 'file-link').write_text('private change')
+            self.assertEqual((package / 'index.js').read_text(), 'original')
+            compare.shutil.rmtree(source)
+            self.assertEqual((copied / 'packages/name/1/index.js').read_text(), 'private change')
+            self.assertEqual((copied / 'relative/index.js').read_text(), 'private change')
+
+    def test_external_dangling_and_loop_links_fail_before_copy(self):
+        for kind in ('external', 'dangling', 'loop'):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                source, copied = root / 'seed', root / 'copy'
+                source.mkdir()
+                outside = root / 'outside'
+                outside.write_text('do not copy')
+                target = {'external': outside, 'dangling': source / 'missing', 'loop': source / 'link'}[kind]
+                (source / 'link').symlink_to(target)
+                with self.assertRaisesRegex(adapter.Error, 'resolve inside seed'):
+                    compare.copy_private_cache(source, copied, experiment.tree(source))
+                self.assertFalse(copied.exists())
+
+    def test_changed_seed_or_corrupted_copy_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / 'seed'
+            source.mkdir()
+            (source / 'file').write_text('good')
+            seal = experiment.tree(source)
+            (source / 'file').write_text('bad')
+            with self.assertRaisesRegex(adapter.Error, 'changed or corrupted'):
+                compare.copy_private_cache(source, root / 'copy', seal)
+            self.assertFalse((root / 'copy').exists())
+            (source / 'file').write_text('good')
+            copytree = compare.shutil.copytree
+            def corrupt(src, dst, **kwargs):
+                copytree(src, dst, **kwargs)
+                (dst / 'file').write_text('bad')
+            with mock.patch.object(compare.shutil, 'copytree', side_effect=corrupt):
+                with self.assertRaisesRegex(adapter.Error, 'changed or corrupted'):
+                    compare.copy_private_cache(source, root / 'copy', seal)
 
 
 class ComparisonTests(unittest.TestCase):

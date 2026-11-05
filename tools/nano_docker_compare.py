@@ -68,14 +68,49 @@ def copy_prepared_snapshot(seed, context):
     return prepared
 
 
+def copy_private_cache(source, destination, seal):
+    """Copy bytes independently and relocate only validated cache-local links."""
+    experiment.verify_cache(source, seal)
+    source_root = source.resolve(strict=True)
+    relocated = dict(seal, files={name: dict(entry) for name, entry in seal['files'].items()})
+    for name, entry in seal['files'].items():
+        if 'link' not in entry:
+            continue
+        link = source / name
+        try:
+            target = link.resolve(strict=True)
+            relative_target = target.relative_to(source_root)
+        except (OSError, RuntimeError, ValueError) as exc:
+            raise adapter.Error(f'cache link must resolve inside seed: {name}') from exc
+        adapter.require(target.is_file() or target.is_dir(), f'unsupported cache link target: {name}')
+        relocated['files'][name] = {
+            'link': os.path.relpath(destination / relative_target, (destination / name).parent)}
+    # copy2 creates independent regular files; preserve links temporarily so
+    # copying never follows a link back into the seed or outside the cache.
+    copying = time.monotonic()
+    shutil.copytree(source, destination, symlinks=True)
+    for name, entry in relocated['files'].items():
+        if 'link' in entry:
+            link = destination / name
+            link.unlink()
+            link.symlink_to(entry['link'])
+    copy_seconds = time.monotonic() - copying
+    experiment.verify_cache(source, seal)
+    experiment.verify_cache(destination, relocated)
+    destination_root = destination.resolve(strict=True)
+    for name, entry in relocated['files'].items():
+        if 'link' in entry:
+            target = (destination / name).resolve(strict=True)
+            adapter.require(target.is_relative_to(destination_root),
+                            f'copied cache link escaped destination: {name}')
+    return relocated, copy_seconds
+
+
 def nano_sample(seed, root, expected, node, prepared):
     started = time.monotonic()
     seal = load(seed / 'cache-seal.json')
-    experiment.verify_cache(seed / 'bun-cache', seal)
-    copying = time.monotonic()
-    shutil.copytree(seed / 'bun-cache', root / 'cache')
-    copy_seconds = time.monotonic() - copying
-    experiment.verify_cache(root / 'cache', seal)
+    copied_seal, copy_seconds = copy_private_cache(seed / 'bun-cache', root / 'cache', seal)
+    (root / 'cache-seal.json').write_text(json.dumps(copied_seal, indent=2) + '\n')
     command([sys.executable, '-I', '-B', TOOLS / 'nano_bun.py', '--prepared', prepared,
              '--work-root', root / 'jobs', '--cache-root', root / 'cache', '--node', node,
              '--bun', seed / 'bun', '--python', Path(sys.executable).resolve()], root, 'adapter')

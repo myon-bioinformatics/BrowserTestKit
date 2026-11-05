@@ -30,6 +30,17 @@ snapshot to the nano adapter. Missing, duplicate, malformed and symlinked inputs
 remain fail-closed. Offline regression tests and replay of the retained input
 artifact verify this layout fix; a new Docker experiment still requires approval.
 
+Run [41953483576](https://github.com/myon-bioinformatics/browser-test-kit/actions/runs/41953483576)
+(2026-11-05, implementation `d58caf3`) built the dependency image and verified
+matching host/container Node binaries, but stopped before the first sample when
+ordinary cache copying dereferenced Bun's 30 absolute cache-local symlinks.
+The cache seal correctly rejected that changed layout. Private cache copying now
+validates the source seal, rejects external/dangling/looping links, copies regular
+files independently, and rewrites validated links to relative targets inside the
+copy. It verifies the unchanged seed and the relocated copy seal, which is saved
+per trial. Copy timing includes byte copying and link relocation; seal checks
+remain in execution-path wall time. Neither failed run provides paired results.
+
 This first independent experiment uses **three paired sequential trials on one
 Linux x86_64 host**, in order nano/Docker, Docker/nano, nano/Docker. It does not
 implement shared-budget fanout from parent issue #133. No experimental CPU or
@@ -68,7 +79,7 @@ with `--network=none`, starts its idle process, then execs the test worker.
 `start_api_seconds` measures the start API call, not readiness or test latency;
 `exec_wall_seconds` includes exec/IPC and worker overhead. This split is explicit:
 it is not a single `docker run` timing. Each nano sample makes a real independent
-cache copy and invokes the existing offline adapter with its usual validation,
+cache copy (including relocated cache-local links) and invokes the existing offline adapter with its usual validation,
 lock and quarantine. Bun offline mode is a package-manager policy; it is not a
 host network namespace restriction equivalent to Docker's network isolation.
 
