@@ -20,6 +20,10 @@ Module names are the file names (`btk`, `route_trail`, ...), so install into an 
 
 The stdlib alone can size up a checkout, a data file, or a running process from a single command line, no extra files or packages. `python -m zipfile -c sel.zip a b` zips only the files you name, narrowing what a reviewer or a scanning tool sees; `json.tool`/`pprint` make structured data readable at a glance; `tempfile` hands you a scratch directory when you don't want to touch the repo.
 
+BrowserTestKit itself requires Python 3.11+. The version column below records
+historical compatibility of independent CPython standard-library commands, not
+the supported runtime floor for BrowserTestKit.
+
 Every command below was actually run (not just `--help`) under this repo's system Python (3.11), and under 3.9 and 3.13 via `uv run --no-project --python 3.9|3.13 python ...`. **Min Python** is the oldest of those three it worked on.
 
 **A. `python -m` CLIs**

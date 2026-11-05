@@ -30,7 +30,7 @@ def test_all_remote_workflow_actions_and_reusable_jobs_pin_full_sha(path):
 
 def test_python_compatibility_lanes_keep_their_executable_support_checks():
     jobs = yaml.safe_load((ROOT / '.github/workflows/python-support.yml').read_text())['jobs']
-    assert jobs['stdlib']['strategy']['matrix']['python'] == ['3.9', '3.10']
+    assert jobs['stdlib']['strategy']['matrix']['python'] == ['3.11']
     commands = '\n'.join(step.get('run', '') for step in jobs['stdlib']['steps'])
     assert 'python -S -m unittest discover -s tests/stdlib' in commands
     assert 'uv pip install --no-deps .' in commands

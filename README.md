@@ -30,20 +30,19 @@ that every browser or environment has been tested.
 
 ## Python support
 
-- Stdlib-only modules and the base package: **Python 3.9+**, with no runtime dependencies.
+- Stdlib-only modules and the base package: **Python 3.11+**, with no runtime dependencies.
   Run a source script with `python -S tools/check_png.py --help`, or install the
   base package with `uv venv && uv pip install .` (an active virtual environment is required) and use `python -m btk --help`. Tools under `tools/` are
   repository tooling; original `scripts/` entries and installed modules remain supported.
-- Image diff (`scripts/image_diff.py` / `python -m image_diff`): **Python 3.11+**, using the vendored stdlib-only `pillow_min.py` backend. Python 3.9/3.10 exit 2 before decoding images. See [image comparison](docs/image-diff.md).
+- Image diff (`scripts/image_diff.py` / `python -m image_diff`): **Python 3.11+**, using the vendored stdlib-only `pillow_min.py` backend. See [image comparison](docs/image-diff.md).
 - Development, tests, browser integrations, and this repository's **uv project
   environment/lockfile: Python 3.11+**. Use
   `uv run --locked --python 3.11 pytest tests/python -q -m "not browser"`. Add `--group browser` for browser
   integration dependencies. The requirements-test files have the same floor.
-  Python 3.9/3.10 consumers should install the base package with `uv pip` (or pip), not `uv sync`.
 
-The Python support CI checks actual 3.9/3.10 stdlib execution and base wheel
+The Python support CI checks actual 3.11 stdlib execution and base wheel
 installation without test dependencies, and the complete browserless test suite at the 3.11 floor. Existing browser CI
-continues on 3.13.
+continues on its configured newer Python version.
 
 ## Fast Init
 
@@ -130,7 +129,7 @@ node --test tests/node-unit/hit_probe.test.mjs
 - The Node ES module uses only Node standard modules (Node 26+); it exports `refine`, `exhaustive`, `factorize`, `boundary_pairs`, `ranges`, `render`, `rows_from_map`, and `to_json`. `await refine(width, height, probe, {stride: 8, margin: 0.25})` accepts a synchronous or asynchronous `probe(points)` returning one numeric score per integer `[x, y]` cell. `exhaustive` is also awaited. There is no Playwright runtime dependency in the module.
 - Python integer bitsets become Node `BigInt` rows/factor masks, including columns beyond 32/53 bits. Node scores are a `Map` keyed by `"x,y"`. Use `to_json(result, {rank: 3})` for JSON-safe `btk-hit-probe/1` evidence (same map strings, factor ranges, scale rounding, sorted/truncated uncertain cells and metadata as Python); raw BigInt results cannot be JSON-stringified. Node options use the Python names, including `max_probes`. The CLI accepts the same saved map and emits the same summary/ranges with exit 0 or 2.
 - Node validates dimensions/stride/budgets as safe integers, thresholds/margins and callback scores as finite numeric 0..1 values, and masks as non-negative BigInt values. It rejects coercible strings/booleans and malformed callback lengths; Python's existing coercion behavior is unchanged. Compatibility covers valid numeric inputs, not Python-specific permissive coercions.
-- Scale accumulation follows Python 3.12+ compensated `sum` (the reference CI uses Python 3.15), then Python's six-decimal rounding. Python 3.9–3.11 uses an older summation method, so arbitrary non-dyadic scores can differ at a six-decimal rounding boundary; quarter-step browser scores have identical results on both. A regression covers the modern summation boundary and importing from stdin/eval without running the CLI.
+- Scale accumulation follows Python 3.12+ compensated `sum` (the reference CI uses Python 3.15), then Python's six-decimal rounding. Python 3.11 uses an older summation method, so arbitrary non-dyadic scores can differ at a six-decimal rounding boundary; quarter-step browser scores have identical results on both. A regression covers the modern summation boundary and importing from stdin/eval without running the CLI.
 - `tests/node-unit/hit_probe.test.mjs` compares Python/Node evidence, full uncertainty lists, raw masks, factors, boundary pairs and ordered probe batches on 84 deterministic cases: tiny/wide grids, thresholds, ties, low confidence, rotated boxes, overlays and seeded score matrices. It also checks repeated-run determinism, exhaustive maps, malformed inputs, budgets and CLI parity. The existing browserless Playwright CI runs this suite through `tests/browserless/hit-probe.spec.ts`; Python is used only as a test oracle.
 - `tests/node/hit-probe.spec.ts` observes the same four fixture targets using integer origins/sub-points, compares live Node adaptive maps with exhaustive observations and Python results from those same observations, and verifies real boundary clicks. Existing Node browser projects execute it, including their existing emulated profiles; this adds no device configuration or Flutter integration. It records fractional-edge behavior without assuming equality across engines. Evidence is saved as `hit-probe.json` / `fractional-edge.json` under each test output directory.
 - `tests/python/test_hit_probe_browser.py` maps four targets in `fixtures/hit_probe.html` (plain, rounded, covered by a blocker plus a `pointer-events:none` ghost, rotated) on Chromium, Firefox, and WebKit. It asserts that the map equals an exhaustive probe, uses under half the probes, and that real clicks on cells either side of the boundary match the map. Evidence goes to `test-results/hit-probe/<browser>.json`.

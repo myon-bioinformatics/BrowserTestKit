@@ -1,4 +1,4 @@
-"""Dependency-free support checks, run with python -S on Python 3.9+."""
+"""Dependency-free support checks, run with python -S on Python 3.11+."""
 import base64
 import importlib
 import pathlib
@@ -45,15 +45,6 @@ class StdlibSupport(unittest.TestCase):
                 )
                 self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_old_python_rejects_image_use(self):
-        if sys.version_info >= (3, 11):
-            self.skipTest("Old-Python image rejection runs on 3.9/3.10")
-        result = subprocess.run(
-            [sys.executable, "-S", str(ROOT / "scripts/image_diff.py"), "missing.png", "missing.png"],
-            capture_output=True, text=True, timeout=30,
-        )
-        self.assertEqual(result.returncode, 2)
-        self.assertIn("Python >=3.11 is required", result.stderr)
 
 
 if __name__ == "__main__":

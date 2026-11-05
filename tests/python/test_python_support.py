@@ -1,4 +1,4 @@
-"""Keep the stdlib distribution separate from supported optional/dev environments."""
+"""Keep runtime, distribution, and development on the same Python floor."""
 from pathlib import Path
 import tomllib
 
@@ -7,13 +7,13 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_metadata_support_split():
+def test_metadata_has_one_runtime_floor():
     project = tomllib.loads((ROOT / 'pyproject.toml').read_text())
-    assert project['project']['requires-python'] == '>=3.9'
+    assert project['project']['requires-python'] == '>=3.11'
     assert project['project'].get('dependencies', []) == []
     assert project['project'].get('optional-dependencies', {}) == {}
-    assert project['tool']['uv']['environments'] == ["python_version >= '3.11'"]
-    for name in ('dev', 'browser'):
+    assert "environments" not in project["tool"]["uv"]
+    for name in ('dev', 'browser', 'browser-test'):
         assert project['tool']['uv']['dependency-groups'][name]['requires-python'] == '>=3.11'
     assert 'pillow' not in str(project['dependency-groups']['dev'])
     assert 'pip>=26.2' in project['dependency-groups']['dev']
@@ -25,7 +25,8 @@ def test_metadata_support_split():
 
 def test_lock_has_no_legacy_pillow_or_pip():
     lock = tomllib.loads((ROOT / 'uv.lock').read_text())
-    assert lock['supported-markers'] == ["python_full_version >= '3.11'"]
+    assert lock["requires-python"] == ">=3.11"
+    assert lock.get("supported-markers", []) == []
     names = {package['name'] for package in lock['package']}
     assert 'pillow' not in names
     for package in lock['package']:
@@ -53,7 +54,7 @@ def test_built_wheel_metadata_when_present():
             license_path = backend.rsplit('/', 1)[0] + '/Ironmate-LICENSE'
             assert archive.read(backend) == (ROOT / 'vendor/pillow_min/pillow_min.py').read_bytes()
             assert archive.read(license_path) == (ROOT / 'vendor/pillow_min/Ironmate-LICENSE').read_bytes()
-        assert metadata['Requires-Python'] == '>=3.9'
+        assert metadata['Requires-Python'] == '>=3.11'
         assert metadata.get_all('Requires-Dist') is None
 
 
