@@ -55,7 +55,20 @@ def validate(receipt, expected):
                     and receipt.get('source_commit') == adapter.SOURCE_COMMIT, 'output/test/source mismatch')
 
 
-def nano_sample(seed, root, expected, node):
+def copy_prepared_snapshot(seed, context):
+    """Flatten the preparation helper's unique job into the Docker contract."""
+    candidates = list((seed / 'prepared').iterdir())
+    adapter.require(len(candidates) == 1 and candidates[0].is_dir(),
+                    'expected exactly one prepared snapshot')
+    prepared = candidates[0]
+    # Reject malformed, altered or symlinked inputs before copying/building.
+    adapter.read_prepared(prepared)
+    shutil.copytree(prepared, context / 'prepared')
+    adapter.read_prepared(context / 'prepared')
+    return prepared
+
+
+def nano_sample(seed, root, expected, node, prepared):
     started = time.monotonic()
     seal = load(seed / 'cache-seal.json')
     experiment.verify_cache(seed / 'bun-cache', seal)
@@ -63,7 +76,7 @@ def nano_sample(seed, root, expected, node):
     shutil.copytree(seed / 'bun-cache', root / 'cache')
     copy_seconds = time.monotonic() - copying
     experiment.verify_cache(root / 'cache', seal)
-    command([sys.executable, '-I', '-B', TOOLS / 'nano_bun.py', '--prepared', seed / 'prepared',
+    command([sys.executable, '-I', '-B', TOOLS / 'nano_bun.py', '--prepared', prepared,
              '--work-root', root / 'jobs', '--cache-root', root / 'cache', '--node', node,
              '--bun', seed / 'bun', '--python', Path(sys.executable).resolve()], root, 'adapter')
     execution_path_seconds = time.monotonic() - started
@@ -180,7 +193,7 @@ def main():
         context_started = time.monotonic()
         context = root / 'context'
         context.mkdir()
-        shutil.copytree(seed / 'prepared', context / 'prepared')
+        prepared = copy_prepared_snapshot(seed, context)
         (context / 'tools').mkdir()
         for name in ('nano_bun.py', 'nano_bun_experiment.py', 'nano_docker_worker.py'):
             shutil.copyfile(TOOLS / name, context / 'tools' / name)
@@ -212,7 +225,7 @@ def main():
             for kind in order:
                 folder = root / f'trial-{trial}-{kind}'
                 folder.mkdir(mode=0o700)
-                sample = (nano_sample(seed, folder, expected, node) if kind == 'nano' else
+                sample = (nano_sample(seed, folder, expected, node, prepared) if kind == 'nano' else
                           docker_sample(image, folder, expected, summary['node_sha256']))
                 sample['trial'] = trial
                 report['samples'].append(sample)

@@ -19,6 +19,17 @@ The latest cache run has retained artifact `nano-bun-41438159817-1` (479,978 ZIP
 bytes); its upload size is not dependency capacity. No previous timing values
 are imported into this comparison.
 
+Run [41951180221](https://github.com/myon-bioinformatics/browser-test-kit/actions/runs/41951180221)
+(2026-11-05, implementation `b96be4f`) passed seed preparation and runtime-image
+construction, then failed dependency-image construction because the preparation
+helper nests its snapshot under a generated job directory. No paired samples
+ran, so this run supplies no Docker parity or performance result. The comparison
+now selects exactly one snapshot, validates its pinned receipt/source/lock,
+copies its contents directly to the Docker prepared root, and passes that same
+snapshot to the nano adapter. Missing, duplicate, malformed and symlinked inputs
+remain fail-closed. Offline regression tests and replay of the retained input
+artifact verify this layout fix; a new Docker experiment still requires approval.
+
 This first independent experiment uses **three paired sequential trials on one
 Linux x86_64 host**, in order nano/Docker, Docker/nano, nano/Docker. It does not
 implement shared-budget fanout from parent issue #133. No experimental CPU or

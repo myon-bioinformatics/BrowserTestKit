@@ -34,6 +34,77 @@ def receipt():
             'artifact_sha256': {str(i): str(i) * 64 for i in range(4)}}
 
 
+class PreparedSnapshotTests(unittest.TestCase):
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        self.root = Path(temp.name)
+        self.seed = self.root / 'seed'
+        self.context = self.root / 'context'
+        self.context.mkdir()
+        self.prepared = self.seed / 'prepared/nano-browser-test-kit-document-mirrors-random'
+        project = self.prepared / 'browser-test-kit'
+        contents = {'package.json': b'{"private":true}', 'package-lock.json': b'{"lockfileVersion":3}'}
+        for name, data in contents.items():
+            project.mkdir(parents=True, exist_ok=True)
+            (project / name).write_bytes(data)
+        (self.prepared / 'receipt.json').write_text(json.dumps({
+            'feature': adapter.FEATURE, 'source_commit': adapter.SOURCE_COMMIT}))
+        for name, value in (('SOURCE_BLOBS', {}),
+                            ('MANIFEST_SHA256', adapter.sha256(contents['package.json'])),
+                            ('LOCK_SHA256', adapter.sha256(contents['package-lock.json']))):
+            patcher = mock.patch.object(adapter, name, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.contents = contents
+
+    def test_nested_helper_snapshot_is_flattened_and_unchanged(self):
+        prepared = compare.copy_prepared_snapshot(self.seed, self.context)
+        self.assertEqual(prepared, self.prepared)
+        self.assertEqual(adapter.read_prepared(prepared), self.contents)
+        self.assertEqual(adapter.read_prepared(self.context / 'prepared'), self.contents)
+        self.assertTrue((self.context / 'prepared/receipt.json').is_file())
+        self.assertFalse((self.context / 'prepared' / prepared.name).exists())
+
+    def test_missing_or_duplicate_snapshot_is_rejected(self):
+        for extra in (False, True):
+            with self.subTest(extra=extra):
+                if extra:
+                    (self.seed / 'prepared/second-job').mkdir()
+                else:
+                    self.prepared.rename(self.seed / 'saved')
+                with self.assertRaisesRegex(adapter.Error, 'exactly one'):
+                    compare.copy_prepared_snapshot(self.seed, self.context)
+                self.assertFalse((self.context / 'prepared').exists())
+                if not extra:
+                    (self.seed / 'saved').rename(self.prepared)
+
+    def test_tampered_receipt_and_symlink_snapshot_are_rejected(self):
+        (self.prepared / 'receipt.json').write_text('{}')
+        with self.assertRaisesRegex(adapter.Error, 'wrong prepared'):
+            compare.copy_prepared_snapshot(self.seed, self.context)
+        saved = self.seed / 'saved'
+        self.prepared.rename(saved)
+        self.prepared.symlink_to(saved, target_is_directory=True)
+        with self.assertRaisesRegex(adapter.Error, 'symlink'):
+            compare.copy_prepared_snapshot(self.seed, self.context)
+        self.assertFalse((self.context / 'prepared').exists())
+
+    def test_nano_uses_same_validated_snapshot_not_parent(self):
+        prepared = compare.copy_prepared_snapshot(self.seed, self.context)
+        sample = self.root / 'sample'
+        sample.mkdir()
+        (self.seed / 'bun-cache').mkdir()
+        (self.seed / 'cache-seal.json').write_text('{}')
+        with mock.patch.object(experiment, 'verify_cache'), \
+             mock.patch.object(compare, 'command', side_effect=adapter.Error('offline stop')) as command:
+            with self.assertRaisesRegex(adapter.Error, 'offline stop'):
+                compare.nano_sample(self.seed, sample, {}, Path('/node'), prepared)
+        argv = command.call_args.args[0]
+        self.assertEqual(argv[argv.index('--prepared') + 1], prepared)
+        self.assertNotEqual(prepared, self.seed / 'prepared')
+
+
 class ComparisonTests(unittest.TestCase):
     def test_workflow_preflight_leaves_comparison_output_new(self):
         workflow = (TOOLS.parent / '.github/workflows/nano-docker-compare.yml').read_text()
