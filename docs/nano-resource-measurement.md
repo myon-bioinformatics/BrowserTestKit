@@ -64,6 +64,11 @@ unlimited limits, counter reset, sampled versus historical peak, real success
 and failure child commands, unmeasured RSS on unknown platforms, timeout/log
 retention, failed-batch persistence, and mocked fanout aggregation at 1/2/4.
 The 1/2/4 integration fixtures are mocked workers, not throughput measurements.
+The broader browserless suite finished with 1151 passed, 2 failed, 5 skipped,
+109 deselected and 41 subtests passed. Both failures are existing Node entrypoint
+tests rejected by their Node 26+ guard because this environment has Node 24.22.1;
+the changed files do not alter those entrypoints. The stdlib boundary suite ran
+5 tests successfully with 1 skip. Existing CI uses Node 26.
 
 The small read-only meter is worth reusing experimentally across repositories,
 but shared-budget scheduling is **not ready for rollout**. The next reference
