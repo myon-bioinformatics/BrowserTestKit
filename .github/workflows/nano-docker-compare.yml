@@ -25,7 +25,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          evidence="$RUNNER_TEMP/nano-docker-evidence"
+          evidence="$RUNNER_TEMP/nano-docker-preflight"
           mkdir -p "$evidence"
           {
             echo "source=$GITHUB_SHA"
@@ -58,6 +58,8 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
           path: |
+            ${{ runner.temp }}/nano-docker-preflight/*.stdout
+            ${{ runner.temp }}/nano-docker-preflight/*.stderr
             ${{ runner.temp }}/nano-docker-evidence/docker-summary.json
             ${{ runner.temp }}/nano-docker-evidence/*.json
             ${{ runner.temp }}/nano-docker-evidence/*.stdout
