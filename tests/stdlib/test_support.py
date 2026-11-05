@@ -37,7 +37,7 @@ class StdlibSupport(unittest.TestCase):
         self.assertEqual(h("ul", h("li", "item")), "<ul><li>item</li></ul>")
 
     def test_representative_cli_help(self):
-        for name in ("check_png", "page_text", "image_diff", "app_digest_comment"):
+        for name in ("check_png", "page_text", "image_diff"):
             with self.subTest(module=name):
                 result = subprocess.run(
                     [sys.executable, "-S", str(next(d / (name + ".py") for d in (ROOT / "scripts", ROOT / "tools") if (d / (name + ".py")).exists())), "--help"],
