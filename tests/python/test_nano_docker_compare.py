@@ -3,11 +3,9 @@ import importlib.util
 import json
 import os
 from pathlib import Path
-import re
 import subprocess
 import sys
 import tempfile
-import textwrap
 import unittest
 from unittest import mock
 
@@ -172,31 +170,10 @@ class PrivateCacheTests(unittest.TestCase):
 
 
 class ComparisonTests(unittest.TestCase):
-    def test_workflow_preflight_leaves_comparison_output_new(self):
-        workflow = (TOOLS.parent / '.github/workflows/nano-docker-compare.yml').read_text()
-        preflight = textwrap.dedent(workflow.split('        run: |\n', 1)[1].split('      - uses:', 1)[0])
-        output_template = re.search(r'--output "([^"]+)"', workflow).group(1)
-        for valid in (True, False):
-            with self.subTest(valid=valid), tempfile.TemporaryDirectory() as temp:
-                image = 'node:26.0.0-bookworm-slim@sha256:' + 'a' * 64 if valid else 'node:26'
-                result = subprocess.run(['bash', '-c', preflight], cwd=TOOLS.parent,
-                                        env=dict(os.environ, RUNNER_TEMP=temp, GITHUB_SHA='test-ref', BASE_IMAGE=image),
-                                        capture_output=True, text=True, timeout=10)
-                self.assertEqual(result.returncode, 0 if valid else 1)
-                output = Path(output_template.replace('$RUNNER_TEMP', temp))
-                self.assertFalse(output.exists(), 'preflight must not create comparison output')
-                self.assertTrue((Path(temp) / 'nano-docker-preflight/preflight.stdout').is_file())
-                self.assertIn('${{ runner.temp }}/nano-docker-preflight/*.stdout', workflow)
-                self.assertIn('${{ runner.temp }}/nano-docker-preflight/*.stderr', workflow)
-                if valid:
-                    with mock.patch.object(sys, 'argv', ['compare', '--output', str(output), '--base-image', image]), \
-                         mock.patch.object(compare, 'command', side_effect=adapter.Error('offline stop')) as command:
-                        with self.assertRaisesRegex(adapter.Error, 'offline stop'):
-                            compare.main()
-                    self.assertEqual(command.call_args_list[0].args[0], ['docker', 'version'])
-                    report = json.loads((output / 'docker-summary.json').read_text())
-                    self.assertEqual(report['status'], 'failed')
-                    self.assertNotIn('medians', report)
+    def test_manual_comparison_workflow_is_retired(self):
+        self.assertFalse((TOOLS.parent / '.github/workflows/nano-docker-compare.yml').exists())
+        self.assertTrue((TOOLS.parent / '.github/workflows/nano-bun-experiment.yml').is_file())
+        self.assertTrue((TOOLS.parent / '.github/workflows/nano-bun-fanout.yml').is_file())
 
     def test_existing_comparison_output_is_still_rejected(self):
         with tempfile.TemporaryDirectory() as temp:

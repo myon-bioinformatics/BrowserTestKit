@@ -1,12 +1,30 @@
-# Manual Docker / Bun + Node comparison
+# Docker / Bun + Node comparison record
 
 ## Status and scope
 
-Implementation only: no Docker comparison measurements exist for this change.
-No predicted speedup, memory saving or capacity saving is a measured result.
-Normal CI and the existing Bun adapter/fanout remain unchanged. This workflow has
-only `workflow_dispatch`; do not dispatch without separate user approval of the
-exact ref, image digest and resource envelope below.
+The comparison completed successfully in
+[run 41955055837](https://github.com/myon-bioinformatics/browser-test-kit/actions/runs/41955055837)
+on 2026-11-05, implementation `5c2bcca6cefecede8eade54f76a223c7d51d8190`.
+The dedicated `nano-docker-compare.yml` manual workflow is now removed at the
+user's request. No replacement automatic or scheduled comparison is added, and
+no further manual dispatch is requested. Other workflows are unchanged. The
+comparison scripts, Dockerfile, offline tests and this evidence record remain.
+
+All six paired samples passed two unique tests with zero skips/retries, and the
+four actual output SHA-256 hashes matched across all samples and the seed.
+The median test time was 1.769 s (nano) / 1.771 s (Docker), execution-path wall
+3.132 s / 2.398 s, and evidence-inclusive total wall 3.292 s / 2.865 s.
+Seed preparation took 12.047 s; Docker base pull, runtime build and dependency
+build took 4.478 s, 11.296 s and 2.675 s respectively, outside sample timings.
+The test time was effectively similar in this run. Different preparation paths
+and only three sequential pairs do not establish a general speedup or the pure
+cost of containerization; the scope and measurement boundaries below still apply.
+
+The retained artifact is
+[nano-docker-41955055837-1](https://github.com/myon-bioinformatics/browser-test-kit/actions/runs/41955055837/artifacts/13382737926),
+SHA-256 `826db6642ad31c593c4e6acce15a3e6fd34c7af9b8ca21778cca6120a6c9e319`,
+with the original 14-day retention (expires 2026-11-19). Removing the workflow
+file does not request deletion of historical runs or artifacts.
 
 Rechecked 2026-11-03: main is #147's merge `cc7322bc2e0a7c8c28f43380f6417c9e00a819f0`.
 #146's cache experiment succeeded in runs
@@ -115,39 +133,28 @@ Logical bytes, image Size, writable layer bytes, transfer bytes, allocated disk,
 RSS and peak host memory are different quantities. Do not subtract unlike
 capacity measures or claim memory reduction; RSS/aggregate peaks are unmeasured.
 Hardlinked files can share blocks. Cold means private package-manager cache is
-empty, not cold OS caches or network. Runtime layers are reused inside this one
-dispatch. Do not compare these numbers directly with other hosts or earlier runs.
+empty, not cold OS caches or network. Runtime layers were reused inside the recorded experiment. Do not compare these numbers directly with other hosts or earlier runs.
 
-## Reproduce after approval
+## Retained tooling and historical execution conditions
 
-Prerequisites: Linux x86_64, working local Docker daemon, Python3 stdlib,
-Node 26.0.0 and npm 11.9.0. Network access is needed for the pinned source/helper,
-Bun, npm registry, image registry and apt preparation. Supply a reviewed actual
-linux/amd64 digest; the placeholder below is not executable as written.
+The scripts are retained for inspection and offline regression tests. They are
+not invoked by a GitHub Actions comparison workflow. The ordinary test suite can
+be run without Docker or downloads:
 
 ```sh
 python3 -m unittest discover -s tests/python -p 'test_nano*.py' -q
-python3 tools/nano_docker_compare.py \
-  --base-image 'node:26.0.0-bookworm-slim@sha256:<reviewed-64-hex-digest>' \
-  --output /absolute/new/path/outside-checkout
 ```
 
-After merge, choose Actions → Nano Docker same-input experiment, the approved
-ref and reviewed `base_image` input. The exact digest is required, with no
-mutable-tag default or automatic fallback. Reuse the same digest when repeating
-an experiment; apt repository resolution is captured as installed package
-versions, not a fully immutable apt snapshot. Changing those versions creates a
-different preparation condition even if the base digest remains unchanged.
-
-Approval envelope (estimates, not measured): **one ubuntu-24.04 standard runner
-job, 30-minute timeout, no GPU/service/browser, six measured samples and one
-three-condition seed, 18 total test-case executions**. No fanout or repeated
-dispatch. Downloads/builds may consume hundreds of MB and local Docker storage
-may reach multiple GB; actual values depend on the base and package layers.
-Runner minutes and artifact storage use the repository's current Actions plan;
-no monetary cost estimate has been established. Artifact retention is 14 days.
-The workflow is globally serialized with itself. BuildKit may retain local build
-cache until the hosted runner is discarded; no broad docker prune is performed.
+The recorded experiment used one Linux x86_64 ubuntu-24.04 runner, four visible
+CPUs, Node 26.0.0, npm 11.9.0 and the reviewed base image
+`node:26.0.0-bookworm-slim@sha256:52d70d606181ef3b3c2137a190196a8c452e0358e6d0971573d0e59135ada9fc`.
+It had no GPU/service/browser or fanout, six measured samples plus one three-
+condition seed (18 test-case executions total). Network access was used during
+source/helper, Bun, npm, base-image and apt preparation. apt package versions
+were recorded rather than supplied by an immutable apt snapshot. BuildKit could
+retain local build cache until the hosted runner was discarded; no broad Docker
+prune was performed. These historical conditions are not authorization for a new
+experiment.
 
 ## Results and failure recovery
 
