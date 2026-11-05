@@ -1,6 +1,6 @@
 # Running the scripts with `python -m`
 
-Every `scripts/*.py` is stdlib-only at runtime. `pyproject.toml` installs each one as a top-level module, so after installation it runs from any directory, like `python -m zipfile`, with no clone or file path. The in-repo tools under `tools/` can also be run from a checkout. The original `scripts/` entries and installed modules remain available for compatibility, including `page_inspect`, `pw_install_plan`, `repo_overview`, and `image_diff`. `page_inspect` delegates to the current BTK implementation in both Python and Node; the image-diff backend remains vendored and packaged.
+Every `scripts/*.py` is stdlib-only at runtime. `pyproject.toml` installs each one as a top-level module, so after installation it runs from any directory, like `python -m zipfile`, with no clone or file path. The in-repo tools under `tools/` can also be run from a checkout. The original `scripts/` entries and installed modules remain available for compatibility, including `page_inspect`, `pw_install_plan`, and `image_diff`. `page_inspect` delegates to the current BTK implementation in both Python and Node; the image-diff backend remains vendored and packaged.
 
 ```sh
 # one-off: nothing cloned, uv caches the build
@@ -14,7 +14,7 @@ python -m btk --help
 PYTHONPATH=scripts python -S -m btk --help
 ```
 
-Module names are the file names (`btk`, `gh_ops`, `route_trail`, ...), so install into an environment without other modules of the same names, such as a uv run or a virtualenv. `tests/python/test_python_m.py` runs `python -S -m NAME --help` for every script, and CI installs the repository and runs one module from outside the checkout.
+Module names are the file names (`btk`, `route_trail`, ...), so install into an environment without other modules of the same names, such as a uv run or a virtualenv. `tests/python/test_python_m.py` runs `python -S -m NAME --help` for every script, and CI installs the repository and runs one module from outside the checkout.
 
 ## Standard-library one-liners
 

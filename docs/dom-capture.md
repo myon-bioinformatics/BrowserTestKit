@@ -2,7 +2,7 @@
 
 This example belongs to the browser-testing lane. It uses the repository's existing
 `browser` dependency group (Playwright) and Chromium installation, rather
-than adding a browser dependency to gh_identity or the stdlib scripts.
+than adding a browser dependency to the stdlib scripts.
 
 ```sh
 python examples/capture_browser_dom.py https://chatgpt.com/ --selector h1 --output chatgpt-dom.json

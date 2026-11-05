@@ -1,4 +1,4 @@
-"""Digest writes use gh_ops; duplicate reruns and other authors are safe."""
+"""Digest writes use local GitHub REST helpers; duplicate reruns and other authors are safe."""
 import sys
 from pathlib import Path
 
@@ -20,7 +20,7 @@ class Client:
 
 
 def test_exact_bot_duplicate_is_not_posted(monkeypatch):
-    monkeypatch.setattr(comment.gh_ops, 'issue_comment_create', lambda *a, **k: pytest.fail('no duplicate write'))
+    monkeypatch.setattr(comment, 'issue_comment_create', lambda *a, **k: pytest.fail('no duplicate write'))
     client = Client([{'id': 12, 'user': {'login': 'github-actions[bot]'}, 'body': BODY + '\n'}])
     assert comment.publish('owner/repo', 96, BODY, client=client) == {
         'ok': True, 'posted': False, 'duplicate': True, 'comment_id': 12}
@@ -29,7 +29,7 @@ def test_exact_bot_duplicate_is_not_posted(monkeypatch):
 @pytest.mark.parametrize('old', [BODY, '<!-- platform-apps-digest -->\nolder run'])
 def test_other_authors_are_never_patched_and_new_runs_use_canonical_create(monkeypatch, old):
     calls = []
-    monkeypatch.setattr(comment.gh_ops, 'issue_comment_create', lambda *a, **k: calls.append((a, k)) or {'ok': True})
+    monkeypatch.setattr(comment, 'issue_comment_create', lambda *a, **k: calls.append((a, k)) or {'ok': True})
     client = Client([{'id': 12, 'user': {'login': 'someone-else'}, 'body': old}])
     assert comment.publish('owner/repo', 96, BODY, client=client)['ok']
     assert calls == [(('owner/repo', 96), {'body': BODY, 'write': True, 'client': client})]
