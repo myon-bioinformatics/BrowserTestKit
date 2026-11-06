@@ -1,40 +1,8 @@
 # Discover files and production entry points by convention
 
-## Built-in Git-aware path selection
-
-```sh
-python -S tools/repo_overview.py . --paths-only --match 'scripts/*probe*' --match '*.toml' --json
-python -S tools/repo_overview.py . --paths-only --match '*.py' --exclude 'tests/*'
-```
-
-`repo_overview.select_files(root, patterns=('*.py',), exclude=('tests/*',))`
-filters the existing combined tracked/untracked Git inventory. Git ignore rules
-and the established dependency/cache/result exclusions remain in force; a plain
-directory retains the existing walk fallback. Repeated matches are ORed once,
-then exclusions are applied. Rules match relative paths or basenames using
-case-sensitive fnmatch semantics (`*` spans `/`).
-
-`--paths-only` prints paths without rendering about/key-file contents. `--json`
-returns `files`, `total` and `truncated`; text mode keeps one line per path,
-escaping control characters. `--max-files` applies after selection (default
-400). Exact-limit/empty output returns 0; truncated output, invalid roots or
-inventory errors return 2. In paths-only mode, a Git failure inside a worktree
-(including ancestor and linked-worktree `.git` markers) never falls back to a
-walk that could expose ignored files. Plain-directory walk/stat errors also
-return 2; plain directories still work when Git is unavailable. The inventory's own shared limit is preserved, and
-paths-only cannot be mixed with content/stats/churn options. This uses the
-repository's installed Git inspector and needs no sibling xprobe checkout.
-
-The first command was run on this checkout: it selected 5 paths (pyproject.toml
-and four probe scripts), with no truncation.
-
-Validation: **45 repo_overview pytest tests** passed, including tracked/untracked
-Git inventory and ignore rules, default overview behavior, OR/exclusion rules,
-exact limits, shared-inventory failures, mixed-mode errors and direct
-`python -S` path extraction. Regression checks include a real corrupt Git
-index, ancestor/linked-worktree markers, missing Git on a plain directory,
-unstaged deletions/dangling links, stat permission failures and injected walk errors. Existing overview fallback behavior
-is preserved.
+Path selection previously lived in a local `repo_overview.py` copy that depended
+on vendored `gh_identity`. That copy was removed; use a sibling xprobe checkout
+(below) or ordinary `git ls-files` / filesystem search instead.
 
 ## Optional source-symbol inspection
 
@@ -84,9 +52,6 @@ On 2026-10-21 at `75d736d26f6752ff7bc1436ae414f6578e321f43`, the first command p
 truncation. Examples:
 
 - `tools/btk_events.py`: `validate`
-- `scripts/gh_identity.py`: `validate_repository_metadata_v1`
-- `scripts/gh_ops.py`: `_validate_branch_name`
-- `scripts/gh_ops.py`: `_validate_branch_segment`
 
 The second command selected 7 YAML/TOML files at the same revision.
 These are observations for that snapshot, not future expected counts. Full

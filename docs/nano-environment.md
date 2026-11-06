@@ -133,7 +133,7 @@ unrelated tests pass; use the unchanged full environment for those tests.
 ## 3. Run both readers and the two original browserless cases
 
 The unchanged test file invokes `python` for its stdlib comparator, so an existing
-Python 3.9+ must also be available under that command name. `python3` above was
+Python 3.11+ must also be available under that command name. `python3` above was
 used for the parent helper. Do not let either command resolve to an unrelated
 environment. No pytest package is needed for these two Node-runner cases.
 
@@ -175,7 +175,7 @@ do not imply faster algorithm execution under Node or a Bun runtime migration.
 
 The reviewed adapter currently supports Linux x86_64 and the official
 `bun-linux-x64` **1.4.4** executable (its bytes are verified), existing Node 24+
-and a Python 3.9+ comparator. Node 24.22.1 was exercised locally; other Node
+and a Python 3.11+ comparator. Node 24.22.1 was exercised locally; other Node
 versions are separated by cache key, not claimed to have been benchmarked.
 The adapter downloads or upgrades **no runtime**. Use the preparation from
 section 1 above and already available, explicitly selected executables:

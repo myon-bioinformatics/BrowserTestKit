@@ -306,8 +306,10 @@ class RuntimeTests(TemporaryTests):
     def test_wrong_bun_version_or_old_python_is_rejected(self):
         with self.assertRaises(nano.Error):
             self.probe(bun_version="1.4.3")
-        with self.assertRaises(nano.Error):
-            self.probe(python=[3, 8, 20])
+        for version in ([3, 8, 20], [3, 9, 25], [3, 10, 19]):
+            with self.subTest(version=version), self.assertRaisesRegex(nano.Error, "Python 3.11"):
+                self.probe(python=version)
+        self.assertEqual(self.probe(python=[3, 11, 0])["python_version"], [3, 11, 0])
 
     def test_wrong_bun_bytes_are_rejected_before_execution(self):
         with mock.patch.object(nano.platform, "system", return_value="Linux"), \

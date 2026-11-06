@@ -56,8 +56,12 @@ def test_public_vendor_ci_verifies_lock_without_repository_writes():
     locked = jobs["test-locked"]["steps"]
     recreate = next(s for s in locked if s.get("name") == "Recreate locked vendor files from GitHub")
     assert recreate["shell"] == "bash"
-    assert recreate["run"].strip() == "python -S tools/recreate_locked_vendor.py"
-    assert "unlink" not in recreate["run"]
+    run = recreate["run"]
+    assert "tools/recreate_locked_vendor.py" not in run
+    assert ".vendor-sync-tools/vendor_sync.py" in run
+    assert "materialize" in run
+    assert "TemporaryDirectory" in run or "tempfile" in run
+    assert "unlink" not in run
     assert not any(s.get("uses", "").startswith("actions/download-artifact@") for s in locked)
     stage = next(s for s in locked if s.get("name") == "Stage canonical vendor evidence")
     assert "--kind locked" in stage["run"]
@@ -113,3 +117,10 @@ def test_real_canonical_staging_preserves_locked_bytes(tmp_path):
         data = (output / name).read_bytes()
         assert data == (tmp_path / name).read_bytes()
         assert hashlib.sha256(data).hexdigest() == meta['sha256'][name]
+
+
+def test_launcher_pin_uses_canonical_first_parent_source():
+    entry = next(e for e in LOCK["files"] if e["destination"] == "vendor/py_launch.cjs")
+    assert entry["repository"] == "myon-bioinformatics/myon-bioinformatics"
+    assert entry["source"] == "py_launch.cjs"
+    assert entry["commit"] == entry["ref"] == "384f5dd532076062f7833038764e9a62322c387c"
