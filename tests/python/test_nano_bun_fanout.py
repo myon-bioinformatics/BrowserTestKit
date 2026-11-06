@@ -24,8 +24,9 @@ class FanoutTests(unittest.TestCase):
             with self.subTest(changes=changes), self.assertRaises(fanout.adapter.Error):
                 fanout.check_receipts([dict(self.receipt(), **changes)], {'a': 'hash'}, 1)
 
+    @patch.object(fanout, 'prepared_snapshot', return_value=pathlib.Path('/dummy/prepared'))
     @patch.object(fanout.shutil, 'which', return_value='/dummy/node')
-    def test_batch_executes_every_worker_and_checks_failure(self, which):
+    def test_batch_executes_every_worker_and_checks_failure(self, which, prepared):
         import tempfile
         import json
         with tempfile.TemporaryDirectory() as tmp:

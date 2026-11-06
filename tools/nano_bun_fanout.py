@@ -14,6 +14,8 @@ import time
 from threading import Event
 import nano_bun_experiment as experiment
 import nano_bun as adapter
+import nano_resources as resources
+from nano_docker_compare import copy_private_cache
 
 
 def check_receipts(receipts, expected, count):
@@ -50,10 +52,21 @@ def run_worker(command, private, timeout=480):
             raise
 
 
-def batch(seed, root, workers=10, concurrency=1):
+def prepared_snapshot(seed):
+    candidates = list((seed / 'prepared').iterdir())
+    adapter.require(len(candidates) == 1 and candidates[0].is_dir(),
+                    'expected exactly one prepared snapshot')
+    adapter.read_prepared(candidates[0])
+    return candidates[0]
+
+
+def batch(seed, root, workers=10, concurrency=1, measure_resources=False, cgroup=None):
+    if workers < 1 or concurrency not in (1, 2, 4):
+        raise ValueError("positive workers and concurrency 1/2/4 required")
     root.mkdir(mode=0o700)
     report = {'status': 'failed', 'workers': workers, 'concurrency': concurrency}
     started = time.monotonic()
+    meter = resources.ScopeMeter(cgroup).start() if measure_resources else None
     try:
         node = shutil.which('node')
         adapter.require(node is not None, 'Node executable not found on PATH; install the fixed Node runtime before fanout')
@@ -63,6 +76,7 @@ def batch(seed, root, workers=10, concurrency=1):
         expected = summary['conditions']['npm-cold']['receipt']['artifact_sha256']
         seal = json.loads((seed / 'cache-seal.json').read_text())
         experiment.verify_cache(seed / 'bun-cache', seal)
+        prepared = prepared_snapshot(seed)
         jobs = []
         copy_started = time.monotonic()
         for index in range(workers):
@@ -70,8 +84,9 @@ def batch(seed, root, workers=10, concurrency=1):
             private.mkdir(mode=0o700)
             cache = private / 'cache'
             # Real copies: no symlinks/hardlinks to another worker's writable data.
-            shutil.copytree(seed / 'bun-cache', cache)
-            experiment.verify_cache(cache, seal)
+            relocated, _ = copy_private_cache(seed / 'bun-cache', cache, seal)
+            (private / 'cache-seal.json').write_text(json.dumps(relocated, indent=2) + '\n')
+            experiment.verify_cache(cache, relocated)
             jobs.append(private)
         report['copy_seconds'] = time.monotonic() - copy_started
         report['cache_logical_bytes'] = seal['logical_bytes'] * workers
@@ -85,16 +100,22 @@ def batch(seed, root, workers=10, concurrency=1):
                 raise
         def execute_one(private):
             command = [sys.executable, '-I', '-B', str(Path(adapter.__file__).resolve()),
-                       '--prepared', str(seed / 'prepared'), '--work-root', str(private / 'jobs'),
+                       '--prepared', str(prepared), '--work-root', str(private / 'jobs'),
                        '--cache-root', str(private / 'cache'), '--node', node,
                        '--bun', str(seed / 'bun'), '--python', str(Path(sys.executable).resolve())]
+            if measure_resources:
+                command = [sys.executable, '-S', str(Path(resources.__file__).resolve()),
+                           str(private / 'resources.json'), '--', *command]
             begin = time.monotonic()
             code = run_worker(command, private)
             adapter.require(code == 0, f'worker failed: {private.name}')
             paths = list((private / 'jobs').glob('*/receipt.json'))
             adapter.require(len(paths) == 1, 'expected one worker receipt')
             receipt = json.loads(paths[0].read_text())
-            return {'worker': private.name, 'seconds': time.monotonic() - begin, 'receipt': receipt}
+            result = {'worker': private.name, 'seconds': time.monotonic() - begin, 'receipt': receipt}
+            if measure_resources:
+                result['resources'] = json.loads((private / 'resources.json').read_text())
+            return result
         run_started = time.monotonic()
         with ThreadPoolExecutor(max_workers=concurrency) as pool:
             results = list(pool.map(execute, jobs))
@@ -108,6 +129,10 @@ def batch(seed, root, workers=10, concurrency=1):
         raise
     finally:
         report['total_seconds'] = time.monotonic() - started
+        if meter is not None:
+            report['resources'] = meter.finish()
+        if report['status'] == 'passed':
+            report['throughput'] = resources.aggregate(results, report['execution_seconds'], report['total_seconds'])
         (root / 'batch.json').write_text(json.dumps(report, indent=2) + '\n')
     return report
 
@@ -115,23 +140,28 @@ def batch(seed, root, workers=10, concurrency=1):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--seed', type=Path, help='reuse a validated prepared seed without network preparation')
+    parser.add_argument('--measure-resources', action='store_true')
+    parser.add_argument('--cgroup', type=Path, help='explicit read-only aggregate cgroup v2 scope')
     args = parser.parse_args()
     root = args.output.resolve()
     root.mkdir(mode=0o700, parents=True, exist_ok=False)
     report = {'status': 'failed', 'batches': [], 'scope': 'private cache copies; no shared writable cache; no CPU/RAM quotas',
               'checkout': os.environ.get('GITHUB_SHA'), 'runner_image': os.environ.get('ImageVersion')}
     try:
-        seed = root / 'seed'
+        seed = args.seed.resolve() if args.seed else root / 'seed'
         command = [sys.executable, '-I', '-B', '-c',
                    'import runpy,sys; sys.path.insert(0,"tools"); runpy.run_path("tools/nano_bun_experiment.py",run_name="__main__")',
                    '--output', str(seed)]
         begin = time.monotonic()
-        subprocess.run(command, check=True, timeout=600)
+        if args.seed is None:
+            subprocess.run(command, check=True, timeout=600)
         report['seed_seconds'] = time.monotonic() - begin
         # Rotate order to reduce systematic order bias. Every cell gets fresh copies.
         for trial, order in enumerate(((1, 2, 4), (2, 4, 1), (4, 1, 2)), 1):
             for concurrency in order:
-                result = batch(seed, root / f'trial-{trial}-parallel-{concurrency}', concurrency=concurrency)
+                result = batch(seed, root / f'trial-{trial}-parallel-{concurrency}', concurrency=concurrency,
+                               measure_resources=args.measure_resources, cgroup=args.cgroup)
                 report['batches'].append(result)
         report['status'] = 'passed'
     except BaseException as exc:
