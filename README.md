@@ -6,6 +6,10 @@ Cross-browser testing reference kit for Playwright Node/Python, screenshots, mob
 
 [Artwork and icon usage](docs/assets/brand/README.md) describes the supplied visual marks and their separate roles.
 
+## Name origin
+
+The name says what it is: a kit of tools for testing and observing with a browser. It was formerly named browser-test-kit, and the `btk` abbreviation is kept for the CLI and environment variables.
+
 ## Scope
 
 The kit's center is browser testing: Playwright lanes, evidence acquisition and validation, execution strategy, and reproducible diagnostics. It also hosts stdlib-only engineering utilities that the same agents and CI jobs use around that work, such as repository orientation, GitHub/CI operations, log digests, Python-version matrices, HTML fixture building, and explicit-file commits. Stdlib utilities must run under `python -S`, stay bounded in their output, and have unit tests. A utility that grows its own dependencies or domain belongs in its own repository.
