@@ -166,3 +166,24 @@ isolated temporary copies (missing image, wrong hash, stale run ID, failed recei
 and requires each to fail the same validator. It never modifies the actual evidence.
 Use the same expect/captures/SHA/run/attempt and receipt pattern as the real lane.
 A mixed-engine bundle must be named honestly; it is not an individual engine project.
+
+## README GIF evidence (`tools/evidence_gif.py`)
+
+A README wants one picture a reviewer can watch, not a bundle to download. `tools/evidence_gif.py`
+records a plan of shots (page × viewport × steps: `click`, `fill`, `select`, `press`, `scroll`, `wait`,
+`eval`) in Chromium and writes `docs/evidence/browser.gif` plus `docs/evidence/browser.json`.
+
+- 🖼️ Every shot and every step is one frame, fitted into a 720×480 canvas (multiples of 8) under a 32 px
+  caption that Chromium renders in Meiryo with Japanese fallbacks; ✅/⛔ in the caption is the shot status.
+- 🎨 One shared palette, no dither, delta frames (the encoding PySaiyanWeBoo's `tool/record_demo.py` uses).
+- 🌐 For served (`/…`) shots every request leaving 127.0.0.1 is refused and listed under `external`; it
+  does not fail the shot, so the evidence never depends on the network. `--map PREFIX=DIR` answers a pinned
+  CDN prefix (jsDelivr web-ui CSS, cdn.plot.ly) from a local checkout so the page is recorded styled.
+- ⛔ A page error, console error (with its URL) or HTTP ≥ 400 fails the shot; `"allow": ["text"]` keeps
+  errors a fixture raises on purpose (a deliberately wrong SRI hash) under `allowed` instead. Exit 1 still
+  writes the GIF so the failure can be seen.
+- 🧾 The receipt holds the GIF's sha256, frames, browser version, tested commit, per-shot results and the
+  plan itself, so `--plan docs/evidence/browser.json` re-records the same GIF.
+
+It needs Pillow from the caller's environment (this lock stays Pillow-free; the recording test skips without it).
+It is review evidence, not a pixel baseline: GIF bytes depend on the Chromium build and fonts.

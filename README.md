@@ -28,6 +28,29 @@ replace it. The outcomes describe the kit's intended uses, not a guarantee
 that every browser or environment has been tested.
 [Additional panel provenance](docs/assets/repository-concept-v2.json).
 
+## 🎞️ Browser evidence
+
+![BrowserTestKit fixtures, interaction and platform matrix in Chromium](docs/evidence/browser.gif)
+
+🗓️ 2026-11-07 · 🧭 Chromium 153 (Playwright 1.64 test harness) · 🐧 Linux · receipt [`docs/evidence/browser.json`](docs/evidence/browser.json) (sha256, per-shot status, page errors)
+
+| 🧪 Suite | ✅ | ⏭️ | 🚫 Not run here |
+| --- | ---: | ---: | --- |
+| `pytest -m browser` (Python) | 72 | 1 | 37 Firefox/WebKit cases (engines not installed) |
+| Playwright Test `chromium` + `mobile-chromium` | 36 | 2 | `firefox` / `webkit` / `mobile-webkit` projects |
+| 🎞️ `tools/evidence_gif.py` shots | 9 | 0 | — |
+
+🔁 Re-record (the receipt is also the plan):
+
+```sh
+python tools/platform_probe.py collect --browser chromium --profile desktop --out /tmp/rec
+python tools/platform_probe.py collect --browser chromium --profile pixel --out /tmp/rec
+python tools/platform_probe.py render /tmp/rec --out test-results/evidence/platform-matrix.html
+python tools/evidence_gif.py docs/evidence/browser.gif --serve . --plan docs/evidence/browser.json
+```
+
+`tools/evidence_gif.py` is the shared recorder the other repositories use for their README GIFs: page × viewport × steps, captioned in Meiryo, one shared palette, network refused and listed (`external`), pinned CDN assets answered locally with `--map PREFIX=DIR`. See [docs/screenshot-evidence.md](docs/screenshot-evidence.md#readme-gif-evidence-toolsevidence_gifpy).
+
 ## Python support
 
 - Stdlib-only modules and the base package: **Python 3.9+**, with no runtime dependencies.

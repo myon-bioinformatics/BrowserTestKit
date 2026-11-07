@@ -1,0 +1,210 @@
+{
+  "schema": "btk-evidence-gif/1",
+  "gif": "browser.gif",
+  "bytes": 137858,
+  "sha256": "d61a941bc4dc92bc6e04612c578c9c39575f0f1285707fc46301426dec07d389",
+  "frames": 17,
+  "canvas": "720x512",
+  "browser": "chromium 153.0.8010.12",
+  "recorded": "2026-11-08",
+  "commit": "dec58176c756dc3e122a67adf6526f67434b0582",
+  "mapped": [],
+  "summary": {
+    "pass": 9,
+    "fail": 0
+  },
+  "shots": [
+    {
+      "label": "🏠 fixture",
+      "url": "/fixtures/index.html",
+      "viewport": "1280x800",
+      "steps": [
+        "fill #name",
+        "click #submit"
+      ],
+      "status": "pass",
+      "errors": [],
+      "allowed": [],
+      "external": []
+    },
+    {
+      "label": "📱 fixture",
+      "url": "/fixtures/index.html",
+      "viewport": "392x848",
+      "steps": [
+        "fill #name",
+        "click #submit"
+      ],
+      "status": "pass",
+      "errors": [],
+      "allowed": [],
+      "external": []
+    },
+    {
+      "label": "🖱️ interaction",
+      "url": "/fixtures/interaction.html",
+      "viewport": "1280x800",
+      "steps": [
+        "click #quiet",
+        "scroll 1400",
+        "eval ⚙️"
+      ],
+      "status": "pass",
+      "errors": [],
+      "allowed": [],
+      "external": []
+    },
+    {
+      "label": "🔎 page inspect",
+      "url": "/fixtures/page_inspect.html",
+      "viewport": "1280x800",
+      "steps": [],
+      "status": "pass",
+      "errors": [],
+      "allowed": [],
+      "external": []
+    },
+    {
+      "label": "🧭 route trail",
+      "url": "/fixtures/route_trail.html",
+      "viewport": "1280x800",
+      "steps": [],
+      "status": "pass",
+      "errors": [],
+      "allowed": [],
+      "external": []
+    },
+    {
+      "label": "🎯 hit probe",
+      "url": "/fixtures/hit_probe.html",
+      "viewport": "392x848",
+      "steps": [],
+      "status": "pass",
+      "errors": [],
+      "allowed": [],
+      "external": []
+    },
+    {
+      "label": "🧪 platform probe",
+      "url": "/fixtures/platform_probe.html",
+      "viewport": "1280x800",
+      "steps": [],
+      "status": "pass",
+      "errors": [],
+      "allowed": [
+        "console: Failed to find a valid digest in the 'integrity' attribute for resource 'http://127.0.0.1:45305/vendor/js/seedrandom.js' with computed SHA-384 integrity 'Qj6XJWUAR0RXLEb7I9aNoEMBOPRraB1dFw5WXtFDYrLgA3N/qQWVtz9YLeo0IZV+'. The resource has been blocked. @ http://127.0.0.1:45305/fixtures/platform_probe.html"
+      ],
+      "external": []
+    },
+    {
+      "label": "🗂️ platform matrix",
+      "url": "/test-results/evidence/platform-matrix.html",
+      "viewport": "1280x800",
+      "steps": [
+        "click text=Pixel 7"
+      ],
+      "status": "pass",
+      "errors": [],
+      "allowed": [],
+      "external": []
+    },
+    {
+      "label": "📱 platform matrix",
+      "url": "/test-results/evidence/platform-matrix.html",
+      "viewport": "392x848",
+      "steps": [],
+      "status": "pass",
+      "errors": [],
+      "allowed": [],
+      "external": []
+    }
+  ],
+  "plan": [
+    {
+      "label": "🏠 fixture",
+      "url": "/fixtures/index.html",
+      "viewport": "1280x800",
+      "steps": [
+        {
+          "fill": [
+            "#name",
+            "Myon"
+          ]
+        },
+        {
+          "click": "#submit"
+        }
+      ]
+    },
+    {
+      "label": "📱 fixture",
+      "url": "/fixtures/index.html",
+      "viewport": "392x848",
+      "steps": [
+        {
+          "fill": [
+            "#name",
+            "スマホ"
+          ]
+        },
+        {
+          "click": "#submit"
+        }
+      ]
+    },
+    {
+      "label": "🖱️ interaction",
+      "url": "/fixtures/interaction.html",
+      "viewport": "1280x800",
+      "steps": [
+        {
+          "click": "#quiet"
+        },
+        {
+          "scroll": 1400
+        },
+        {
+          "eval": "document.getElementById('target').click()"
+        }
+      ]
+    },
+    {
+      "label": "🔎 page inspect",
+      "url": "/fixtures/page_inspect.html",
+      "viewport": "1280x800"
+    },
+    {
+      "label": "🧭 route trail",
+      "url": "/fixtures/route_trail.html",
+      "viewport": "1280x800"
+    },
+    {
+      "label": "🎯 hit probe",
+      "url": "/fixtures/hit_probe.html",
+      "viewport": "392x848"
+    },
+    {
+      "label": "🧪 platform probe",
+      "url": "/fixtures/platform_probe.html",
+      "viewport": "1280x800",
+      "allow": [
+        "integrity"
+      ]
+    },
+    {
+      "label": "🗂️ platform matrix",
+      "url": "/test-results/evidence/platform-matrix.html",
+      "viewport": "1280x800",
+      "steps": [
+        {
+          "click": "text=Pixel 7"
+        }
+      ]
+    },
+    {
+      "label": "📱 platform matrix",
+      "url": "/test-results/evidence/platform-matrix.html",
+      "viewport": "392x848"
+    }
+  ]
+}
