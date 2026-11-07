@@ -356,12 +356,12 @@ def run(args):
         raise
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("prepared", "work-root", "cache-root", "node", "bun", "python"):
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--allow-network", action="store_true", help="explicitly permit fixed package downloads; default is offline")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     try:
         print(run(args))
     except (Error, OSError, subprocess.SubprocessError, KeyError, json.JSONDecodeError) as exc:

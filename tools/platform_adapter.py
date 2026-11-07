@@ -190,11 +190,11 @@ def click_check(page, config: dict, touch: bool) -> dict:
             'before': before, 'after': after, 'input': 'touch' if touch else 'mouse', 'point': [x, y]}
 
 
-def main():
+def main(argv=None):
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('adapter', nargs='?', help='validate a btk-platform-adapter/1 JSON file')
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if args.adapter:
         config = load_adapter(args.adapter)
         print(config['id'])

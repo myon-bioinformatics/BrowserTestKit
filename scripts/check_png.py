@@ -17,14 +17,15 @@ def dimensions(data: bytes) -> tuple[int, int]:
         raise ValueError("PNG has no terminal IEND")
     return width, height
 
-def main() -> int:
-    if len(sys.argv) < 2:
+def main(argv=None) -> int:
+    argv = sys.argv[1:] if argv is None else list(argv)
+    if len(argv) < 1:
         print("usage: check_png.py FILE [...]", file=sys.stderr)
         return 2
-    if sys.argv[1] in {"-h", "--help"}:
+    if argv[0] in {"-h", "--help"}:
         print("usage: check_png.py FILE [...]\nValidate PNG signature, IHDR, and IEND; print dimensions.")
         return 0
-    for raw in sys.argv[1:]:
+    for raw in argv:
         path = Path(raw)
         data = path.read_bytes()
         width, height = dimensions(data)

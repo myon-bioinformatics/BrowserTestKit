@@ -130,10 +130,10 @@ def measure(job, cache):
             'receipt': json.loads((job / 'receipt.json').read_text())}
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     root = args.output.resolve()
     root.mkdir(mode=0o700, parents=True, exist_ok=False)
     summary = {'status': 'failed', 'conditions': {}, 'parent': PARENT, 'helper_sha256': HELPER_SHA,

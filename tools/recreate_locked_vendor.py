@@ -32,9 +32,14 @@ def recreate(root, tool):
     subprocess.run(command + ["check", "--root", str(root), "--manifest", "vendor.lock.json"], check=True)
 
 
-if __name__ == "__main__":
+def main(argv=None):
+    argv = sys.argv[1:] if argv is None else list(argv)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument("--tool", type=Path, default=Path(".vendor-sync-tools/vendor_sync.py"))
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     recreate(args.root, args.tool)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

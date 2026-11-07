@@ -77,7 +77,7 @@ def _normalized_returncode(returncode: int) -> tuple[int, int | None]:
     return 128 + signal_number, signal_number
 
 
-def main() -> int:
+def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Run terminal-browser with structured diagnostics")
     parser.add_argument("--check", action="store_true", help="only verify that terminal-browser is installed")
     parser.add_argument(
@@ -86,7 +86,7 @@ def main() -> int:
         help="capture combined child stdout/stderr to a file; intended for non-interactive commands",
     )
     parser.add_argument("args", nargs=argparse.REMAINDER, help="arguments passed to terminal-browser")
-    ns = parser.parse_args()
+    ns = parser.parse_args(argv)
 
     if ns.check and (ns.log is not None or ns.args):
         parser.error("--check cannot be combined with --log or terminal-browser arguments")

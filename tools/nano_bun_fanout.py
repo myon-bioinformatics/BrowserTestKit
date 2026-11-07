@@ -112,10 +112,10 @@ def batch(seed, root, workers=10, concurrency=1):
     return report
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     root = args.output.resolve()
     root.mkdir(mode=0o700, parents=True, exist_ok=False)
     report = {'status': 'failed', 'batches': [], 'scope': 'private cache copies; no shared writable cache; no CPU/RAM quotas',
