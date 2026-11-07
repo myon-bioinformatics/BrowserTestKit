@@ -189,7 +189,7 @@ def test_summary_reports_narrow_width_click_and_layout_failure():
 def test_report_adds_the_web_ui_viewer_on_top_of_the_ironmate_comparison():
     import re
     apps = (ROOT / '.github/workflows/platform-apps.yml').read_text()
-    pin = re.search(r'repository: myon-bioinformatics/web-ui\n\s+ref: ([0-9a-f]+)', apps)
+    pin = re.search(r'repository: myon-bioinformatics/PySaiyanWeBoo\n\s+ref: ([0-9a-f]+)', apps)
     assert pin and pin.group(1) == 'b35ed9b77d4222b946d9813298243489a69e624a'
     assert 'ref: e77d2a3f7b66f37c899832b261450b2bcd29f3dc' in apps
     assert apps.count('repository: myon-bioinformatics/Ironmate') == 1  # one comparison, not two

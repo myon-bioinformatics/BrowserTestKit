@@ -172,7 +172,7 @@ jobs:
         if: always() && hashFiles('app-matrix/screenshots/report.json') != ''
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: myon-bioinformatics/web-ui
+          repository: myon-bioinformatics/PySaiyanWeBoo
           ref: b35ed9b77d4222b946d9813298243489a69e624a
           path: .web-ui
           persist-credentials: false
