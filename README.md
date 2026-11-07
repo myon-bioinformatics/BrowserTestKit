@@ -300,7 +300,7 @@ Implemented:
 
 1. Documentation and evidence contract (`docs/`, `docs/evidence-events.md`).
 2. Shared local deterministic fixtures and artifact validators (`fixtures/`, `tools/evidence_board.py`).
-3. Playwright Node matrix (`.github/workflows/playwright.yml`, `platform-matrix.yml`).
+3. Playwright Node matrix (`.github/workflows/ci.yml`, `platform-matrix.yml`).
 4. Playwright Python API and CLI matrix (`tools/platform_probe.py`).
 5. Browser parity guards (Node `tests/node-launch` runs observe, act, and scenario through `vendor/py_launch.cjs` in Chromium).
 7. terminal-browser quick CLI/TUI lane (`tools/terminal_browser.py`).

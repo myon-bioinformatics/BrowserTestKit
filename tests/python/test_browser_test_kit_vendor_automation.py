@@ -9,7 +9,7 @@ import subprocess
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-WORKFLOW = '.github/workflows/playwright.yml'
+WORKFLOW = '.github/workflows/ci.yml'
 TEST_JOB = 'python'
 LOCK = json.loads((ROOT / 'vendor.lock.json').read_text())
 SNAPSHOT = ['vendor.lock.json'] + [e['destination'] for e in LOCK['files']]

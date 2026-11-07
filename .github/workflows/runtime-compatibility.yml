@@ -1,4 +1,4 @@
-name: Python support boundaries
+name: Stdlib runtime compatibility
 
 on:
   pull_request:
