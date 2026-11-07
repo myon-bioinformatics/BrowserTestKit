@@ -39,6 +39,6 @@ browser-test = { requires-python = ">=3.11" }
 package-dir = { "" = "scripts" }
 
 [tool.setuptools.data-files]
-"share/browser-test-kit" = ["scripts/route_trail_node.mjs", "scripts/interaction.mjs", "scripts/hit_probe.mjs", "scripts/element_overlay.mjs", "scripts/page_inspect.cjs", "scripts/mirror_facts.mjs"]
+"share/browser-test-kit" = ["scripts/route_trail_node.mjs", "scripts/interaction.mjs", "scripts/hit_probe.mjs", "scripts/element_overlay.mjs", "scripts/mirror_facts.mjs"]
 
 "share/browser-test-kit/pillow_min" = ["vendor/pillow_min/pillow_min.py", "vendor/pillow_min/Ironmate-LICENSE"]
