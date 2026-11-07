@@ -1,12 +1,5 @@
-import importlib.util
-import json
-import os
-import socket
-import subprocess
-import sys
-import threading
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
+import importlib.util, json, os, socket, subprocess, sys, threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer; from pathlib import Path
 
 import pytest
 

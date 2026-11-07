@@ -1,6 +1,5 @@
-import ast
+import ast, re
 from pathlib import Path
-import re
 
 import yaml
 

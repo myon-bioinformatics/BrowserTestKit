@@ -21,19 +21,8 @@ Exit codes: 0 OK; 1 an environment failed (collect, summary); 2 input error.
 """
 from __future__ import annotations
 
-import argparse
-import datetime
-
-import functools
-import glob
-import html
-import json
-import os
-import platform
-import sys
-import threading
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
+import argparse, datetime, functools, glob, html, json, os, platform, sys, threading
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer; from pathlib import Path
 
 # Tests load this module directly by path.
 if str(Path(__file__).resolve().parent) not in sys.path:

@@ -1,11 +1,6 @@
 """Keep pre-consolidation consumers working, including installed modules."""
-import importlib.util
-import json
-import os
+import importlib.util, json, os, subprocess, sys, zipfile
 from pathlib import Path
-import subprocess
-import sys
-import zipfile
 
 import pytest
 

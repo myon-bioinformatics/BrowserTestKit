@@ -1,11 +1,6 @@
 """Real observe and act runs through the CLI on a loopback fixture."""
-import json
-import os
-import subprocess
-import sys
-import threading
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
+import json, os, subprocess, sys, threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer; from pathlib import Path
 
 import pytest
 

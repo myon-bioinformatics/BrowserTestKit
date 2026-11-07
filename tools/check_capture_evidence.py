@@ -2,13 +2,8 @@
 """Validate multi-capture receipts and provenance using only the standard library."""
 from __future__ import annotations
 
-import argparse
-import hashlib
-import importlib.util
-import json
+import argparse, hashlib, importlib.util, json, re, sys
 from pathlib import Path
-import re
-import sys
 
 _spec = importlib.util.spec_from_file_location("_btk_check_png", Path(__file__).with_name("check_png.py"))
 assert _spec and _spec.loader

@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
 """Check a real capture bundle, then require four mutated copies to be rejected."""
 from __future__ import annotations
-import argparse
-import json
+import argparse, json, shutil, tempfile
 from pathlib import Path
-import shutil
-import tempfile
 
 import check_capture_evidence as validator
 

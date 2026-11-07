@@ -52,10 +52,8 @@ that merely inspects this file (for example ``python -S -m pytest_btk_events
 """
 from __future__ import annotations
 
-import argparse
-import os
-from pathlib import Path
-from typing import Any, Union
+import argparse, os
+from pathlib import Path; from typing import Any, Union
 
 import btk_events
 

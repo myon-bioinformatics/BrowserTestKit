@@ -1,7 +1,5 @@
+import importlib.util, json, sys
 from pathlib import Path
-import importlib.util
-import json
-import sys
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]

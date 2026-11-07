@@ -31,8 +31,7 @@ Exit codes: 0 = OK, 2 = usage error (argparse: no tags given, etc.).
 """
 from __future__ import annotations
 
-import argparse
-import html
+import argparse, html
 
 VOID_ELEMENTS = frozenset({"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source",
                            "track", "wbr"})

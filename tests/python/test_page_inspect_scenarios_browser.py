@@ -1,10 +1,6 @@
 """Real Chromium CLI tests with a private loopback HTTP server."""
-import json
-import subprocess
-import sys
-import threading
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
+import json, subprocess, sys, threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer; from pathlib import Path
 
 import pytest
 

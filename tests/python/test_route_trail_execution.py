@@ -1,10 +1,5 @@
-import asyncio
-import copy
-import importlib.util
-import json
-import subprocess
-from pathlib import Path
-from types import SimpleNamespace
+import asyncio, copy, importlib.util, json, subprocess
+from pathlib import Path; from types import SimpleNamespace
 import pytest
 ROOT=Path(__file__).resolve().parents[2]
 spec=importlib.util.spec_from_file_location('trail_execution',ROOT/'scripts/route_trail.py')

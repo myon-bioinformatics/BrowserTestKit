@@ -1,9 +1,5 @@
 """Measured press and side-effect records: pure rules, CLI, and real browsers."""
-import asyncio
-import importlib.util
-import json
-import subprocess
-import sys
+import asyncio, importlib.util, json, subprocess, sys
 from pathlib import Path
 
 import pytest

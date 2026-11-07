@@ -1,10 +1,6 @@
 """Local app doubles test adapters without depending on the published Flutter site."""
-import functools
-import importlib.util
-import json
-import threading
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
+import functools, importlib.util, json, threading
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer; from pathlib import Path
 
 import pytest
 

@@ -25,10 +25,7 @@ Exit codes: 0 all records OK, 1 a side-effects record is not quiet, 2 input erro
 """
 from __future__ import annotations
 
-import argparse
-import json
-import math
-import sys
+import argparse, json, math, sys
 
 # Same snapshot function text as storage() in interaction.mjs.
 _STORAGE = """() => {

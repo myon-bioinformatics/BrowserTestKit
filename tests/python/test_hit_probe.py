@@ -1,6 +1,4 @@
-import importlib.util
-import json
-import math
+import importlib.util, json, math
 from pathlib import Path
 
 import pytest

@@ -4,10 +4,8 @@ JSON adapters are trusted test configuration, not code supplied by the target pa
 """
 from __future__ import annotations
 
-import hashlib
-import json
-from pathlib import Path
-from urllib.parse import urljoin, urlsplit
+import hashlib, json
+from pathlib import Path; from urllib.parse import urljoin, urlsplit
 
 
 LAYOUT_JS = r"""cfg => {

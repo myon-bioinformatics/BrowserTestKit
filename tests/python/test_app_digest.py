@@ -1,8 +1,6 @@
 """app_digest: one small page per run; thumbnails shrink to a quarter until it fits."""
-import importlib.util
-import json
+import importlib.util, json, sys
 from pathlib import Path
-import sys
 
 import pytest
 

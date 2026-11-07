@@ -5,13 +5,8 @@ Pixel differences are diagnostic only and never override platform-probe verdicts
 """
 from __future__ import annotations
 
-import argparse
-import fnmatch
-import html
-import importlib
-import json
+import argparse, fnmatch, html, importlib, json, sys
 from pathlib import Path
-import sys
 
 import platform_probe as probe
 

@@ -1,13 +1,6 @@
 """Offline contract/failure tests; never start Docker or download packages."""
-import importlib.util
-import json
-import os
-from pathlib import Path
-import subprocess
-import sys
-import tempfile
-import unittest
-from unittest import mock
+import importlib.util, json, os, subprocess, sys, tempfile, unittest
+from pathlib import Path; from unittest import mock
 
 TOOLS = Path(__file__).resolve().parents[2] / 'tools'
 

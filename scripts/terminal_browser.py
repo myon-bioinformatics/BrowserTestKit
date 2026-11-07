@@ -14,14 +14,8 @@ out of the repo keeps working unmodified.
 """
 from __future__ import annotations
 
-import argparse
-import json
-import shutil
-import signal
-import subprocess
-import sys
-from datetime import datetime, timezone
-from pathlib import Path
+import argparse, json, shutil, signal, subprocess, sys
+from datetime import datetime, timezone; from pathlib import Path
 
 try:
     import btk_events

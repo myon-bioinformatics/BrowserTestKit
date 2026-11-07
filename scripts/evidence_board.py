@@ -58,12 +58,8 @@ Stdlib only; runs under ``python -S``.
 """
 from __future__ import annotations
 
-import argparse
-import json
-import os
-import sys
-from pathlib import Path
-from typing import Union
+import argparse, json, os, sys
+from pathlib import Path; from typing import Union
 
 import btk_events
 

@@ -1,8 +1,4 @@
-import importlib.util
-import io
-import json
-import subprocess
-import sys
+import importlib.util, io, json, subprocess, sys
 from pathlib import Path
 
 import pytest

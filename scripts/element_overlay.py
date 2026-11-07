@@ -15,13 +15,8 @@ Exit codes: 0 OK; 1 assertion failure or no search match; 2 usage or input error
 """
 from __future__ import annotations
 
-import argparse
-import json
-import math
-import re
-import sys
-from decimal import Decimal, ROUND_HALF_UP, localcontext
-from typing import Any, Dict, List, Optional, Union
+import argparse, json, math, re, sys
+from decimal import Decimal, localcontext, ROUND_HALF_UP; from typing import Any, Dict, List, Optional, Union
 
 SCHEMA = "btk-element-overlay/1"
 

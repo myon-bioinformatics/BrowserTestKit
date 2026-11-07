@@ -1,6 +1,4 @@
-import os
-import subprocess
-import sys
+import os, subprocess, sys
 from pathlib import Path
 
 import pytest
