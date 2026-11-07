@@ -2,7 +2,7 @@
 
 Push and PR CI verify `vendor.lock.json` with the pinned shared `vendor_sync.py`
 tool. The primary Python job runs against the checked-in vendored bytes after
-`check`. A separate `test-locked` job removes the allowlisted files, materializes
+`check`. A separate `vendor-locked` job removes the allowlisted files, materializes
 their exact upstream commits, verifies again, and runs the same Python suite on
 that recreated snapshot. Existing documentation-only change detection is retained.
 No dedicated token, scheduled update PR, or main writeback is required. Source
@@ -32,12 +32,12 @@ JUnit work remains tracked separately in myon-bioinformatics/myon-bioinformatics
 
 ## What a green run covers
 
-The primary Python job tests the checked-in lock. `test-locked` exercises the
+The primary Python job tests the checked-in lock. `vendor-locked` exercises the
 materialize path on one representative Python version on every selected push/PR
 run. Locked evidence uses a `locked-` artifact prefix and is retained on failure.
 
 Pages/Docker continue shipping checked-in bytes; no source is written back to
-main. Green `test-locked` covers the materialize baseline on its one Python
+main. Green `vendor-locked` covers the materialize baseline on its one Python
 version, not the whole primary matrix.
 
 The pinned shared tool uses anonymous public Git fallback on HTTP 403/429 for

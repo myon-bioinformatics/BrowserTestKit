@@ -63,11 +63,11 @@ def test_evidence_expectations_match_the_test_matrices() -> None:
 
 def test_browserless_lanes_do_not_install_engines_and_gate_browser_work():
     jobs = yaml.safe_load((ROOT / '.github/workflows/ci.yml').read_text())['jobs']
-    lightweight = {'python', 'test-locked', 'node-browserless'}
+    lightweight = {'python', 'vendor-locked', 'node-browserless'}
     for name in lightweight:
         commands = '\n'.join(step.get('run', '') for step in jobs[name]['steps'])
         assert 'playwright install' not in commands, name
-    for name in ('python', 'test-locked'):
+    for name in ('python', 'vendor-locked'):
         commands = '\n'.join(step.get('run', '') for step in jobs[name]['steps'])
         assert 'uv run --locked' in commands
         assert '--group browser' not in commands
@@ -96,7 +96,7 @@ def test_direct_browser_test_imports_are_lazy_and_marked():
 
 def test_module_smoke_still_checks_noneditable_install_outside_checkout():
     jobs = yaml.safe_load((ROOT / '.github/workflows/ci.yml').read_text())['jobs']
-    for name in ('python', 'test-locked'):
+    for name in ('python', 'vendor-locked'):
         step = next(s for s in jobs[name]['steps'] if s.get('name') == 'Scripts install and run as modules (python -m)')
         assert 'cd "$RUNNER_TEMP"' in step['run']
         assert 'uv run --locked --no-dev --no-editable --project "$GITHUB_WORKSPACE" python -m btk --help' in step['run']
