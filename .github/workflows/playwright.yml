@@ -153,12 +153,35 @@ jobs:
         id: deps_check
         continue-on-error: true
         run: npx playwright install-deps --dry-run chromium firefox webkit
+      # The 114 MB of .deb downloads took 56 s of a 76 s apt step at ~2 MB/s from the mirror.
+      # Keep them in a cache that only main writes; apt still checks each file against the signed indexes.
+      - name: Restore apt downloads (written only by main)
+        if: steps.deps_check.outcome == 'failure'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/apt-archives
+          key: apt-ubuntu-24.04-node-browsers-${{ github.run_id }}
+          restore-keys: apt-ubuntu-24.04-node-browsers-
       - name: System libraries (apt, bounded; runs only when the dry run reports missing packages)
+        id: apt
         if: steps.deps_check.outcome == 'failure'
         timeout-minutes: 8
         run: |
+          archives="$RUNNER_TEMP/apt-archives"; mkdir -p "$archives/partial"
+          debs() { find "$archives" -maxdepth 1 -name '*.deb' | sort | sha256sum; }
+          before=$(debs)
+          echo "Dir::Cache::Archives \"$archives/\";" | sudo tee /etc/apt/apt.conf.d/90-ci-archives >/dev/null
           sudo DEBIAN_FRONTEND=noninteractive dpkg --configure -a
           npx playwright install-deps chromium firefox webkit
+          sudo apt-get autoclean -qq
+          sudo rm -rf "$archives/partial" "$archives/lock"; sudo chown -R "$(id -u):$(id -g)" "$archives"
+          [ "$(debs)" = "$before" ] || echo changed=true >> "$GITHUB_OUTPUT"
+      - name: Save apt downloads (main only, when they changed)
+        if: steps.apt.outputs.changed == 'true' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/apt-archives
+          key: apt-ubuntu-24.04-node-browsers-${{ github.run_id }}
       - name: Install browsers (first attempt)
         id: install_first
         continue-on-error: true
@@ -343,12 +366,34 @@ jobs:
         id: deps_check
         continue-on-error: true
         run: uv run --locked --no-dev --group browser-test python -m playwright install-deps --dry-run firefox webkit
+      # Same apt download cache as the node job (only main writes it).
+      - name: Restore apt downloads (written only by main)
+        if: steps.deps_check.outcome == 'failure'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/apt-archives
+          key: apt-ubuntu-24.04-firefox-webkit-${{ github.run_id }}
+          restore-keys: apt-ubuntu-24.04-firefox-webkit-
       - name: System libraries (apt, bounded; runs only when the dry run reports missing packages)
+        id: apt
         if: steps.deps_check.outcome == 'failure'
         timeout-minutes: 8
         run: |
+          archives="$RUNNER_TEMP/apt-archives"; mkdir -p "$archives/partial"
+          debs() { find "$archives" -maxdepth 1 -name '*.deb' | sort | sha256sum; }
+          before=$(debs)
+          echo "Dir::Cache::Archives \"$archives/\";" | sudo tee /etc/apt/apt.conf.d/90-ci-archives >/dev/null
           sudo DEBIAN_FRONTEND=noninteractive dpkg --configure -a
           uv run --locked --no-dev --group browser-test python -m playwright install-deps firefox webkit
+          sudo apt-get autoclean -qq
+          sudo rm -rf "$archives/partial" "$archives/lock"; sudo chown -R "$(id -u):$(id -g)" "$archives"
+          [ "$(debs)" = "$before" ] || echo changed=true >> "$GITHUB_OUTPUT"
+      - name: Save apt downloads (main only, when they changed)
+        if: steps.apt.outputs.changed == 'true' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/apt-archives
+          key: apt-ubuntu-24.04-firefox-webkit-${{ github.run_id }}
       - name: Install browsers (first attempt)
         id: install_first
         continue-on-error: true
