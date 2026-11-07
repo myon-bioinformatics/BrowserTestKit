@@ -1,4 +1,4 @@
-name: platform-matrix
+name: Platform matrix
 
 # Measure the same fixture on Windows, macOS and Linux x Chromium/Firefox/WebKit
 # (+ branded Chrome/Edge) x desktop/iPhone/Pixel x headless/headed, then build one

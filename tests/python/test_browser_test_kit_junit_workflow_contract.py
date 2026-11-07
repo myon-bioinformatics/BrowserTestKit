@@ -7,7 +7,7 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
-WORKFLOW = ROOT / ".github/workflows/playwright.yml"
+WORKFLOW = ROOT / ".github/workflows/ci.yml"
 COLLECTOR = (
     "myon-bioinformatics/myon-bioinformatics/.github/workflows/"
     "reusable-junit-identity.yml@9e3da7ae1846e9604ebc24bb5178f7de094a4e77"
