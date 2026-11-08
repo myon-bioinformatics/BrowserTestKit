@@ -17,7 +17,7 @@ that the browser itself renders in Meiryo (with Japanese fallbacks), so no font 
 
 Encoding follows PySaiyanWeBoo's ``tool/record_demo.py``: one shared palette (no dither, so frames never flicker), delays in
 10 ms units, looping forever, and frames written as deltas (``optimize=True``). Next to the GIF a receipt ``<name>.json``
-records every shot's status and page errors, the GIF's sha256 and the browser version, and keeps the plan itself under ``plan``,
+records every shot's status, page errors and ``generator`` (the page's ``<meta name="generator">``, e.g. ``web_ui <commit>``), the GIF's sha256 and the browser version, and keeps the plan itself under ``plan``,
 so ``--plan <name>.json`` re-records the same GIF (the receipt is the recipe).
 
 Exit codes: 0 every shot loaded without a page error or HTTP error; 1 some shot failed (the GIF is still written, ⛔ in its
@@ -212,6 +212,15 @@ def encode(frames: list, delays: list[int]) -> bytes:
     return out.getvalue()
 
 
+def page_generator(page) -> str | None:
+    """``<meta name="generator">`` of the page just loaded (PySaiyanWeBoo's web_ui writes ``web_ui <commit>``), so the
+    receipt says which generator drew what the GIF shows; None when the page has none."""
+    with contextlib.suppress(Exception):
+        content = page.evaluate("() => document.querySelector('meta[name=generator]')?.content ?? null")
+        return content[:120] if isinstance(content, str) else None
+    return None
+
+
 def record(out: Path, shots: list[dict], *, serve_dir: Path | None = None, width: int = 720, height: int = 480,
            sha: str | None = None, plan: list | None = None, maps: list[tuple[str, Path]] | None = None) -> dict:
     """Run every shot in Chromium, write ``out`` (GIF) and ``out.with_suffix('.json')`` (receipt); returns the receipt."""
@@ -228,6 +237,7 @@ def record(out: Path, shots: list[dict], *, serve_dir: Path | None = None, width
                 page.set_default_timeout(10000)            # a missing selector fails the shot in 10 s, not Playwright's 30 s
                 errors: list[str] = []
                 external: list[str] = []
+                generator = None
                 if shot["url"].startswith("/"):
                     context.route(lambda u: not is_local(u), route_handler(maps or [], external))
                 page.on("pageerror", lambda exc, errs=errors: errs.append(f"pageerror: {exc}"[:300]))
@@ -238,6 +248,7 @@ def record(out: Path, shots: list[dict], *, serve_dir: Path | None = None, width
                     if response is not None and response.status >= 400:
                         errors.append(f"http {response.status}")
                     page.wait_for_timeout(600)
+                    generator = page_generator(page)
                     pngs.append(("", page.screenshot(type="png")))
                     for step in shot["steps"]:
                         done.append(run_step(page, step))
@@ -257,7 +268,7 @@ def record(out: Path, shots: list[dict], *, serve_dir: Path | None = None, width
                     context.close()
                 results.append({"label": shot["label"], "url": shot["url"], "viewport": f"{w}x{h}", "steps": done,
                                 "status": "pass" if ok else "fail", "errors": errors, "allowed": allowed,
-                                "external": sorted(set(external))})
+                                "external": sorted(set(external)), "generator": generator})
             version = browser.version
         finally:
             browser.close()

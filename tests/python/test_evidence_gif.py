@@ -43,7 +43,7 @@ def test_records_frames_and_receipt(tmp_path):
     from PIL import Image, ImageSequence
     site = tmp_path / "site"
     site.mkdir()
-    (site / "index.html").write_text("<h1>ok</h1><button id=b onclick=\"this.textContent='done'\">go</button><select id=s><option>a<option>b</select><img src='https://example.invalid/x.png'><link rel=stylesheet href='https://cdn.example.test/pin/site.css'>", encoding="utf-8")
+    (site / "index.html").write_text("<meta name=generator content='web_ui " + "a" * 40 + "'><h1>ok</h1><button id=b onclick=\"this.textContent='done'\">go</button><select id=s><option>a<option>b</select><img src='https://example.invalid/x.png'><link rel=stylesheet href='https://cdn.example.test/pin/site.css'>", encoding="utf-8")
     (site / "broken.html").write_text("<script>throw new Error('boom')</script>", encoding="utf-8")
     cdn = tmp_path / "cdn"
     cdn.mkdir()
@@ -58,6 +58,7 @@ def test_records_frames_and_receipt(tmp_path):
     assert any("boom" in e for e in receipt["shots"][2]["errors"]) and "http 404" in receipt["shots"][3]["errors"]
     assert receipt["shots"][1]["steps"] == ["click #b", "select #s → b"]
     assert receipt["shots"][0]["external"] == ["https://example.invalid/x.png"]       # refused, listed, not a failure
+    assert receipt["shots"][0]["generator"] == "web_ui " + "a" * 40 and receipt["shots"][2]["generator"] is None
     assert receipt["mapped"] == ["https://cdn.example.test/pin/"]                      # mapped CSS: served locally, not external and receipt["commit"] == "0" * 40
     frames = list(ImageSequence.Iterator(Image.open(out)))
     assert len(frames) == receipt["frames"] == 6 and frames[0].size == (720, 512)

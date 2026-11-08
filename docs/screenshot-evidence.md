@@ -182,6 +182,8 @@ records a plan of shots (page × viewport × steps: `click`, `fill`, `select`, `
 - ⛔ A page error, console error (with its URL) or HTTP ≥ 400 fails the shot; `"allow": ["text"]` keeps
   errors a fixture raises on purpose (a deliberately wrong SRI hash) under `allowed` instead. Exit 1 still
   writes the GIF so the failure can be seen.
+- 🏷️ Each shot records the page's `<meta name="generator">` as `generator` (PySaiyanWeBoo's `web_ui` writes
+  `web_ui <commit>`), so the receipt says which generator drew what the GIF shows.
 - 🧾 The receipt holds the GIF's sha256, frames, browser version, tested commit, per-shot results and the
   plan itself, so `--plan docs/evidence/browser.json` re-records the same GIF.
 
