@@ -5,11 +5,11 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT / "tools"))
 
 import btk  # noqa: E402
 
-SCRIPT = ROOT / "scripts" / "btk.py"
+SCRIPT = ROOT / "tools" / "btk.py"
 ENV = {"os": "linux", "browser": "chromium", "profile": "desktop", "headless": True}
 
 

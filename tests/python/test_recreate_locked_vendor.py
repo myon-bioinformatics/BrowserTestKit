@@ -16,7 +16,7 @@ spec.loader.exec_module(recreate)
 def test_fresh_materialization_is_verified_before_any_checkout_replacement(tmp_path, monkeypatch, failure):
     root = tmp_path / "checkout"
     root.mkdir()
-    files = {"scripts/helper.py": b"locked helper\n", "scripts/helper-LICENSE": b"locked license\n"}
+    files = {"tools/helper.py": b"locked helper\n", "tools/helper-LICENSE": b"locked license\n"}
     for name, data in files.items():
         path = root / name
         path.parent.mkdir(parents=True, exist_ok=True)

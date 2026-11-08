@@ -10,11 +10,11 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT / "tools"))
 
 import btk  # noqa: E402
 
-SCRIPT = ROOT / "scripts" / "btk.py"
+SCRIPT = ROOT / "tools" / "btk.py"
 
 PAGE = """<!doctype html><meta charset="utf-8"><title>frames fixture</title>
 <iframe name="inner" srcdoc="&lt;button&gt;inside&lt;/button&gt;"></iframe>

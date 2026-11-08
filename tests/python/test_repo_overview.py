@@ -314,7 +314,7 @@ def test_shared_inventory_sort_and_truncation_are_not_hidden(tmp_path: Path, mon
 
 
 def test_vendored_gh_identity_matches_pinned_lock() -> None:
-    entry = _locked('scripts/gh_identity.py')
+    entry = _locked('tools/gh_identity.py')
     data = (ROOT / entry['destination']).read_bytes()
     assert hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest() == entry['blob_sha']
     assert hashlib.sha256(data).hexdigest() == entry['sha256']
@@ -392,24 +392,24 @@ def test_stats_truncates_to_top_15_extensions(tmp_path: Path) -> None:
 
 def test_churn_counts_commits_added_deleted_and_last_date(tmp_path: Path) -> None:
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True, env=git_env())
-    commit_file(tmp_path, "scripts/a.py", "print(1)\n", "2026-01-01T00:00:00+0000")
-    commit_file(tmp_path, "scripts/a.py", "print(1)\nprint(2)\n", "2026-02-01T00:00:00+0000")
-    commit_file(tmp_path, "scripts/b.py", "print('b')\n", "2026-03-01T00:00:00+0000")
+    commit_file(tmp_path, "tools/a.py", "print(1)\n", "2026-01-01T00:00:00+0000")
+    commit_file(tmp_path, "tools/a.py", "print(1)\nprint(2)\n", "2026-02-01T00:00:00+0000")
+    commit_file(tmp_path, "tools/b.py", "print('b')\n", "2026-03-01T00:00:00+0000")
     assert repo_overview.churn(tmp_path, 5).splitlines() == [
         "=== churn (3 commits scanned) ===",
-        "  2 commits  +2/-0  2026-02-01  scripts/a.py",
-        "  1 commit  +1/-0  2026-03-01  scripts/b.py",
+        "  2 commits  +2/-0  2026-02-01  tools/a.py",
+        "  1 commit  +1/-0  2026-03-01  tools/b.py",
     ]
 
 
 def test_churn_skips_binary_numstat(tmp_path: Path) -> None:
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True, env=git_env())
-    commit_file(tmp_path, "scripts/a.py", "print(1)\n", "2026-01-01T00:00:00+0000")
+    commit_file(tmp_path, "tools/a.py", "print(1)\n", "2026-01-01T00:00:00+0000")
     commit_file(tmp_path, "assets/logo.png", b"\x89PNG\x00\x01", "2026-01-02T00:00:00+0000")
     out = repo_overview.churn(tmp_path, 5)
     assert out.splitlines()[0] == "=== churn (2 commits scanned) ==="
     assert "logo.png" not in out
-    assert "scripts/a.py" in out
+    assert "tools/a.py" in out
 
 
 def test_churn_truncates_to_top_n_and_notes_remainder(tmp_path: Path) -> None:

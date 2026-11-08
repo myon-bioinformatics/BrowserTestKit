@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def load(name):
-    spec = importlib.util.spec_from_file_location(name, ROOT / 'scripts' / (name + '.py'))
+    spec = importlib.util.spec_from_file_location(name, ROOT / 'tools' / (name + '.py'))
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -102,7 +102,7 @@ def test_python_expected_url_decisions(url, expected):
 @pytest.mark.skipif(shutil.which('node') is None, reason='node unavailable')
 def test_node_expected_decisions_and_native_parser_agree():
     cases = [[[step(url)]] for url in VALID + INVALID]
-    actual = node_calls(ROOT / 'scripts/route_trail_node.mjs', 'validateSteps', cases)
+    actual = node_calls(ROOT / 'tools/route_trail_node.mjs', 'validateSteps', cases)
     assert [r['ok'] for r in actual] == [True]*len(VALID) + [False]*len(INVALID)
     # An independent implementation checks the positive oracle is browser-parseable.
     parsed = subprocess.run(['node', '--input-type=module', '-e',
@@ -119,7 +119,7 @@ def test_port_boundaries_have_expected_decisions_in_python_and_node():
                 for port in (0, 1, 65534, 65535, 65536, 99999)]
     cases = [[[step(u)]] for u in urls]
     for results in (python_calls(trail.validate_steps, cases),
-                    node_calls(ROOT / 'scripts/route_trail_node.mjs', 'validateSteps', cases)):
+                    node_calls(ROOT / 'tools/route_trail_node.mjs', 'validateSteps', cases)):
         assert [r['ok'] for r in results] == expected
 
 
@@ -145,7 +145,7 @@ def test_invalid_later_step_prevents_python_navigation_and_process(monkeypatch, 
 @pytest.mark.skipif(shutil.which('node') is None, reason='node unavailable')
 def test_invalid_later_step_prevents_node_navigation():
     script = """
-import {walk,walkSteps} from './scripts/route_trail_node.mjs';
+import {walk,walkSteps} from './tools/route_trail_node.mjs';
 let calls=0;
 const page={goto(){calls++;throw Error('navigation called');}};
 for(const url of JSON.parse(process.argv[1])){

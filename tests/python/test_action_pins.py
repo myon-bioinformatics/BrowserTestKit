@@ -34,11 +34,11 @@ def test_python_compatibility_lanes_keep_their_executable_support_checks():
     commands = '\n'.join(step.get('run', '') for step in jobs['stdlib']['steps'])
     assert 'python -S -m unittest discover -s tests/stdlib' in commands
     assert 'uv pip install --no-deps .' in commands
-    assert 'python -S scripts/image_diff.py --help' in commands
+    assert 'python -S tools/image_diff.py --help' in commands
     floor = jobs['development-floor']['steps']
     assert next(step for step in floor if step.get('uses', '').startswith('astral-sh/setup-uv@'))['with']['python-version'] == '3.11'
     assert any(step.get('run') == 'uv sync --locked --all-groups' for step in floor)
-    assert any(step.get('run') == 'python -S scripts/image_diff.py --help' for step in floor)
+    assert any(step.get('run') == 'python -S tools/image_diff.py --help' for step in floor)
 
 
 def test_node_execution_lanes_keep_node_26():

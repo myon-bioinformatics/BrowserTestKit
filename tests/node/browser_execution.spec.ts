@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 let explore, choice;
 test.beforeAll(async () => {
   ({ explore, choice } = await new Function('url', 'return import(url)')(
-    pathToFileURL(resolve('scripts/browser_execution.mjs')).href));
+    pathToFileURL(resolve('tools/browser_execution.mjs')).href));
 });
 const seedFor = (index: number) => {
   for (let seed = 0; seed < 1000; seed++) {

@@ -1,4 +1,4 @@
-// btk.py の Node 入口（vendor/py_launch.cjs と scripts/page_inspect.cjs）を確かめる。ブラウザは使わない。
+// btk.py の Node 入口（vendor/py_launch.cjs と tools/page_inspect.cjs）を確かめる。ブラウザは使わない。
 import test from "node:test";
 import assert from "node:assert/strict";
 import {spawnSync} from "node:child_process";
@@ -17,8 +17,8 @@ function pythonBin() {
 
 const python = pythonBin();
 const env = {...process.env, BTK_PYTHON: python};
-const LAUNCH = ["vendor/py_launch.cjs", "--env-var", "BTK_PYTHON", "--site", "scripts/btk.py"];
-const ENTRIES = [["py_launch", LAUNCH], ["page_inspect.cjs", ["scripts/page_inspect.cjs"]]];
+const LAUNCH = ["vendor/py_launch.cjs", "--env-var", "BTK_PYTHON", "--site", "tools/btk.py"];
+const ENTRIES = [["py_launch", LAUNCH], ["page_inspect.cjs", ["tools/page_inspect.cjs"]]];
 
 test("help goes through btk.py for both Node entries", () => {
   for (const [label, prefix] of ENTRIES) {
@@ -28,7 +28,7 @@ test("help goes through btk.py for both Node entries", () => {
   }
 });
 
-test("locate through Node matches python -S scripts/btk.py", () => {
+test("locate through Node matches python -S tools/btk.py", () => {
   const directory = mkdtempSync(join(tmpdir(), "page-inspect-"));
   const snapshot = join(directory, "observe.json");
   const body = {
@@ -39,7 +39,7 @@ test("locate through Node matches python -S scripts/btk.py", () => {
   };
   writeFileSync(snapshot, `${JSON.stringify(body)}\n`);
   const args = ["locate", snapshot, "--query", "Save draft", "--unique", "--json"];
-  const py = spawnSync(python, ["-S", "scripts/btk.py", ...args], {encoding: "utf8"});
+  const py = spawnSync(python, ["-S", "tools/btk.py", ...args], {encoding: "utf8"});
   assert.equal(py.status, 0, py.stderr);
   for (const [label, prefix] of ENTRIES) {
     const node = spawnSync(process.execPath, [...prefix, ...args], {encoding: "utf8", env});

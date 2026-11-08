@@ -10,8 +10,8 @@ import json
 import sys
 from pathlib import Path
 
-# gh_ops is vendored under scripts/ (see vendor.lock.json).
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
+# gh_ops is vendored under tools/ (see vendor.lock.json).
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import gh_ops  # noqa: E402
 
 MAX_BYTES = 60_000

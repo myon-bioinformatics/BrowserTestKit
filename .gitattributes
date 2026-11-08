@@ -1,8 +1,8 @@
-scripts/myon-bioinformatics-LICENSE -text
+tools/myon-bioinformatics-LICENSE -text
 tests/vendor/xprobe/xprobe.py -text
 tests/vendor/xprobe/LICENSE -text
-scripts/gh_identity.py -text
-scripts/gh_identity-LICENSE -text
+tools/gh_identity.py -text
+tools/gh_identity-LICENSE -text
 vendor/pillow_min/pillow_min.py -text
 vendor/pillow_min/Ironmate-LICENSE -text
 # js-adopt: SRI hashes the exact bytes; never convert line endings of adopted files (Windows core.autocrlf).

@@ -1,6 +1,6 @@
 // Measured input and side-effect observation for an existing Playwright Page.
 // No runtime dependency on import: the caller owns Page, Locator and Playwright.
-// Python twin: scripts/interaction.py (same records, same rules).
+// Python twin: tools/interaction.py (same records, same rules).
 
 // Same float operations as interaction.py _round (Math.round and Python round() differ on ties).
 const round = (v) => Math.floor(v * 1000 + 0.5) / 1000;
@@ -63,7 +63,7 @@ const storage = (page) => page.evaluate(() => {
 // uncaught errors, popups and Web Storage changes (key count + content
 // fingerprint, no raw values). Dialogs are dismissed.
 // Assert late: keep the record as JSON and check it at the end (or with
-// `python -S scripts/interaction.py check record.json`).
+// `python -S tools/interaction.py check record.json`).
 export async function watch(page, {dismissDialogs = true} = {}) {
   const seen = {requests: [], dialogs: [], page_errors: [], popups: []};
   const handlers = {

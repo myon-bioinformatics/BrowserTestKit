@@ -7,7 +7,7 @@ from pathlib import Path
 from types import SimpleNamespace
 import pytest
 ROOT=Path(__file__).resolve().parents[2]
-spec=importlib.util.spec_from_file_location('trail_execution',ROOT/'scripts/route_trail.py')
+spec=importlib.util.spec_from_file_location('trail_execution',ROOT/'tools/route_trail.py')
 m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
 CATALOG=json.loads((ROOT/'fixtures/route_trail_execution.json').read_text())
 REG=m.load_registry(json.dumps(CATALOG))

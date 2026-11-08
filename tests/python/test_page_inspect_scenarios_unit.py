@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT / "tools"))
 import btk as api
 import page_inspect_scenarios as scenario
 
@@ -44,7 +44,7 @@ def test_coverage_relations_and_cli_bad_flags():
     assert api.evidence_relation(a, api._section("test", "complete_within_window", {"case": "offline"})) == "same"
     assert api.evidence_relation(a, api._section("test", "complete", {"case": "latency"})) == "different"
     assert api.evidence_relation(a, api._section("test", "truncated", {"case": "offline"})) == "unknown"
-    cmd = [sys.executable, "-S", str(ROOT / "scripts/btk.py"), "scenario",
+    cmd = [sys.executable, "-S", str(ROOT / "tools/btk.py"), "scenario",
            "http://127.0.0.1:9/page", "--case", "display", "--viewport", "9999x9999", "--json"]
     proc = subprocess.run(cmd, capture_output=True, text=True)
     assert proc.returncode == 2

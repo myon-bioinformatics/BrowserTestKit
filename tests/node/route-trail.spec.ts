@@ -9,12 +9,12 @@ let walkSteps, walk, TrailExecutionError;
 test.beforeAll(async () => {
   // Native import avoids the CommonJS test runner transforming the ESM asset.
   ({walkSteps, walk, TrailExecutionError} = await new Function('url', 'return import(url)')(
-    pathToFileURL(resolve('scripts/route_trail_node.mjs')).href));
+    pathToFileURL(resolve('tools/route_trail_node.mjs')).href));
 });
 
 const base = pathToFileURL(resolve('fixtures/route_trail_delayed.html')).href;
 function plan(trail = '@home → @hub → @world → @home') {
-  const child = spawnSync('python', ['-S', 'scripts/route_trail.py', trail, '--registry',
+  const child = spawnSync('python', ['-S', 'tools/route_trail.py', trail, '--registry',
     'fixtures/route_trail_execution.json', '--base', base, '--json'], {encoding:'utf8'});
   expect(child.status, child.stderr).toBe(0);
   return JSON.parse(child.stdout);
@@ -71,7 +71,7 @@ test('Python CLI executes one Node worker with the same receipt contract', async
   const require = createRequire(resolve(consumer, 'package.json'));
   expect(() => require.resolve('playwright')).toThrow();
   let child;
-  try { child = spawnSync('python', ['-S', 'scripts/route_trail.py', '🏠 ↔ 🌍',
+  try { child = spawnSync('python', ['-S', 'tools/route_trail.py', '🏠 ↔ 🌍',
     '--registry', 'fixtures/route_trail_execution.json', '--base', base,
     '--run', '--backend', 'node', '--node-cwd', consumer, '--browser', browserName, '--json'],
     {encoding:'utf8',timeout:30000}); }

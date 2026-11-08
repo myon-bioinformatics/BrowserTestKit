@@ -13,7 +13,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / "tests" / "fixtures" / "image_diff"
 GOLDEN = json.loads((FIXTURES / "golden.json").read_text(encoding="utf-8"))
-SCRIPT = ROOT / "scripts" / "image_diff.py"
+SCRIPT = ROOT / "tools" / "image_diff.py"
 PILLOW_MIN = ROOT / "vendor" / "pillow_min" / "pillow_min.py"
 spec = importlib.util.spec_from_file_location("image_diff", SCRIPT)
 image_diff = importlib.util.module_from_spec(spec)

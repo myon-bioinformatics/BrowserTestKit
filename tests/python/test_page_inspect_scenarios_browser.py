@@ -47,7 +47,7 @@ def url():
 
 
 def run(url, *flags):
-    proc = subprocess.run([sys.executable, "scripts/btk.py", "scenario", url,
+    proc = subprocess.run([sys.executable, "tools/btk.py", "scenario", url,
                            "--browser", "chromium", *flags, "--json"],
                           cwd=ROOT, capture_output=True, text=True, timeout=90)
     assert proc.returncode == 0, proc.stdout + proc.stderr
@@ -124,7 +124,7 @@ def test_profile_environment_matches_context(url, profile, explicit):
 @pytest.mark.parametrize("explicit", [False, True])
 def test_native_window_configuration_is_accepted(explicit):
     # Headless launch also validates the headed context kwargs without an X server.
-    sys.path.insert(0, str(ROOT / "scripts"))
+    sys.path.insert(0, str(ROOT / "tools"))
     from types import SimpleNamespace
     from playwright.sync_api import sync_playwright
     import btk as api

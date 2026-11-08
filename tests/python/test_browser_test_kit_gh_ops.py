@@ -9,17 +9,17 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_canonical_module_imports_with_adjacent_identity():
-    spec = importlib.util.spec_from_file_location('consumer_gh_ops', ROOT / 'scripts/gh_ops.py')
+    spec = importlib.util.spec_from_file_location('consumer_gh_ops', ROOT / 'tools/gh_ops.py')
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
-    assert Path(module.gh_identity.__file__).resolve() == ROOT / 'scripts/gh_identity.py'
+    assert Path(module.gh_identity.__file__).resolve() == ROOT / 'tools/gh_identity.py'
     assert callable(module.pr_status)
     assert callable(module.checks_status)
 
 
 def test_canonical_cli_help_works_without_site_packages_or_credentials(tmp_path):
-    result = subprocess.run([sys.executable, '-S', str(ROOT / 'scripts/gh_ops.py'), '--help'],
+    result = subprocess.run([sys.executable, '-S', str(ROOT / 'tools/gh_ops.py'), '--help'],
                             cwd=tmp_path, capture_output=True, text=True, timeout=30)
     assert result.returncode == 0
     assert 'usage:' in result.stdout.lower()
@@ -28,7 +28,7 @@ def test_canonical_cli_help_works_without_site_packages_or_credentials(tmp_path)
 
 def test_gh_ops_is_a_locked_parent_dependency():
     lock = json.loads((ROOT / 'vendor.lock.json').read_text())
-    entries = [e for e in lock['files'] if e['destination'] == 'scripts/gh_ops.py']
+    entries = [e for e in lock['files'] if e['destination'] == 'tools/gh_ops.py']
     assert len(entries) == 1
     assert entries[0]['repository'] == 'myon-bioinformatics/myon-bioinformatics'
     assert entries[0]['source'] == 'gh_ops.py'
@@ -63,7 +63,7 @@ receipt = gh_ops.git_push(cwd=sys.argv[2], write=False, timeout=10)
 assert calls == ['branch', 'check-ref-format', 'rev-parse', 'remote']
 print(json.dumps(receipt))
 """
-    result = subprocess.run([sys.executable, "-S", "-c", code, str(ROOT / 'scripts'), str(tmp_path)],
+    result = subprocess.run([sys.executable, "-S", "-c", code, str(ROOT / 'tools'), str(tmp_path)],
                             capture_output=True, text=True, timeout=20)
     assert result.returncode == 0, result.stderr
     receipt = json.loads(result.stdout)

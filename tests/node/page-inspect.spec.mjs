@@ -30,7 +30,7 @@ test("the Node CLI observes Chromium through the Python bridge", async ({}, test
     const port = server.address().port;
     const run = await new Promise((resolvePromise) => {
       const child = spawn(process.execPath, [
-        "vendor/py_launch.cjs", "--env-var", "BTK_PYTHON", "--site", "scripts/btk.py", "observe", `http://127.0.0.1:${port}/page`, "--browser", "chromium", "--json",
+        "vendor/py_launch.cjs", "--env-var", "BTK_PYTHON", "--site", "tools/btk.py", "observe", `http://127.0.0.1:${port}/page`, "--browser", "chromium", "--json",
       ], {env: {...process.env, BTK_PYTHON: python}});
       let stdout = "";
       let stderr = "";

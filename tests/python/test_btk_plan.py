@@ -3,7 +3,7 @@ import importlib.util
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-spec = importlib.util.spec_from_file_location("btk", ROOT / "scripts" / "btk.py")
+spec = importlib.util.spec_from_file_location("btk", ROOT / "tools" / "btk.py")
 pip = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(pip)
 

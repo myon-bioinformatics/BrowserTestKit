@@ -43,11 +43,11 @@ browser = { requires-python = ">=3.11" }
 browser-test = { requires-python = ">=3.11" }
 
 [tool.setuptools]
-# Every scripts/*.py becomes a top-level module (src-layout discovery), so
+# Every tools/*.py becomes a top-level module (src-layout discovery), so
 # `python -m btk ...` works from any directory after installation.
-package-dir = { "" = "scripts" }
+package-dir = { "" = "tools" }
 
 [tool.setuptools.data-files]
-"share/browser-test-kit" = ["scripts/route_trail_node.mjs", "scripts/interaction.mjs", "scripts/hit_probe.mjs", "scripts/element_overlay.mjs", "scripts/page_inspect.cjs", "scripts/mirror_facts.mjs"]
+"share/browser-test-kit" = ["tools/route_trail_node.mjs", "tools/interaction.mjs", "tools/hit_probe.mjs", "tools/element_overlay.mjs", "tools/page_inspect.cjs", "tools/mirror_facts.mjs"]
 
 "share/browser-test-kit/pillow_min" = ["vendor/pillow_min/pillow_min.py", "vendor/pillow_min/Ironmate-LICENSE"]

@@ -3,7 +3,7 @@
 ## Built-in Git-aware path selection
 
 ```sh
-python -S tools/repo_overview.py . --paths-only --match 'scripts/*probe*' --match '*.toml' --json
+python -S tools/repo_overview.py . --paths-only --match 'tools/*probe*' --match '*.toml' --json
 python -S tools/repo_overview.py . --paths-only --match '*.py' --exclude 'tests/*'
 ```
 
@@ -54,7 +54,7 @@ replace `../xprobe/xprobe.py` with that checkout's path. They use Python's
 standard library and work with `python -S`.
 
 ```sh
-python -S ../xprobe/xprobe.py --symbols . --include 'scripts/*.py' --symbol-pattern '*probe*' --symbol-pattern '*capture*' --symbol-pattern '*validate*' --brief
+python -S ../xprobe/xprobe.py --symbols . --include 'tools/*.py' --symbol-pattern '*probe*' --symbol-pattern '*capture*' --symbol-pattern '*validate*' --brief
 python -S ../xprobe/xprobe.py --discover --root . --include '*.yml' --include '*.toml' --include-hidden --brief
 ```
 
@@ -84,9 +84,9 @@ On 2026-10-21 at `75d736d26f6752ff7bc1436ae414f6578e321f43`, the first command p
 truncation. Examples:
 
 - `tools/btk_events.py`: `validate`
-- `scripts/gh_identity.py`: `validate_repository_metadata_v1`
-- `scripts/gh_ops.py`: `_validate_branch_name`
-- `scripts/gh_ops.py`: `_validate_branch_segment`
+- `tools/gh_identity.py`: `validate_repository_metadata_v1`
+- `tools/gh_ops.py`: `_validate_branch_name`
+- `tools/gh_ops.py`: `_validate_branch_segment`
 
 The second command selected 7 YAML/TOML files at the same revision.
 These are observations for that snapshot, not future expected counts. Full

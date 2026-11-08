@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-spec = importlib.util.spec_from_file_location("btk", ROOT / "scripts" / "btk.py")
+spec = importlib.util.spec_from_file_location("btk", ROOT / "tools" / "btk.py")
 btk = importlib.util.module_from_spec(spec)
 assert spec.loader
 spec.loader.exec_module(btk)
@@ -140,7 +140,7 @@ def test_cli_offline_commands_match_the_library(tmp_path: Path):
     )
     path = tmp_path / "survey.json"
     path.write_text(btk.dumps(survey), encoding="utf-8")
-    script = ROOT / "scripts" / "btk.py"
+    script = ROOT / "tools" / "btk.py"
 
     def run(args):
         return subprocess.run([sys.executable, "-S", str(script), *args], cwd=tmp_path, capture_output=True, text=True, timeout=30)
@@ -187,7 +187,7 @@ def test_loopback_policy_and_evidence_do_not_treat_missing_as_same():
     finger = btk.storage_fingerprint("secret-value")
     assert finger["fingerprint_version"] == 2 and "secret-value" not in json.dumps(finger)
     # Passive observation and Chromium settle use CDP without page evaluation.
-    source = (ROOT / "scripts" / "btk.py").read_text(encoding="utf-8")
+    source = (ROOT / "tools" / "btk.py").read_text(encoding="utf-8")
     assert ".evaluate(" not in source
 
 
