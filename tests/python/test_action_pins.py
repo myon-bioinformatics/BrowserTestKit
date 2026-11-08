@@ -29,7 +29,7 @@ def test_all_remote_workflow_actions_and_reusable_jobs_pin_full_sha(path):
 
 
 def test_python_compatibility_lanes_keep_their_executable_support_checks():
-    jobs = yaml.safe_load((ROOT / '.github/workflows/python-support.yml').read_text())['jobs']
+    jobs = yaml.safe_load((ROOT / '.github/workflows/runtime-compatibility.yml').read_text())['jobs']
     assert jobs['stdlib']['strategy']['matrix']['python'] == ['3.9', '3.10']
     commands = '\n'.join(step.get('run', '') for step in jobs['stdlib']['steps'])
     assert 'python -S -m unittest discover -s tests/stdlib' in commands
@@ -42,7 +42,7 @@ def test_python_compatibility_lanes_keep_their_executable_support_checks():
 
 
 def test_node_execution_lanes_keep_node_26():
-    jobs = yaml.safe_load((ROOT / '.github/workflows/playwright.yml').read_text())['jobs']
+    jobs = yaml.safe_load((ROOT / '.github/workflows/ci.yml').read_text())['jobs']
     for name in ('node', 'node-browserless'):
         setup = next(step for step in jobs[name]['steps'] if step.get('uses', '').startswith('actions/setup-node@'))
         assert setup['with']['node-version'] == '26'

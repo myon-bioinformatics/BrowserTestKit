@@ -7,7 +7,7 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
-WORKFLOW = ROOT / ".github/workflows/playwright.yml"
+WORKFLOW = ROOT / ".github/workflows/ci.yml"
 COLLECTOR = (
     "myon-bioinformatics/myon-bioinformatics/.github/workflows/"
     "reusable-junit-identity.yml@9e3da7ae1846e9604ebc24bb5178f7de094a4e77"
@@ -52,7 +52,7 @@ def _assert_contract(workflow):
         assert upload["with"]["path"].strip() == path
         assert upload["with"]["if-no-files-found"] == "error"
         assert upload["with"]["retention-days"] == 14
-    collector = workflow["jobs"]["junit-identity"]
+    collector = workflow["jobs"]["failure-identity"]
     assert collector["needs"] == ["changes", "python", "node-browserless", "python-browser", "python-browser-optional"]
     assert collector["if"] == (
         "always() && needs.changes.outputs.product_changed == 'true'"
@@ -86,7 +86,7 @@ def test_failure_evidence_contract_rejects_unsafe_mutations():
     run_index = producer["steps"].index(_step(producer, "Run Python tests with JUnit"))
     job_path = ("jobs", "python")
     run_path = job_path + ("steps", run_index)
-    collector_path = ("jobs", "junit-identity")
+    collector_path = ("jobs", "failure-identity")
     mutations = [
         ("job masks failure", job_path + ("continue-on-error",), True),
         ("step masks failure", run_path + ("continue-on-error",), True),

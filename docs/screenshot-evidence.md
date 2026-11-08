@@ -15,7 +15,7 @@ and framework scroll adapters in the owning application.
   `stage: "complete"` receipt and validates every complete PNG record, including
   retries. Optional recorded dimensions must match the PNG.
 - `tests/node/smoke.spec.ts`, `tests/python/test_smoke.py` and
-  `.github/workflows/playwright.yml`: working Node/Python reference lanes.
+  `.github/workflows/ci.yml`: working Node/Python reference lanes.
 - [btk-event/1](evidence-events.md): optional event stream and evidence board.
   Its stage/status vocabulary is separate from the screenshot receipt's
   `stage: "complete"`; do not interchange those formats.

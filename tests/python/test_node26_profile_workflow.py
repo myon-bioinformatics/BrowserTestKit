@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_live_browser_workflow_keeps_pins_and_exact_node26_guards():
-    workflow = yaml.safe_load((ROOT / '.github/workflows/playwright.yml').read_text())
+    workflow = yaml.safe_load((ROOT / '.github/workflows/ci.yml').read_text())
     step = next(s for s in workflow['jobs']['node']['steps']
                 if s.get('name') == 'Prepare and install the fixed 30-package Node browser environment')
     assert step['env'] == {

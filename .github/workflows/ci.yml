@@ -1,4 +1,4 @@
-name: playwright-prototype
+name: CI
 on:
   pull_request:
   push:
@@ -40,7 +40,7 @@ jobs:
           retention-days: 14
 
   node:
-    needs: [changes, python, node-browserless, test-locked]
+    needs: [changes, python, node-browserless, vendor-locked]
     if: needs.changes.outputs.product_changed == 'true'
     runs-on: ubuntu-24.04
     steps:
@@ -252,7 +252,7 @@ jobs:
 
   python-browser:
     name: Python browser integration (Chromium)
-    needs: [changes, python, node-browserless, test-locked]
+    needs: [changes, python, node-browserless, vendor-locked]
     if: needs.changes.outputs.product_changed == 'true'
     permissions:
       contents: read
@@ -324,7 +324,7 @@ jobs:
 
   python-browser-optional:
     name: Python browser integration (Firefox and WebKit)
-    needs: [changes, python, node-browserless, test-locked]
+    needs: [changes, python, node-browserless, vendor-locked]
     if: needs.changes.outputs.product_changed == 'true'
     permissions:
       contents: read
@@ -387,7 +387,8 @@ jobs:
             !test-results/controlled-failure/**
           if-no-files-found: error
 
-  test-locked:
+  vendor-locked:
+    name: Vendor locked baseline
     permissions:
       contents: read
     needs: changes
@@ -448,11 +449,10 @@ jobs:
         path: build/vendor-evidence-locked
         if-no-files-found: error
         retention-days: 14
-    name: Locked baseline
     timeout-minutes: 20
 
 
-  junit-identity:
+  failure-identity:
     needs: [changes, python, node-browserless, python-browser, python-browser-optional]
     if: always() && needs.changes.outputs.product_changed == 'true'
     permissions:
