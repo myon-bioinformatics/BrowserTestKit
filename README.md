@@ -1,4 +1,4 @@
-# browser-test-kit
+# BrowserTestKit
 
 <img src="docs/assets/brand/validation-buddy.png" alt="Validation Buddy: browser, desktop, and mobile inputs leading to screenshot validation" width="191" height="212">
 
@@ -138,7 +138,7 @@ repair status; the first record covers flutter_navigation_basic PR #128 (merged)
 
 ### Provenance
 
-The initial rules were distilled from working patterns and incidents in `mcp-toolcall-lab`, `flutter_navigation_basic`, `web-ui`, `markdown`, and `Ironmate`.
+The initial rules were distilled from working patterns and incidents in `mcp-toolcall-lab`, `flutter_navigation_basic`, `PySaiyanWeBoo`, `markdown`, and `Ironmate`.
 
 Notable portable lessons include WebKit producing a PNG before a non-zero shutdown, browser-config/install parity tests, exact Playwright CLI argv regression tests, staged visual-regression rollout, `python -m playwright screenshot` for simple Python CLI capture, and keeping Stagehand separate from deterministic Playwright.
 
@@ -248,7 +248,7 @@ python -m element_overlay --file elements.json --format css
 
 ### Page observe, locate, and act (`scripts/btk.py`)
 
-Separate commands for a loopback page: passive observe, offline locate, and one declared action. The design follows REA's browser observation notes (morluto/rea, MIT), not that project's server. See [REA observation](docs/rea-observation.md). Later phases stay on [issue 117](https://github.com/myon-bioinformatics/browser-test-kit/issues/117).
+Separate commands for a loopback page: passive observe, offline locate, and one declared action. The design follows REA's browser observation notes (morluto/rea, MIT), not that project's server. See [REA observation](docs/rea-observation.md). Later phases stay on [issue 117](https://github.com/myon-bioinformatics/BrowserTestKit/issues/117).
 
 ```bash
 python scripts/btk.py observe http://127.0.0.1:8765/page --json --out observe.json
