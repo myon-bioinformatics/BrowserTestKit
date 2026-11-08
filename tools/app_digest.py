@@ -51,15 +51,20 @@ def _cells(records):
     return cells
 
 
+_PAGE_CSS = ".ui-table th,.ui-table td{text-align:center}.ui-table td img{display:block;margin:0 auto .25rem}.ui-table small{color:var(--ui-muted)}"
+
+
 def _page(pages, envs, cells, tiles, encode, tile, run_url):
-    head = ''.join(f'<th>{html.escape(e)}</th>' for e in envs)
+    """The digest page comes from PySaiyanWeBoo's web_ui (``pages`` dependency group); only the cells are built here."""
+    import web_ui  # PySaiyanWeBoo, pinned in pyproject's pages group
+
     rows = []
     for page in pages:
-        row = [f'<th>{html.escape(page)}</th>']
+        row = [f'<strong>{html.escape(page)}</strong>']
         for env in envs:
             cell, image = cells.get((page, env)), tiles.get((page, env))
             if cell is None and image is None:
-                row.append('<td class="missing">not run</td>')
+                row.append('<span class="ui-muted">not run</span>')
                 continue
             img = ''
             if image is not None:
@@ -69,18 +74,18 @@ def _page(pages, envs, cells, tiles, encode, tile, run_url):
             why = '<br>'.join(html.escape(f) for f in (cell or {}).get('failures', []))
             build = (cell or {}).get('build')
             build_note = f'<br><small>build {html.escape(build[:12])}</small>' if build else ''
-            row.append(f'<td class="{html.escape(verdict)}">{img}<br>{html.escape(verdict)}'
-                       + build_note + (f'<br><small>{why}</small>' if why else '') + '</td>')
-        rows.append('<tr>' + ''.join(row) + '</tr>')
+            status = {'pass': 'ui-pass', 'fail': 'ui-fail'}.get(verdict, '')
+            row.append(f'{img}<span class="{status}">{html.escape(verdict)}</span>'
+                       + build_note + (f'<br><small>{why}</small>' if why else ''))
+        rows.append(row)
     builds = sorted({c['build'][:12] for c in cells.values() if c.get('build')})
     link = f' · <a href="{html.escape(run_url, quote=True)}">run</a>' if run_url else ''
-    return ('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-            '<title>Published app digest</title><style>body{font:13px system-ui,sans-serif;margin:8px}'
-            'table{border-collapse:collapse}th,td{border:1px solid #ccc;padding:4px;vertical-align:top;text-align:center}'
-            'td.fail{background:#ffebe9}td.missing{color:#666}small{color:#555}</style>'
-            f'<p>Thumbnails {tile[0]}x{tile[1]} px · builds {html.escape(", ".join(builds) or "unknown")}{link}. '
+    body = (f'<main class="ui-page"><h1 class="ui-title">Published app digest</h1>'
+            f'<p class="ui-muted">Thumbnails {tile[0]}x{tile[1]} px · builds {html.escape(", ".join(builds) or "unknown")}{link}. '
             'Mobile profiles are emulation; thumbnails are for orientation, not pixel review.</p>'
-            f'<table><tr><th></th>{head}</tr>{"".join(rows)}</table>\n')
+            + web_ui.table(['', *envs], rows, trusted_html=True) + '</main>')
+    return web_ui.render_document(trusted_html=body, title='Published app digest',
+                                  css=web_ui.core_css() + _PAGE_CSS) + '\n'
 
 
 def summary_markdown(pages, envs, cells, run_url=None):

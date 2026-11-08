@@ -329,38 +329,28 @@ def summary_lines(records: list[dict]) -> list[str]:
     return out
 
 
-_PAGE = """<!doctype html>
-<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Platform matrix</title>
-<style>
-:root{--bg:#fff;--fg:#1a1a1a;--muted:#666;--line:#d8d8d8;--tab:#f1f1f1;--on:#1f5fbf;--ok:#1a7f37;--ng:#c62828;--chg:#fff3bf}
-@media (prefers-color-scheme:dark){:root{--bg:#141414;--fg:#eee;--muted:#999;--line:#333;--tab:#222;--on:#6ea8ff;--ok:#4cc26a;--ng:#ff6b6b;--chg:#4a3f00}}
-body{margin:0;background:var(--bg);color:var(--fg);font:14px system-ui,sans-serif}
-main{max-width:1100px;margin:0 auto;padding:16px}
-h1{font-size:20px;margin:0 0 4px}.sub{color:var(--muted);margin:0 0 12px}
-.row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0}.row b{width:72px;color:var(--muted);font-weight:500}
-.row button{font:inherit;border:1px solid var(--line);background:var(--tab);color:var(--fg);border-radius:6px;padding:4px 10px;cursor:pointer}
-.row button[aria-pressed=true]{background:var(--on);border-color:var(--on);color:#fff}
-.row button.none{opacity:.45}
+_PAGE_CSS = """
+.pp-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0}.pp-row b{width:72px;color:var(--ui-muted);font-weight:500}
+.pp-row .ui-button{padding:4px 10px;cursor:pointer}.pp-row .ui-button[aria-pressed=true]{background:var(--ui-accent);border-color:var(--ui-accent);color:var(--ui-bg)}
+.pp-row .ui-button.none{opacity:.45}
 #head{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:12px 0}
-.badge{font-weight:600;padding:2px 10px;border-radius:999px;color:#fff}.pass{background:var(--ok)}.fail{background:var(--ng)}
-.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}@media(max-width:760px){.grid{grid-template-columns:1fr}}
-table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid var(--line);padding:3px 6px;text-align:left;vertical-align:top;overflow-wrap:anywhere}
-th{color:var(--muted);font-weight:500;width:42%}tr.group th{color:var(--fg);font-weight:600;padding-top:10px}
-td.changed{background:var(--chg);transition:background .2s}td.varies::after{content:" *";color:var(--muted)}
-svg{width:100%;height:auto;border:1px solid var(--line);border-radius:6px}svg text{font:11px system-ui;fill:var(--fg)}
-.note{color:var(--muted);font-size:12px}
-</style></head><body><main>
-<h1>Platform matrix</h1>
-<p class="sub">対象ごとの OS × ブラウザ × 端末の実測値（スマホはエミュレーション、実機ではありません）。タブを切り替えると、直前と値が変わった行が色付きになります（* は環境によって値が違う項目）。</p>
+.pp-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}@media(max-width:760px){.pp-grid{grid-template-columns:1fr}}
+#facts th{width:42%}#facts tr.group th{color:var(--ui-fg);font-weight:600;padding-top:10px}
+#facts td.ui-changed{transition:background .2s}#facts td.varies::after{content:" *";color:var(--ui-muted)}
+#diagram{width:100%;height:auto;border:1px solid var(--ui-border);border-radius:var(--ui-radius)}#diagram text{font:11px var(--ui-font);fill:var(--ui-fg)}
+"""
+
+_PAGE_BODY = """<main class="ui-page">
+<h1 class="ui-title">Platform matrix</h1>
+<p class="ui-muted">対象ごとの OS × ブラウザ × 端末の実測値（スマホはエミュレーション、実機ではありません）。タブを切り替えると、直前と値が変わった行が色付きになります（* は環境によって値が違う項目）。</p>
 <div id="tabs"></div>
 <div id="head"></div>
-<div class="grid"><div><table id="facts"></table></div><div><svg id="diagram" viewBox="0 0 420 300" role="img" aria-label="screen, window and viewport"></svg>
-<p class="note">外枠 = screen、点線 = avail、青 = window（outer）、緑 = viewport（inner）、赤 = scrollbar。headless では枠が 0 になります。</p></div></div>
+<div class="pp-grid"><div><table id="facts" class="ui-table"></table></div><div><svg id="diagram" viewBox="0 0 420 300" role="img" aria-label="screen, window and viewport"></svg>
+<p class="ui-muted">外枠 = screen、点線 = avail、枠線色 = window（outer）、アクセント色 = viewport（inner）、危険色 = scrollbar。headless では枠が 0 になります。</p></div></div>
 </main>
-<script type="application/json" id="data">__DATA__</script>
-<script>
-const records = JSON.parse(document.getElementById('data').textContent).records;
+<script type="application/json" id="data">__DATA__</script>"""
+
+_PAGE_JS = """const records = JSON.parse(document.getElementById('data').textContent).records;
 const axes = [['Target', r => r.target?.key || 'fixture'], ['OS', r => r.env.os], ['Browser', r => r.env.channel || r.env.browser], ['Device', r => r.env.device],
               ['Mode', r => r.env.headless ? 'headless' : 'headed']];
 const sel = axes.map(([, f]) => f(records[0]));
@@ -374,10 +364,10 @@ function match() { return records.find(r => axes.every(([, f], i) => f(r) === se
 function tabs() {
   const box = document.getElementById('tabs'); box.textContent = '';
   axes.forEach(([name, f], i) => {
-    const row = document.createElement('div'); row.className = 'row';
+    const row = document.createElement('div'); row.className = 'pp-row';
     row.append(Object.assign(document.createElement('b'), {textContent: name}));
     for (const value of [...new Set(records.map(f))].sort()) {
-      const b = document.createElement('button'); b.type = 'button'; b.textContent = value;
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'ui-button'; b.textContent = value;
       b.setAttribute('aria-pressed', String(sel[i] === value));
       const probe = sel.slice(); probe[i] = value;
       if (!records.some(r => axes.every(([, g], j) => g(r) === probe[j]))) b.classList.add('none');
@@ -405,18 +395,18 @@ function diagram(r) {
   rect(svg, ox, oy, s.width * k, s.height * k, 'currentColor', '', `screen ${s.width}×${s.height}`);
   rect(svg, ox + (s.avail_left || 0) * k, oy + (s.avail_top || 0) * k, s.avail_width * k, s.avail_height * k, 'currentColor', '4 3');
   const wx = ox + Math.max(0, w.screen_x) * k, wy = oy + Math.max(0, w.screen_y) * k;
-  rect(svg, wx, wy, w.outer_width * k, w.outer_height * k, '#1f5fbf', '', `window ${w.outer_width}×${w.outer_height}（枠 ${w.frame_width}×${w.frame_height}）`, 1);
+  rect(svg, wx, wy, w.outer_width * k, w.outer_height * k, 'var(--ui-border)', '', `window ${w.outer_width}×${w.outer_height}（枠 ${w.frame_width}×${w.frame_height}）`, 1);
   const side = Math.max(0, w.frame_width) / 2;
   const ix = wx + side * k, iy = wy + Math.max(0, w.frame_height - side) * k;
-  rect(svg, ix, iy, w.inner_width * k, w.inner_height * k, '#1a7f37', '', `viewport ${w.inner_width}×${w.inner_height}`, 2);
-  if (v.scrollbar_width > 0) rect(svg, ix + v.client_width * k, iy, v.scrollbar_width * k, w.inner_height * k, '#c62828', '');
+  rect(svg, ix, iy, w.inner_width * k, w.inner_height * k, 'var(--ui-accent)', '', `viewport ${w.inner_width}×${w.inner_height}`, 2);
+  if (v.scrollbar_width > 0) rect(svg, ix + v.client_width * k, iy, v.scrollbar_width * k, w.inner_height * k, 'var(--ui-danger)', '');
 }
 function show() {
   tabs();
   const r = match(), head = document.getElementById('head'), table = document.getElementById('facts');
   head.textContent = ''; table.textContent = '';
   if (!r) { head.textContent = 'この組み合わせは未測定です（薄いタブは測定がありません）'; diagram(null); previous = null; return; }
-  const badge = Object.assign(document.createElement('span'), {className: 'badge ' + r.verdict, textContent: r.verdict});
+  const badge = Object.assign(document.createElement('span'), {className: 'ui-tag ui-' + r.verdict, textContent: r.verdict});
   head.append(badge, ` ${r.env.id}  v${r.env.browser_version}  OS ${r.env.os_release}`,
     `  ・対象 ${r.target?.url || 'fixture'} / ${r.env.device_validation || 'legacy'}  `,
     `  ・最小幅 ${r.min_ok_width ?? '—'}px`, r.layout.failed.length ? `  ・崩れ: ${r.layout.failed.join(', ')}` : '',
@@ -431,18 +421,22 @@ function show() {
     row.append(Object.assign(document.createElement('th'), {textContent: key.split('.').slice(2).join('.') || key}));
     const td = row.insertCell(); td.textContent = value === null ? '—' : String(value);
     if (varies.has(key)) td.classList.add('varies');
-    if (previous && JSON.stringify(previous.get(key)) !== JSON.stringify(value)) td.classList.add('changed');
+    if (previous && JSON.stringify(previous.get(key)) !== JSON.stringify(value)) td.classList.add('ui-changed');
   }
   diagram(r); previous = now;
 }
 show();
-</script></body></html>
 """
 
 
 def render(records: list[dict]) -> str:
-    data = json.dumps({"schema": DATASET_SCHEMA, "records": records}, ensure_ascii=False)
-    return _PAGE.replace("__DATA__", data.replace("<", "\\u003c"))
+    """One self-contained review page from PySaiyanWeBoo's web_ui (core CSS + the matrix script); needs the
+    ``pages`` dependency group (``uv run --group pages``), unlike collect/merge/summary which stay stdlib."""
+    import web_ui  # PySaiyanWeBoo, pinned in pyproject's pages group
+
+    data = json.dumps({"schema": DATASET_SCHEMA, "records": records}, ensure_ascii=False).replace("<", "\\u003c")
+    body = _PAGE_BODY.replace("__DATA__", data) + web_ui.classic_script(_PAGE_JS)
+    return web_ui.render_document(trusted_html=body, title="Platform matrix", css=web_ui.core_css() + _PAGE_CSS)
 
 
 def main(argv=None) -> int:

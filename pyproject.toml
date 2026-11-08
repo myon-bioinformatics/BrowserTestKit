@@ -16,6 +16,12 @@ dev = [
     "pytest>=9.0.3",
     "PyYAML>=6.0.3",
     "pip>=26.2",
+    { include-group = "pages" },
+]
+# The review pages (platform matrix, app digest) are built with PySaiyanWeBoo's web_ui; the pin is a commit.
+# Move it with: uv lock --upgrade-package pysaiyanweboo
+pages = [
+    "pysaiyanweboo @ git+https://github.com/myon-bioinformatics/PySaiyanWeBoo@e4c25ddba45b05850cfd2c9666638b1617254990",
 ]
 browser = [
     "playwright>=1.64.1",

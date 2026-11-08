@@ -97,10 +97,11 @@ jobs:
         with:
           pattern: platform-*
           path: platform-results
-      - name: Merge and render the tabbed comparison
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - name: Merge and render the tabbed comparison (the page is built with PySaiyanWeBoo's web_ui)
         run: |
           python -S tools/platform_probe.py merge platform-results --out platform-matrix/dataset.json
-          python -S tools/platform_probe.py render platform-matrix/dataset.json --out platform-matrix/index.html
+          uv run --locked --group pages python tools/platform_probe.py render platform-matrix/dataset.json --out platform-matrix/index.html
           python -S tools/platform_probe.py summary platform-matrix/dataset.json > platform-matrix/summary.txt || true
           { echo '```text'; cat platform-matrix/summary.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
       # Results that live only in artifacts are unreadable after retention, from a phone, or for
