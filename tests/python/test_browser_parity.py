@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def test_browser_install_and_config_parity() -> None:
     config = (ROOT / "playwright.config.ts").read_text(encoding="utf-8")
-    workflow = (ROOT / ".github" / "workflows" / "playwright.yml").read_text(encoding="utf-8")
+    workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     engines = {"chromium", "firefox", "webkit"}
     assert engines <= set(re.findall(r"name: '(chromium|firefox|webkit)'", config))
     jobs = yaml.load(workflow, Loader=yaml.BaseLoader)["jobs"]
@@ -40,7 +40,7 @@ def _evidence_expectations(workflow: str, directory: str) -> set[str]:
 
 def test_evidence_expectations_match_the_test_matrices() -> None:
     config = (ROOT / "playwright.config.ts").read_text(encoding="utf-8")
-    workflow = (ROOT / ".github" / "workflows" / "playwright.yml").read_text(encoding="utf-8")
+    workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     assert _evidence_expectations(workflow, "test-results") == set(re.findall(r"name: '([^']+)'", config))
     smoke = ast.parse((ROOT / "tests" / "python" / "test_smoke.py").read_text(encoding="utf-8"))
     matrix = {
@@ -62,12 +62,12 @@ def test_evidence_expectations_match_the_test_matrices() -> None:
 
 
 def test_browserless_lanes_do_not_install_engines_and_gate_browser_work():
-    jobs = yaml.safe_load((ROOT / '.github/workflows/playwright.yml').read_text())['jobs']
-    lightweight = {'python', 'test-locked', 'node-browserless'}
+    jobs = yaml.safe_load((ROOT / '.github/workflows/ci.yml').read_text())['jobs']
+    lightweight = {'python', 'vendor-locked', 'node-browserless'}
     for name in lightweight:
         commands = '\n'.join(step.get('run', '') for step in jobs[name]['steps'])
         assert 'playwright install' not in commands, name
-    for name in ('python', 'test-locked'):
+    for name in ('python', 'vendor-locked'):
         commands = '\n'.join(step.get('run', '') for step in jobs[name]['steps'])
         assert 'uv run --locked' in commands
         assert '--group browser' not in commands
@@ -95,8 +95,8 @@ def test_direct_browser_test_imports_are_lazy_and_marked():
 
 
 def test_module_smoke_still_checks_noneditable_install_outside_checkout():
-    jobs = yaml.safe_load((ROOT / '.github/workflows/playwright.yml').read_text())['jobs']
-    for name in ('python', 'test-locked'):
+    jobs = yaml.safe_load((ROOT / '.github/workflows/ci.yml').read_text())['jobs']
+    for name in ('python', 'vendor-locked'):
         step = next(s for s in jobs[name]['steps'] if s.get('name') == 'Scripts install and run as modules (python -m)')
         assert 'cd "$RUNNER_TEMP"' in step['run']
         assert 'uv run --locked --no-dev --no-editable --project "$GITHUB_WORKSPACE" python -m btk --help' in step['run']
@@ -112,7 +112,7 @@ def test_browser_jobs_use_test_dependencies_without_dev_pip():
     assert project['tool']['uv']['dependency-groups']['browser-test'] == {
         'requires-python': '>=3.11',
     }
-    jobs = yaml.safe_load((ROOT / '.github/workflows/playwright.yml').read_text())['jobs']
+    jobs = yaml.safe_load((ROOT / '.github/workflows/ci.yml').read_text())['jobs']
     for name in ('python-browser', 'python-browser-optional'):
         commands = '\n'.join(step.get('run', '') for step in jobs[name]['steps'])
         uv_commands = re.findall(r'uv run[^\n]*', commands)
