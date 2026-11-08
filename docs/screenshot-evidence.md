@@ -171,11 +171,35 @@ A mixed-engine bundle must be named honestly; it is not an individual engine pro
 
 A README wants one picture a reviewer can watch, not a bundle to download. `tools/evidence_gif.py`
 records a plan of shots (page × viewport × steps: `click`, `fill`, `select`, `press`, `scroll`, `wait`,
-`eval`) in Chromium and writes `docs/evidence/browser.gif` plus `docs/evidence/browser.json`.
+`eval`, ⏺ `record`, 🔍 `zoom`) in Chromium, Firefox or WebKit (`--browser`) and writes
+`docs/evidence/browser.gif` plus `docs/evidence/browser.json`.
 
-- 🖼️ Every shot and every step is one frame, fitted into a 720×480 canvas (multiples of 8) under a 32 px
-  caption that Chromium renders in Meiryo with Japanese fallbacks; ✅/⛔ in the caption is the shot status.
-- 🎨 One shared palette, no dither, delta frames (the encoding PySaiyanWeBoo's `tool/record_demo.py` uses).
+```
+uv run --project ../BrowserTestKit --group pages --group browser \
+  python ../BrowserTestKit/tools/evidence_gif.py docs/evidence/browser.gif --serve _site --plan docs/evidence/browser.json
+```
+
+🔌 Where the bytes go — Python drives, the browser does the pixel work, nothing is shipped twice:
+
+```
+page ──📸 PNG──▶ Python ──(identical? ♻️ skip)──▶ encoder page ──🎞️ GIF──▶ Python
+                 sha256          one call per shot (≤ 4 MiB base64)    once, at the end
+```
+
+- 📸 Playwright's screenshot is the only image that crosses the socket, once. A byte-identical screenshot
+  (a step that changed nothing) is not sent again; ⏺ `record` with `clip` sends only the element's box and the
+  encoder lays it on the last full screenshot.
+- 🧱 The encoder page is PySaiyanWeBoo's `web_ui.gif_recorder_document()`, built from Python. The browser decodes,
+  fits, zooms and captions on a canvas (Meiryo, Japanese fallbacks; no font file), and `gif.js` adds only what no
+  browser offers: a 6-bit bucket histogram while frames arrive, changed rectangles only, one global palette
+  (exact when it fits, else median cut + refinement), tight delta frames (transparent where unchanged when that
+  is smaller), 12-bit LZW → GIF89a. No Pillow, no image library, in any engine.
+- 🔍 `zoom` eases onto an element (outlined) in `steps` frames over `ms` and holds — all drawn from one capture.
+- ⏺ `record` captures every `every` ms for `for` ms (delays are the measured ones), for animations and transitions.
+- 🎚️ Limits: `--colors` (≤ 255), `--max-bytes 800K` (fewer colours, then fewer ⏺ frames, until it fits; over
+  budget is reported, not fatal), `--max-frames` (⏺ frames are cut first), `--hold`, `--last-hold`,
+  `--width/--height` (multiples of 8). Delays are centiseconds ≥ 2 (browsers stretch 0–1 cs to 10 cs), rounded on
+  the real timeline so the total stays true; the GIF loops forever.
 - 🌐 For served (`/…`) shots every request leaving 127.0.0.1 is refused and listed under `external`; it
   does not fail the shot, so the evidence never depends on the network. `--map PREFIX=DIR` answers a pinned
   CDN prefix (jsDelivr web-ui CSS, cdn.plot.ly) from a local checkout so the page is recorded styled.
@@ -184,8 +208,13 @@ records a plan of shots (page × viewport × steps: `click`, `fill`, `select`, `
   writes the GIF so the failure can be seen.
 - 🏷️ Each shot records the page's `<meta name="generator">` as `generator` (PySaiyanWeBoo's `web_ui` writes
   `web_ui <commit>`), so the receipt says which generator drew what the GIF shows.
-- 🧾 The receipt holds the GIF's sha256, frames, browser version, tested commit, per-shot results and the
-  plan itself, so `--plan docs/evidence/browser.json` re-records the same GIF.
+- 🧾 The receipt (`btk-evidence-gif/2`) holds the GIF's sha256, frames, browser, tested commit, per-shot results,
+  the encoder's report (colours, buckets, merged / synthesised frames, budget steps), `transfer` (screenshots,
+  PNG KiB, identical skipped, patches, KiB sent, calls, GIF KiB) and the plan itself, so `--plan
+  docs/evidence/browser.json` re-records the same GIF.
 
-It needs Pillow from the caller's environment (this lock stays Pillow-free; the recording test skips without it).
-It is review evidence, not a pixel baseline: GIF bytes depend on the Chromium build and fonts.
+📊 Re-recording every repository's existing plan with this encoder (same frames): 2635 → 2134 KiB (−19 %), each
+GIF encoded in 0.1–0.3 s inside the browser. `tests/python/test_evidence_gif.py` records in each engine and reads
+the GIF back with a stdlib block parser, the engine itself and Pillow where installed; PySaiyanWeBoo checks
+`gif.js` against an independently written decoder (`tests/gif.node.js`) and in every engine (`GifBrowserTests`).
+It is review evidence, not a pixel baseline: GIF bytes depend on the browser build and fonts.

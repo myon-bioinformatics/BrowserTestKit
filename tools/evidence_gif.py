@@ -1,49 +1,68 @@
 #!/usr/bin/env python3
 """Record browser evidence as one looping GIF for a README: each shot is a page x viewport (x steps), captioned in Meiryo.
 
-    python tools/evidence_gif.py docs/evidence/browser.gif --serve . \\
+    uv run --group pages python tools/evidence_gif.py docs/evidence/browser.gif --serve . \\
         --shot "🏠 Top|/index.html|1280x800" --shot "📱 Top|/index.html|392x848"
-    python tools/evidence_gif.py docs/evidence/browser.gif --serve . --plan shots.json
+    uv run --group pages python tools/evidence_gif.py docs/evidence/browser.gif --serve . --plan shots.json
 
-A shot is ``label|url|WIDTHxHEIGHT`` or, in ``--plan`` JSON, ``{"label", "url", "viewport", "steps"}`` where each step is one of
-``{"click": sel}``, ``{"fill": [sel, text]}``, ``{"select": [sel, value]}``, ``{"press": key}``, ``{"scroll": y}``, ``{"wait": ms}`` or ``{"eval": js}``; every
-step adds a frame, so the GIF shows what the step did. For a served (``/``) shot every request leaving 127.0.0.1 is refused and
-listed under ``external`` (not a failure: the evidence must not depend on the network); other page errors name their URL.
-``--map PREFIX=DIR`` answers requests under a URL prefix (a pinned CDN asset such as jsDelivr's web-ui CSS) from a local
-checkout instead, so the page is recorded styled as published without the network. ``"allow": ["text", ...]`` names page errors a fixture raises on purpose
-(a deliberately wrong SRI hash): they stay in the receipt under ``allowed`` but do not fail the shot. A URL starting with ``/`` is served from ``--serve DIR`` (a local
-http.server, never the network). Frames are fitted into one canvas (default 720x480, multiples of 8) under a 32 px caption
-that the browser itself renders in Meiryo (with Japanese fallbacks), so no font file is bundled.
+A shot is ``label|url|WIDTHxHEIGHT`` or, in ``--plan`` JSON, ``{"label", "url", "viewport", "steps", "hold", "allow"}``. A step is
+``{"click": sel}``, ``{"fill": [sel, text]}``, ``{"select": [sel, value]}``, ``{"press": key}``, ``{"scroll": y}``, ``{"wait": ms}``,
+``{"eval": js}`` (each adds a frame showing what it did), and two that shape the GIF itself:
 
-Encoding follows PySaiyanWeBoo's ``tool/record_demo.py``: one shared palette (no dither, so frames never flicker), delays in
-10 ms units, looping forever, and frames written as deltas (``optimize=True``). Next to the GIF a receipt ``<name>.json``
-records every shot's status, page errors and ``generator`` (the page's ``<meta name="generator">``, e.g. ``web_ui <commit>``), the GIF's sha256 and the browser version, and keeps the plan itself under ``plan``,
-so ``--plan <name>.json`` re-records the same GIF (the receipt is the recipe).
+* ⏺ ``{"record": {"every": 200, "for": 2000, "clip": sel}}`` — frames every ``every`` ms for ``for`` ms (an animation, a
+  transition); delays are the measured ones. With ``clip`` only that element's box is captured and laid on the last full
+  screenshot, so a spinner costs its own few hundred bytes on the socket instead of the whole page.
+* 🔍 ``{"zoom": sel}`` or ``{"zoom": {"selector": sel, "ms": 900, "steps": 6, "hold": 1200, "pad": 16, "scale": 2}}`` — the
+  view eases onto the element (outlined) in ``steps`` frames over ``ms``, then holds; all of it is drawn from one capture.
+
+For a served (``/``) shot every request leaving 127.0.0.1 is refused and listed under ``external`` (not a failure: the
+evidence must not depend on the network); ``--map PREFIX=DIR`` answers a URL prefix (a pinned CDN asset) from a local
+directory instead; ``"allow": ["text"]`` names page errors a fixture raises on purpose.
+
+📦 Where the bytes go: Playwright takes each screenshot (PNG) in any engine (``--browser chromium|firefox|webkit``); a
+screenshot byte-identical to the previous one is not sent again (the hash decides), and each shot's screenshots go to the
+encoder page in one call per 4 MiB. That page is PySaiyanWeBoo's ``web_ui.gif_recorder_document()``: the browser itself decodes,
+fits, zooms and captions them on a canvas, and ``gif.js`` keeps only changed rectangles, picks one global palette, writes
+delta frames and LZW — the GIF crosses the socket once, pixels never come back. Captions are drawn by the browser in Meiryo
+(Japanese fallbacks), so no font file is bundled.
+
+🎚️ Limits: ``--width/--height`` (canvas under a 32 px caption, multiples of 8), ``--colors`` (palette, ≤ 255),
+``--max-bytes`` (e.g. ``800K``: fewer colours, then fewer ⏺ frames, until it fits; over budget is reported, not fatal),
+``--max-frames`` (⏺ frames are cut first), ``--hold`` / ``--last-hold`` (ms per frame / on the last frame). GIF delays are
+centiseconds, at least 2 (browsers stretch 0–1 cs to 10 cs), rounded on the real timeline so the total stays true.
+
+Next to the GIF a receipt ``<name>.json`` records every shot's status, page errors and ``generator`` (the page's
+``<meta name="generator">``), the encoder's report, what crossed the socket (``transfer``), the browser, and the plan itself
+under ``plan`` — ``--plan <name>.json`` re-records the same GIF (the receipt is the recipe).
 
 Exit codes: 0 every shot loaded without a page error or HTTP error; 1 some shot failed (the GIF is still written, ⛔ in its
-caption, so the failure can be seen); 2 usage. Needs Playwright (Chromium) and Pillow from the caller's environment
-(`pip install pillow`, as PySaiyanWeBoo's recorder does): this repository's own lock stays Pillow-free on purpose.
+caption, so the failure can be seen); 2 usage. Needs Playwright and PySaiyanWeBoo's ``web_ui`` (this repository's ``pages``
+group); no Pillow, no image library.
 """
 from __future__ import annotations
 
 import argparse
+import base64
 import contextlib
 import datetime
 import functools
 import hashlib
-import html
 import http.server
-import io
 import json
 import mimetypes
 from pathlib import Path
 import sys
 import threading
+import time
 
 CAPTION = 32
-FONT = "Meiryo, 'メイリオ', 'Hiragino Sans', 'Noto Sans CJK JP', 'Yu Gothic', sans-serif"
-SCHEMA = "btk-evidence-gif/1"
-STEP_KEYS = ("click", "fill", "select", "press", "scroll", "wait", "eval")
+SCHEMA = "btk-evidence-gif/2"
+STEP_KEYS = ("click", "fill", "select", "press", "scroll", "wait", "eval", "record", "zoom")
+ENGINES = ("chromium", "firefox", "webkit")
+BATCH_BYTES = 4 << 20                 # base64 per call to the encoder page: one shot is usually one call
+MIN_EVERY = 20                        # ms: a GIF frame cannot be shorter (2 cs) without browsers stretching it
+WEB_UI_HINT = ("needs PySaiyanWeBoo's web_ui: run with `uv run --group pages` here, or install "
+               "'pysaiyanweboo @ git+https://github.com/myon-bioinformatics/PySaiyanWeBoo@<commit>'")
 
 
 def parse_viewport(text: str) -> tuple[int, int]:
@@ -60,7 +79,7 @@ def parse_shot(text: str) -> dict:
     return {"label": parts[0], "url": parts[1], "viewport": parts[2]}
 
 
-def check_plan(shots: list) -> list[dict]:
+def check_plan(shots: list, *, hold: int = 1200) -> list[dict]:
     """Shots with their viewport parsed; raises ValueError on anything this tool would not run."""
     if not shots:
         raise ValueError("no shots (use --shot or --plan)")
@@ -68,14 +87,48 @@ def check_plan(shots: list) -> list[dict]:
     for shot in shots:
         if not isinstance(shot, dict) or not isinstance(shot.get("url"), str) or not shot["url"]:
             raise ValueError(f"shot needs a url: {shot!r}")
-        steps = shot.get("steps", [])
-        for step in steps:
-            if not isinstance(step, dict) or len(step) != 1 or next(iter(step)) not in STEP_KEYS:
-                raise ValueError(f"step must be one of {', '.join(STEP_KEYS)}: {step!r}")
+        steps = [check_step(step) for step in shot.get("steps", [])]
         checked.append({"label": str(shot.get("label", shot["url"])), "url": shot["url"],
                         "viewport": parse_viewport(str(shot.get("viewport", "1280x800"))), "steps": steps,
-                        "hold": int(shot.get("hold", 1200)), "allow": [str(a) for a in shot.get("allow", [])]})
+                        "hold": int(shot.get("hold", hold)), "allow": [str(a) for a in shot.get("allow", [])]})
     return checked
+
+
+def check_step(step) -> dict:
+    """One step, with ⏺ record / 🔍 zoom options filled in and bounded; raises ValueError otherwise."""
+    if not isinstance(step, dict) or len(step) != 1 or next(iter(step)) not in STEP_KEYS:
+        raise ValueError(f"step must be one of {', '.join(STEP_KEYS)}: {step!r}")
+    kind, value = next(iter(step.items()))
+    if kind == "record":
+        value = {} if value is None else value
+        if not isinstance(value, dict) or set(value) - {"every", "for", "clip"}:
+            raise ValueError(f"record takes every, for and clip: {step!r}")
+        every, span = int(value.get("every", 200)), int(value.get("for", 2000))
+        if every < MIN_EVERY or not 0 < span <= 60000 or (value.get("clip") is not None and not isinstance(value["clip"], str)):
+            raise ValueError(f"record: every >= {MIN_EVERY} ms, 0 < for <= 60000 ms, clip a selector: {step!r}")
+        return {"record": {"every": every, "for": span, "clip": value.get("clip")}}
+    if kind == "zoom":
+        value = {"selector": value} if isinstance(value, str) else value
+        if not isinstance(value, dict) or not isinstance(value.get("selector"), str) or set(value) - {"selector", "ms", "steps", "hold", "pad", "scale"}:
+            raise ValueError(f"zoom takes a selector (and ms, steps, hold, pad, scale): {step!r}")
+        zoom = {"selector": value["selector"], "ms": int(value.get("ms", 900)), "steps": int(value.get("steps", 6)),
+                "hold": int(value.get("hold", 1200)), "pad": int(value.get("pad", 16)), "scale": float(value.get("scale", 2))}
+        if not (1 <= zoom["steps"] <= 30 and 0 <= zoom["ms"] <= 10000 and 0 <= zoom["hold"] <= 60000 and 1 <= zoom["scale"] <= 8):
+            raise ValueError(f"zoom: 1-30 steps, ms <= 10000, hold <= 60000, scale 1-8: {step!r}")
+        return {"zoom": zoom}
+    return step
+
+
+def parse_bytes(text: str | int | None) -> int | None:
+    """``800K`` / ``2M`` / ``900000`` → bytes; None or 0 → no budget."""
+    if text in (None, "", 0, "0"):
+        return None
+    raw = str(text).strip().upper()
+    scale = {"K": 1024, "M": 1024 * 1024}.get(raw[-1:], 1)
+    number = raw[:-1] if scale > 1 else raw
+    if not number.replace(".", "", 1).isdigit() or float(number) <= 0:
+        raise ValueError(f"--max-bytes must be a size like 800K or 2M: {text!r}")
+    return int(float(number) * scale)
 
 
 @contextlib.contextmanager
@@ -140,6 +193,7 @@ def resolve(url: str, origin: str | None) -> str:
 
 
 def run_step(page, step: dict) -> str:
+    """Do one interaction step and wait for it to settle; returns its caption note (⏺ / 🔍 are captured by capture_step)."""
     kind, value = next(iter(step.items()))
     if kind == "click":
         page.click(value)
@@ -173,45 +227,6 @@ def console_error(msg, errors: list, external: list) -> None:
     errors.append(f"console: {msg.text}" + (f" @ {where}" if where else "")[:300])
 
 
-def caption_png(browser, text: str, width: int, ok: bool) -> bytes:
-    page = browser.new_page(viewport={"width": width, "height": CAPTION})
-    try:
-        color = "#1b5e20" if ok else "#b71c1c"
-        page.set_content(f"<body style='margin:0'><div style=\"height:{CAPTION}px;line-height:{CAPTION}px;padding:0 8px;"
-                         f"font:14px/{CAPTION}px {html.escape(FONT)};color:#fff;background:{color};white-space:nowrap;"
-                         f"overflow:hidden;text-overflow:ellipsis\">{html.escape(text)}</div>")
-        return page.screenshot(type="png")
-    finally:
-        page.close()
-
-
-def compose(shot_png: bytes, caption: bytes, width: int, height: int):
-    """The screenshot fitted (aspect kept, centred) into width x height under its caption."""
-    from PIL import Image
-    shot = Image.open(io.BytesIO(shot_png)).convert("RGB")
-    scale = min(width / shot.width, height / shot.height, 1.0)
-    shot = shot.resize((max(1, round(shot.width * scale)), max(1, round(shot.height * scale))), Image.Resampling.LANCZOS)
-    frame = Image.new("RGB", (width, height + CAPTION), "#eceff1")
-    frame.paste(Image.open(io.BytesIO(caption)).convert("RGB"), (0, 0))
-    frame.paste(shot, ((width - shot.width) // 2, CAPTION + (height - shot.height) // 2))
-    return frame
-
-
-def encode(frames: list, delays: list[int]) -> bytes:
-    """One GIF: shared palette from frames across the run, no dither, 10 ms delays, looping, delta frames."""
-    from PIL import Image
-    sample = frames[::max(1, len(frames) // 16)]
-    sheet = Image.new("RGB", (sample[0].width, sample[0].height * len(sample)))
-    for i, frame in enumerate(sample):
-        sheet.paste(frame, (0, i * frame.height))
-    palette = sheet.quantize(colors=255)
-    encoded = [f.quantize(palette=palette, dither=Image.Dither.NONE) for f in frames]
-    out = io.BytesIO()
-    encoded[0].save(out, format="GIF", save_all=True, append_images=encoded[1:],
-                    duration=[max(20, round(d / 10) * 10) for d in delays], loop=0, optimize=True)
-    return out.getvalue()
-
-
 def page_generator(page) -> str | None:
     """``<meta name="generator">`` of the page just loaded (PySaiyanWeBoo's web_ui writes ``web_ui <commit>``), so the
     receipt says which generator drew what the GIF shows; None when the page has none."""
@@ -221,18 +236,131 @@ def page_generator(page) -> str | None:
     return None
 
 
+class Captures:
+    """One shot's screenshots, held until the shot ends (the caption shows the final ✅/⛔), sent without repeats."""
+
+    def __init__(self, transfer: dict, last: list):
+        self.items: list[dict] = []
+        self.transfer = transfer
+        self.last = last                      # [hash of the last full screenshot sent], shared across shots
+
+    def full(self, page, width: int, note: str, delay: int, group: int = 0, **extra) -> None:
+        png = page.screenshot(type="png")
+        self.transfer["screenshots"] += 1
+        self.transfer["png_bytes"] += len(png)
+        digest = hashlib.sha256(png).digest()
+        item = {"note": note, "delay": delay, "group": group, "cssWidth": width, **extra}
+        if digest == self.last[0]:
+            self.transfer["identical"] += 1  # the encoder page still has it: send nothing
+        else:
+            item["png"] = png
+            self.last[0] = digest
+        self.items.append(item)
+
+    def patch(self, page, box: dict, note: str, delay: int, group: int) -> None:
+        png = page.screenshot(type="png", clip=box)
+        self.transfer["screenshots"] += 1
+        self.transfer["png_bytes"] += len(png)
+        self.transfer["patches"] += 1
+        self.items.append({"note": note, "delay": delay, "group": group, "patch": {"png": png, "x": box["x"], "y": box["y"]}})
+
+
+def capture_step(page, step: dict, captures: Captures, width: int, hold: int, budget: list, group: int) -> str:
+    """⏺ record or 🔍 zoom: the frames this step adds, within the shared frame budget; returns the step's note."""
+    kind, value = next(iter(step.items()))
+    if kind == "zoom":
+        target = page.locator(value["selector"]).first
+        target.scroll_into_view_if_needed(timeout=5000)
+        box = target.bounding_box()
+        if not box:
+            raise ValueError(f"zoom: {value['selector']} has no box (hidden?)")
+        note = f"🔍 {value['selector']}"
+        captures.full(page, width, note, value["hold"], zoom={"x": box["x"], "y": box["y"], "w": box["width"], "h": box["height"]},
+                      steps=value["steps"], ms=value["ms"], hold=value["hold"], pad=value["pad"], maxScale=value["scale"])
+        return note                                                     # its frames are in static_frames already
+    every, span, clip = value["every"], value["for"], value["clip"]
+    planned = max(1, min(span // every, budget[0] + 1))               # the first frame is in static_frames already
+    box = None
+    if clip:
+        box = page.locator(clip).first.bounding_box()
+        if not box:
+            raise ValueError(f"record: {clip} has no box (hidden?)")
+        box = {k: round(box[k]) for k in ("x", "y", "width", "height")}
+    note = "⏺ " + (clip or "") + f" {every} ms"
+    captures.full(page, width, f"{note} 1/{planned}", every, group)    # the base every patch is laid on
+    start = previous = time.monotonic()
+    for index in range(2, planned + 1):
+        wait = start + (index - 1) * every / 1000 - time.monotonic()
+        if wait > 0:
+            page.wait_for_timeout(wait * 1000)
+        now = time.monotonic()
+        captures.items[-1]["delay"] = max(MIN_EVERY, round((now - previous) * 1000))   # what the viewer waited, measured
+        previous = now
+        if box:
+            captures.patch(page, box, f"{note} {index}/{planned}", every, group)
+        else:
+            captures.full(page, width, f"{note} {index}/{planned}", every, group)
+    captures.items[-1]["delay"] = max(captures.items[-1]["delay"], hold)
+    budget[0] -= planned - 1
+    return f"{note} ×{planned}"
+
+
+def send(kernel, items: list[dict], transfer: dict) -> None:
+    """Captioned items to the encoder page, base64, in calls of at most BATCH_BYTES."""
+    batch, size = [], 0
+    for item in items:
+        wire = dict(item)
+        for key in ("png",):
+            if key in wire:
+                wire[key] = base64.b64encode(wire[key]).decode("ascii")
+                size += len(wire[key])
+        if "patch" in wire:
+            wire["patch"] = {**wire["patch"], "png": base64.b64encode(wire["patch"]["png"]).decode("ascii")}
+            size += len(wire["patch"]["png"])
+        batch.append(wire)
+        if size >= BATCH_BYTES:
+            kernel.evaluate("items => rec.add(items)", batch)
+            transfer["calls"] += 1
+            transfer["sent_bytes"] += size
+            batch, size = [], 0
+    if batch:
+        kernel.evaluate("items => rec.add(items)", batch)
+        transfer["calls"] += 1
+        transfer["sent_bytes"] += size
+
+
+def static_frames(shots: list[dict]) -> int:
+    """Frames every shot needs whatever happens: the page, each step, each zoom's steps (⏺ frames come out of the rest)."""
+    return sum(1 + sum(next(iter(s.values()))["steps"] if "zoom" in s else 1 for s in shot["steps"]) for shot in shots)
+
+
 def record(out: Path, shots: list[dict], *, serve_dir: Path | None = None, width: int = 720, height: int = 480,
-           sha: str | None = None, plan: list | None = None, maps: list[tuple[str, Path]] | None = None) -> dict:
-    """Run every shot in Chromium, write ``out`` (GIF) and ``out.with_suffix('.json')`` (receipt); returns the receipt."""
+           sha: str | None = None, plan: list | None = None, maps: list[tuple[str, Path]] | None = None,
+           browser_name: str = "chromium", colors: int = 255, max_bytes: int | None = None, max_frames: int = 300,
+           last_hold: int = 2000) -> dict:
+    """Run every shot in ``browser_name``, write ``out`` (GIF) and ``out.with_suffix('.json')`` (receipt); returns the receipt."""
+    try:
+        import web_ui
+    except ImportError as exc:
+        raise RuntimeError(WEB_UI_HINT) from exc
     from playwright.sync_api import sync_playwright
-    frames, delays, results = [], [], []
+    if browser_name not in ENGINES:
+        raise ValueError(f"--browser must be one of {', '.join(ENGINES)}")
+    results = []
+    transfer = {"screenshots": 0, "png_bytes": 0, "identical": 0, "patches": 0, "calls": 0, "sent_bytes": 0, "gif_bytes": 0}
+    budget = [max(0, max_frames - static_frames(shots))]               # frames ⏺ steps may still take
+    last = [b""]
+    started = time.monotonic()
     with serve(serve_dir) as origin, sync_playwright() as pw:
-        browser = pw.chromium.launch()
+        browser = getattr(pw, browser_name).launch()
         try:
+            kernel = browser.new_context().new_page()                    # its own context: no routes, no network
+            kernel.set_content(web_ui.gif_recorder_document())
+            kernel.evaluate("o => { window.rec = new UiGif.Recorder(o); }", {"width": width, "height": height, "caption": CAPTION})
             total = len(shots)
             for index, shot in enumerate(shots, 1):
                 w, h = shot["viewport"]
-                context = browser.new_context(viewport={"width": w, "height": h}, has_touch=w < 600, is_mobile=w < 600)
+                context = browser.new_context(viewport={"width": w, "height": h}, has_touch=w < 600, is_mobile=w < 600 and browser_name != "firefox")
                 page = context.new_page()
                 page.set_default_timeout(10000)            # a missing selector fails the shot in 10 s, not Playwright's 30 s
                 errors: list[str] = []
@@ -242,46 +370,58 @@ def record(out: Path, shots: list[dict], *, serve_dir: Path | None = None, width
                     context.route(lambda u: not is_local(u), route_handler(maps or [], external))
                 page.on("pageerror", lambda exc, errs=errors: errs.append(f"pageerror: {exc}"[:300]))
                 page.on("console", lambda msg, errs=errors, ext=external: console_error(msg, errs, ext))
-                done, pngs = [], []
+                captures, done = Captures(transfer, last), []
                 try:
                     response = page.goto(resolve(shot["url"], origin), wait_until="load")
                     if response is not None and response.status >= 400:
                         errors.append(f"http {response.status}")
                     page.wait_for_timeout(600)
                     generator = page_generator(page)
-                    pngs.append(("", page.screenshot(type="png")))
-                    for step in shot["steps"]:
-                        done.append(run_step(page, step))
-                        pngs.append((done[-1], page.screenshot(type="png")))
+                    captures.full(page, w, "", shot["hold"])
+                    for group, step in enumerate(shot["steps"], 1):
+                        if "record" in step or "zoom" in step:
+                            done.append(capture_step(page, step, captures, w, shot["hold"], budget, group + 1000 * index))
+                        else:
+                            done.append(run_step(page, step))
+                            captures.full(page, w, done[-1], shot["hold"])
                 except Exception as exc:  # noqa: BLE001 - the failure is the evidence; keep recording the other shots
                     errors.append(f"{type(exc).__name__}: {exc}".splitlines()[0][:300])
                     with contextlib.suppress(Exception):
-                        pngs.append(("⛔", page.screenshot(type="png")))
+                        captures.full(page, w, "⛔", shot["hold"])
                 finally:
                     allowed = [e for e in errors if any(a in e for a in shot["allow"])]
                     errors = [e for e in errors if e not in allowed]
                     ok = not errors
-                    for note, png in pngs:
-                        text = f"{'✅' if ok else '⛔'} {index}/{total} {shot['label']} · {w}×{h}" + (f" · {note}" if note else "")
-                        frames.append(compose(png, caption_png(browser, text, width, ok), width, height))
-                        delays.append(shot["hold"])
+                    for item in captures.items:
+                        note = item.pop("note")
+                        item["caption"] = f"{'✅' if ok else '⛔'} {index}/{total} {shot['label']} · {w}×{h}" + (f" · {note}" if note else "")
+                        item["ok"] = ok
+                    if index == total and captures.items:
+                        captures.items[-1]["delay"] = max(captures.items[-1]["delay"], last_hold)
+                    if captures.items:
+                        send(kernel, captures.items, transfer)
                     context.close()
                 results.append({"label": shot["label"], "url": shot["url"], "viewport": f"{w}x{h}", "steps": done,
                                 "status": "pass" if ok else "fail", "errors": errors, "allowed": allowed,
                                 "external": sorted(set(external)), "generator": generator})
+            captured = time.monotonic()
+            encoded = kernel.evaluate("o => rec.encodeBase64(o)", {"colors": colors, "maxBytes": max_bytes or 0,
+                                                                     "comment": f"BrowserTestKit evidence_gif {sha or ''}".strip()})
             version = browser.version
         finally:
             browser.close()
-    if not frames:
-        raise RuntimeError("no frame was captured")
-    delays[-1] = max(delays[-1], 2000)
-    data = encode(frames, delays)
+    data = base64.b64decode(encoded["gif"])
+    transfer["gif_bytes"] = len(data)
+    report = encoded["report"]
+    report["capture_s"] = round(captured - started, 1)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_bytes(data)
     receipt = {"schema": SCHEMA, "gif": out.name, "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest(),
-               "frames": len(frames), "canvas": f"{width}x{height + CAPTION}", "browser": f"chromium {version}",
+               "frames": report["frames"], "canvas": f"{width}x{height + CAPTION}", "browser": f"{browser_name} {version}",
                "recorded": datetime.date.today().isoformat(), "commit": sha,
-               "mapped": [prefix for prefix, _ in maps or []],
+               "encoder": {"module": "PySaiyanWeBoo web_ui gif.js", "web_ui": web_ui.installed_commit() or "checkout", **report},
+               "limits": {"colors": colors, "max_bytes": max_bytes, "max_frames": max_frames, "last_hold_ms": last_hold},
+               "transfer": transfer, "mapped": [prefix for prefix, _ in maps or []],
                "summary": {"pass": sum(r["status"] == "pass" for r in results), "fail": sum(r["status"] == "fail" for r in results)},
                "shots": results, "plan": plan if plan is not None else []}
     out.with_suffix(".json").write_text(json.dumps(receipt, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -300,24 +440,39 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--width", type=int, default=720, help="canvas width (default 720)")
     parser.add_argument("--height", type=int, default=480, help="canvas height below the caption (default 480)")
     parser.add_argument("--sha", help="tested commit, recorded in the receipt")
+    parser.add_argument("--browser", choices=ENGINES, default="chromium", help="engine that takes the screenshots and encodes (default chromium)")
+    parser.add_argument("--colors", type=int, default=255, help="palette size, 2-255 (default 255)")
+    parser.add_argument("--max-bytes", help="GIF size budget such as 800K or 2M: fewer colours, then fewer ⏺ frames")
+    parser.add_argument("--max-frames", type=int, default=300, help="frame cap; ⏺ record steps get what the other frames leave (default 300)")
+    parser.add_argument("--hold", type=int, default=1200, help="ms each frame stays (default 1200; a shot's \"hold\" wins)")
+    parser.add_argument("--last-hold", type=int, default=2000, help="ms the last frame stays before the loop restarts (default 2000)")
     args = parser.parse_args(argv)
     try:
         raw = [parse_shot(s) for s in args.shot]
         if args.plan:
             loaded = json.loads(args.plan.read_text(encoding="utf-8"))
             raw += loaded["plan"] if isinstance(loaded, dict) else loaded     # a receipt is also a plan
-        shots = check_plan(raw)
+        shots = check_plan(raw, hold=args.hold)
         maps = [parse_map(m) for m in args.map]
+        max_bytes = parse_bytes(args.max_bytes)
         if args.serve is not None and not args.serve.is_dir():
             raise ValueError(f"--serve is not a directory: {args.serve}")
+        if not 2 <= args.colors <= 255 or args.max_frames < len(shots) or args.width % 8 or args.height % 8:
+            raise ValueError("--colors 2-255, --max-frames at least one per shot, --width/--height multiples of 8")
     except (ValueError, OSError) as exc:
         parser.exit(2, f"⛔ {exc}\n")
-    receipt = record(args.out, shots, serve_dir=args.serve, width=args.width, height=args.height, sha=args.sha, plan=raw, maps=maps)
+    try:
+        receipt = record(args.out, shots, serve_dir=args.serve, width=args.width, height=args.height, sha=args.sha, plan=raw, maps=maps,
+                         browser_name=args.browser, colors=args.colors, max_bytes=max_bytes, max_frames=args.max_frames, last_hold=args.last_hold)
+    except RuntimeError as exc:
+        parser.exit(2, f"⛔ {exc}\n")
     for shot in receipt["shots"]:
         print(f"{'✅' if shot['status'] == 'pass' else '⛔'} {shot['label']} {shot['viewport']}"
               + (f" 🌐 {len(shot['external'])}" if shot["external"] else "") + "".join(f"\n   ⚠️ {e}" for e in shot["errors"]))
-    s = receipt["summary"]
-    print(f"🎞️ {args.out} 🖼️ {receipt['frames']} 📦 {receipt['bytes'] // 1024} KiB ✅ {s['pass']} ⛔ {s['fail']}")
+    s, e, x = receipt["summary"], receipt["encoder"], receipt["transfer"]
+    print(f"🎞️ {args.out} 🖼️ {receipt['frames']} 📦 {receipt['bytes'] // 1024} KiB 🎨 {e['colors']} ✅ {s['pass']} ⛔ {s['fail']}"
+          + (" ⚠️ over --max-bytes" if e["overBudget"] else ""))
+    print(f"🔌 📸 {x['screenshots']} ({x['png_bytes'] // 1024} KiB) ♻️ {x['identical']} ✂️ {x['patches']} 📤 {x['sent_bytes'] // 1024} KiB / {x['calls']} calls 📥 {x['gif_bytes'] // 1024} KiB")
     return 1 if s["fail"] else 0
 
 

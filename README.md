@@ -46,10 +46,10 @@ that every browser or environment has been tested.
 python tools/platform_probe.py collect --browser chromium --profile desktop --out /tmp/rec
 python tools/platform_probe.py collect --browser chromium --profile pixel --out /tmp/rec
 uv run --group pages python tools/platform_probe.py render /tmp/rec --out test-results/evidence/platform-matrix.html
-python tools/evidence_gif.py docs/evidence/browser.gif --serve . --plan docs/evidence/browser.json
+uv run --group pages --group browser python tools/evidence_gif.py docs/evidence/browser.gif --serve . --plan docs/evidence/browser.json
 ```
 
-`tools/evidence_gif.py` is the shared recorder the other repositories use for their README GIFs: page × viewport × steps, captioned in Meiryo, one shared palette, network refused and listed (`external`), pinned CDN assets answered locally with `--map PREFIX=DIR`. See [docs/screenshot-evidence.md](docs/screenshot-evidence.md#readme-gif-evidence-toolsevidence_gifpy).
+`tools/evidence_gif.py` is the shared recorder the other repositories use for their README GIFs: page × viewport × steps (⏺ `record` bursts, 🔍 `zoom` from one capture), captioned in Meiryo, in Chromium, Firefox or WebKit. Only screenshots cross the socket (identical ones skipped, ⏺ `clip` sends just the element); PySaiyanWeBoo's `gif.js` does palette, delta frames and LZW in the browser — no Pillow — under `--colors` / `--max-bytes` / `--max-frames`. Network refused and listed (`external`), pinned CDN assets answered locally with `--map PREFIX=DIR`. See [docs/screenshot-evidence.md](docs/screenshot-evidence.md#readme-gif-evidence-toolsevidence_gifpy).
 
 ## Python support
 
