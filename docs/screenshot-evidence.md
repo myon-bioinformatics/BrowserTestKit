@@ -267,3 +267,22 @@ remaining results if desired, and exit nonzero if any required consumer failed.
 Retain the full log and any GIF/JSON produced on failure. CI reruns and polling
 are operational follow-up, not part of the recording plan; a successful rerun
 must still be checked against the current PR head.
+
+
+### Shared failure reports with Err-o-RoadRunner
+
+[Err-o-RoadRunner #64](https://github.com/myon-bioinformatics/Err-o-RoadRunner/pull/64)
+adds `btk-evidence-gif/2` outcome aggregation to its existing `digest` command.
+Once that change is adopted at an explicit commit, run from the consumer outputs:
+
+```bash
+python -S "$ROADRUNNER/triage.py" digest artifacts/*/browser.json
+```
+
+It reports failed shots across receipts alongside JUnit failures (exit 1), and
+rejects malformed/inconsistent receipts (exit 2). It does not prove freshness,
+complete consumer coverage or GIF contents. Wrap each recorder with the existing
+RoadRunner `sentinel --exit-mode child` when command-level diagnostics are wanted;
+preserve the original command's failure even when no receipt was written. Keep
+aggregation in RoadRunner and app preparation/plans in the consumer. Reduced,
+redacted failure fixtures belong upstream in RoadRunner's regression tests.
