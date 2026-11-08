@@ -218,3 +218,52 @@ GIF encoded in 0.1–0.3 s inside the browser. `tests/python/test_evidence_gif.p
 the GIF back with a stdlib block parser, the engine itself and Pillow where installed; PySaiyanWeBoo checks
 `gif.js` against an independently written decoder (`tests/gif.node.js`) and in every engine (`GifBrowserTests`).
 It is review evidence, not a pixel baseline: GIF bytes depend on the browser build and fonts.
+
+### Portable execution from a consumer checkout
+
+Keep the recorder in BrowserTestKit and the encoder in PySaiyanWeBoo. Consumers
+keep their own plan, build/start commands, served directory and pinned CDN maps.
+The parent can coordinate these commands using its existing repository inventory;
+a second copy of the recorder or encoder is unnecessary. The recorder is also
+included by the existing `tools/` module packaging (`python -m evidence_gif` after
+installation). Pin the kit checkout and use its committed lock, including both
+`pages` and `browser` groups; install the matching Playwright engine once in that
+environment. This branch's recorder must reach the chosen upstream ref before
+consumers can adopt it from that ref.
+
+Run from the consumer root after building the served site from the intended
+checkout. Resolve the kit path before changing directories. For Bash on a host
+with GNU `timeout`, this preserves recording/timeout failures even when trimming
+console output:
+
+```bash
+set -euo pipefail
+# KIT is an absolute path to the explicitly pinned BrowserTestKit checkout.
+: "${KIT:?Set KIT to the pinned BrowserTestKit checkout}"
+tested_sha=$(git rev-parse HEAD)
+mkdir -p artifacts/evidence
+timeout 600 uv run --locked --project "$KIT" --group pages --group browser \
+  python "$KIT/tools/evidence_gif.py" artifacts/evidence/browser.gif \
+  --plan docs/evidence/browser.json --serve _site --sha "$tested_sha" \
+  2>&1 | tee artifacts/evidence/record.log | tail -2
+```
+
+Replace `_site` with the consumer's actual build directory and append its `--map`
+arguments. Keep generated run output separate from the committed input receipt
+until it has been reviewed. `--sha` records the consumer checkout, not the kit's
+SHA; it does not verify that a pre-existing build came from that checkout. Record
+the kit SHA and build command in the run log too. Do not reuse a successful old
+GIF/receipt after a failed new attempt; use a clean per-attempt output directory.
+
+For a consumer with a live backend, start it before recording, require a successful
+HTTP readiness check with a bounded deadline, and arrange cleanup with an `EXIT`
+trap. Stop and wait for only the PID started by that invocation; avoid a global
+`pkill -f` that could stop another consumer's server. A readiness timeout must fail
+the attempt rather than proceed with a stale or missing backend. Keep these
+application-specific startup commands in the owning repository.
+
+A parent batch should preserve each consumer's exit code, continue collecting the
+remaining results if desired, and exit nonzero if any required consumer failed.
+Retain the full log and any GIF/JSON produced on failure. CI reruns and polling
+are operational follow-up, not part of the recording plan; a successful rerun
+must still be checked against the current PR head.
