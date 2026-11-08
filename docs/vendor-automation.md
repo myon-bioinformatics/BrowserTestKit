@@ -44,13 +44,9 @@ The pinned shared tool uses anonymous public Git fallback on HTTP 403/429 for
 locked `materialize`. Locked placement preserves each entry's exact commit and
 verifies Git blob/SHA-256 before writing; other errors remain nonzero.
 
-## Canonical GitHub operations and evidence staging
-
-The parent owns `gh_ops.py` and its generic regression tests. `vendor.lock.json`
-records its exact source commit and verified bytes at `scripts/gh_ops.py`;
-GHI remains adjacent for installed-module compatibility. Consumer tests cover
-that wiring, while PR #48/#49 parity cases are maintained by the parent suite.
+## Evidence staging
 
 Vendor artifact uploads use the pinned parent `vendor_stage.py` with `--kind
 locked`. Source members come from the lock only. The staged `vendor-evidence.json`
-records member digests.
+records member digests. Parent-owned tools such as `gh_ops.py` stay in the
+parent repository; this kit no longer vendors them.

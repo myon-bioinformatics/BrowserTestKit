@@ -10,10 +10,10 @@ import zipfile
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-LEGACY = ('app_comparison app_digest app_digest_comment btk_events check_capture_evidence '
-          'check_evidence check_png evidence_board git_commit html_builder image_diff jsonl_digest '
+LEGACY = ('app_comparison app_digest btk_events check_capture_evidence '
+          'check_evidence check_png evidence_board html_builder image_diff jsonl_digest '
           'mirror_check page_inspect page_text platform_adapter platform_probe probe_capture_rejections '
-          'publish_check pw_install_plan py_matrix pytest_brief pytest_btk_events repo_overview '
+          'pw_install_plan pytest_btk_events '
           'terminal_browser write_capture_evidence').split()
 
 
