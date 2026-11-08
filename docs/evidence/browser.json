@@ -1,8 +1,8 @@
 {
   "schema": "btk-evidence-gif/1",
   "gif": "browser.gif",
-  "bytes": 144206,
-  "sha256": "658ac647906c2a799df04bda61d4aaf94d123b95512f05067fd62ed0b84dbf27",
+  "bytes": 143683,
+  "sha256": "41f536e6ce01a98c659fb3b003c50fdf278d8a108c4c57955f26a89a08a662ea",
   "frames": 17,
   "canvas": "720x512",
   "browser": "chromium 153.0.8010.12",
@@ -25,7 +25,8 @@
       "status": "pass",
       "errors": [],
       "allowed": [],
-      "external": []
+      "external": [],
+      "generator": null
     },
     {
       "label": "📱 fixture",
@@ -38,7 +39,8 @@
       "status": "pass",
       "errors": [],
       "allowed": [],
-      "external": []
+      "external": [],
+      "generator": null
     },
     {
       "label": "🖱️ interaction",
@@ -52,7 +54,8 @@
       "status": "pass",
       "errors": [],
       "allowed": [],
-      "external": []
+      "external": [],
+      "generator": null
     },
     {
       "label": "🔎 page inspect",
@@ -62,7 +65,8 @@
       "status": "pass",
       "errors": [],
       "allowed": [],
-      "external": []
+      "external": [],
+      "generator": null
     },
     {
       "label": "🧭 route trail",
@@ -72,7 +76,8 @@
       "status": "pass",
       "errors": [],
       "allowed": [],
-      "external": []
+      "external": [],
+      "generator": null
     },
     {
       "label": "🎯 hit probe",
@@ -82,7 +87,8 @@
       "status": "pass",
       "errors": [],
       "allowed": [],
-      "external": []
+      "external": [],
+      "generator": null
     },
     {
       "label": "🧪 platform probe",
@@ -92,9 +98,10 @@
       "status": "pass",
       "errors": [],
       "allowed": [
-        "console: Failed to find a valid digest in the 'integrity' attribute for resource 'http://127.0.0.1:43489/vendor/js/seedrandom.js' with computed SHA-384 integrity 'Qj6XJWUAR0RXLEb7I9aNoEMBOPRraB1dFw5WXtFDYrLgA3N/qQWVtz9YLeo0IZV+'. The resource has been blocked. @ http://127.0.0.1:43489/fixtures/platform_probe.html"
+        "console: Failed to find a valid digest in the 'integrity' attribute for resource 'http://127.0.0.1:36603/vendor/js/seedrandom.js' with computed SHA-384 integrity 'Qj6XJWUAR0RXLEb7I9aNoEMBOPRraB1dFw5WXtFDYrLgA3N/qQWVtz9YLeo0IZV+'. The resource has been blocked. @ http://127.0.0.1:36603/fixtures/platform_probe.html"
       ],
-      "external": []
+      "external": [],
+      "generator": null
     },
     {
       "label": "🗂️ platform matrix",
@@ -106,7 +113,8 @@
       "status": "pass",
       "errors": [],
       "allowed": [],
-      "external": []
+      "external": [],
+      "generator": "web_ui 1854362d625279f4278f917cd18bacd151bc69b4"
     },
     {
       "label": "📱 platform matrix",
@@ -116,7 +124,8 @@
       "status": "pass",
       "errors": [],
       "allowed": [],
-      "external": []
+      "external": [],
+      "generator": "web_ui 1854362d625279f4278f917cd18bacd151bc69b4"
     }
   ],
   "plan": [
