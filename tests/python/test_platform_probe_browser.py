@@ -50,7 +50,7 @@ def test_viewer_tabs_highlight_what_changed(tmp_path):
                          and r["env"]["browser"] == records[0]["env"]["browser"])
             page.get_by_role("button", name=other["env"]["device"], exact=True).click()
             second = page.locator("#head").inner_text()
-            changed = page.locator("td.changed").count()
+            changed = page.locator("td.ui-changed").count()
             rects = page.locator("#diagram rect").count()
         finally:
             browser.close()
