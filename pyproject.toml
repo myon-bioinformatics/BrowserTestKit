@@ -21,7 +21,7 @@ dev = [
 # The review pages (platform matrix, app digest) are built with PySaiyanWeBoo's web_ui; the pin is a commit.
 # Move it with: uv lock --upgrade-package pysaiyanweboo
 pages = [
-    "pysaiyanweboo @ git+https://github.com/myon-bioinformatics/PySaiyanWeBoo@1854362d625279f4278f917cd18bacd151bc69b4",
+    "pysaiyanweboo @ git+https://github.com/myon-bioinformatics/PySaiyanWeBoo@10d52554ec63c050ffe489d3f98af0747ce40d7a",
 ]
 browser = [
     "playwright>=1.64.1",
