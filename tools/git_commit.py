@@ -41,7 +41,7 @@ Runner = Callable[..., "subprocess.CompletedProcess[str]"]
 
 def _canonical_ops():
     """Load the adjacent locked parent implementation without a sys.path fallback."""
-    path = Path(__file__).resolve().parents[1] / "tools" / "gh_ops.py"
+    path = Path(__file__).resolve().with_name("gh_ops.py")
     spec = importlib.util.spec_from_file_location("_git_commit_parent_ops", path)
     if spec is None or spec.loader is None:
         raise ImportError(f"cannot load canonical gh_ops from {path}")

@@ -48,7 +48,7 @@ from pathlib import Path
 
 # Load the vendored sibling independently of site-packages/sys.path. This also
 # supports direct file imports and the installed top-level module entry point.
-_spec = importlib.util.spec_from_file_location("_btk_gh_identity", Path(__file__).resolve().parents[1] / "tools" / "gh_identity.py")
+_spec = importlib.util.spec_from_file_location("_btk_gh_identity", Path(__file__).resolve().with_name("gh_identity.py"))
 gh_identity = importlib.util.module_from_spec(_spec)
 assert _spec.loader
 _spec.loader.exec_module(gh_identity)
