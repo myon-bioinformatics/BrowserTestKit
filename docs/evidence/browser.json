@@ -1,13 +1,47 @@
 {
-  "schema": "btk-evidence-gif/1",
+  "schema": "btk-evidence-gif/2",
   "gif": "browser.gif",
-  "bytes": 143683,
-  "sha256": "41f536e6ce01a98c659fb3b003c50fdf278d8a108c4c57955f26a89a08a662ea",
+  "bytes": 112828,
+  "sha256": "2fd647190211d353be444a4cc274164d26fcdf2e71ebb1ffecba1ee1ca347b09",
   "frames": 17,
   "canvas": "720x512",
   "browser": "chromium 153.0.8010.12",
   "recorded": "2026-11-08",
-  "commit": null,
+  "commit": "a62f66d2632e896771285f6ccef29e989a6a623b",
+  "encoder": {
+    "module": "PySaiyanWeBoo web_ui gif.js",
+    "web_ui": "d55e14fcf3f088522259295e4a8cf9564beb5721",
+    "bytes": 112828,
+    "frames": 17,
+    "colors": 255,
+    "thin": 0,
+    "attempts": 1,
+    "stored": 17,
+    "merged": 0,
+    "buckets": 2186,
+    "overBudget": false,
+    "encodeMs": 128,
+    "images": 17,
+    "reused": 0,
+    "patches": 0,
+    "synthesized": 0,
+    "capture_s": 10.7
+  },
+  "limits": {
+    "colors": 255,
+    "max_bytes": null,
+    "max_frames": 300,
+    "last_hold_ms": 2000
+  },
+  "transfer": {
+    "screenshots": 17,
+    "png_bytes": 436111,
+    "identical": 0,
+    "patches": 0,
+    "calls": 9,
+    "sent_bytes": 581496,
+    "gif_bytes": 112828
+  },
   "mapped": [],
   "summary": {
     "pass": 9,
@@ -98,7 +132,7 @@
       "status": "pass",
       "errors": [],
       "allowed": [
-        "console: Failed to find a valid digest in the 'integrity' attribute for resource 'http://127.0.0.1:36603/vendor/js/seedrandom.js' with computed SHA-384 integrity 'Qj6XJWUAR0RXLEb7I9aNoEMBOPRraB1dFw5WXtFDYrLgA3N/qQWVtz9YLeo0IZV+'. The resource has been blocked. @ http://127.0.0.1:36603/fixtures/platform_probe.html"
+        "console: Failed to find a valid digest in the 'integrity' attribute for resource 'http://127.0.0.1:36713/vendor/js/seedrandom.js' with computed SHA-384 integrity 'Qj6XJWUAR0RXLEb7I9aNoEMBOPRraB1dFw5WXtFDYrLgA3N/qQWVtz9YLeo0IZV+'. The resource has been blocked. @ http://127.0.0.1:36713/fixtures/platform_probe.html"
       ],
       "external": [],
       "generator": null
@@ -114,7 +148,7 @@
       "errors": [],
       "allowed": [],
       "external": [],
-      "generator": "web_ui 1854362d625279f4278f917cd18bacd151bc69b4"
+      "generator": "web_ui d55e14fcf3f088522259295e4a8cf9564beb5721"
     },
     {
       "label": "📱 platform matrix",
@@ -125,7 +159,7 @@
       "errors": [],
       "allowed": [],
       "external": [],
-      "generator": "web_ui 1854362d625279f4278f917cd18bacd151bc69b4"
+      "generator": "web_ui d55e14fcf3f088522259295e4a8cf9564beb5721"
     }
   ],
   "plan": [
