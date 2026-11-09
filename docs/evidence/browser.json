@@ -1,0 +1,253 @@
+{
+  "schema": "btk-evidence-gif/2",
+  "gif": "browser.gif",
+  "bytes": 112828,
+  "sha256": "2fd647190211d353be444a4cc274164d26fcdf2e71ebb1ffecba1ee1ca347b09",
+  "frames": 17,
+  "canvas": "720x512",
+  "browser": "chromium 153.0.8010.12",
+  "recorded": "2026-11-08",
+  "commit": "a62f66d2632e896771285f6ccef29e989a6a623b",
+  "encoder": {
+    "module": "PySaiyanWeBoo web_ui gif.js",
+    "web_ui": "d55e14fcf3f088522259295e4a8cf9564beb5721",
+    "bytes": 112828,
+    "frames": 17,
+    "colors": 255,
+    "thin": 0,
+    "attempts": 1,
+    "stored": 17,
+    "merged": 0,
+    "buckets": 2186,
+    "overBudget": false,
+    "encodeMs": 128,
+    "images": 17,
+    "reused": 0,
+    "patches": 0,
+    "synthesized": 0,
+    "capture_s": 10.7
+  },
+  "limits": {
+    "colors": 255,
+    "max_bytes": null,
+    "max_frames": 300,
+    "last_hold_ms": 2000
+  },
+  "transfer": {
+    "screenshots": 17,
+    "png_bytes": 436111,
+    "identical": 0,
+    "patches": 0,
+    "calls": 9,
+    "sent_bytes": 581496,
+    "gif_bytes": 112828
+  },
+  "mapped": [],
+  "summary": {
+    "pass": 9,
+    "fail": 0
+  },
+  "shots": [
+    {
+      "label": "🏠 fixture",
+      "url": "/fixtures/index.html",
+      "viewport": "1280x800",
+      "steps": [
+        "fill #name",
+        "click #submit"
+      ],
+      "status": "pass",
+      "errors": [],
+      "allowed": [],
+      "external": [],
+      "generator": null
+    },
+    {
+      "label": "📱 fixture",
+      "url": "/fixtures/index.html",
+      "viewport": "392x848",
+      "steps": [
+        "fill #name",
+        "click #submit"
+      ],
+      "status": "pass",
+      "errors": [],
+      "allowed": [],
+      "external": [],
+      "generator": null
+    },
+    {
+      "label": "🖱️ interaction",
+      "url": "/fixtures/interaction.html",
+      "viewport": "1280x800",
+      "steps": [
+        "click #quiet",
+        "scroll 1400",
+        "eval ⚙️"
+      ],
+      "status": "pass",
+      "errors": [],
+      "allowed": [],
+      "external": [],
+      "generator": null
+    },
+    {
+      "label": "🔎 page inspect",
+      "url": "/fixtures/page_inspect.html",
+      "viewport": "1280x800",
+      "steps": [],
+      "status": "pass",
+      "errors": [],
+      "allowed": [],
+      "external": [],
+      "generator": null
+    },
+    {
+      "label": "🧭 route trail",
+      "url": "/fixtures/route_trail.html",
+      "viewport": "1280x800",
+      "steps": [],
+      "status": "pass",
+      "errors": [],
+      "allowed": [],
+      "external": [],
+      "generator": null
+    },
+    {
+      "label": "🎯 hit probe",
+      "url": "/fixtures/hit_probe.html",
+      "viewport": "392x848",
+      "steps": [],
+      "status": "pass",
+      "errors": [],
+      "allowed": [],
+      "external": [],
+      "generator": null
+    },
+    {
+      "label": "🧪 platform probe",
+      "url": "/fixtures/platform_probe.html",
+      "viewport": "1280x800",
+      "steps": [],
+      "status": "pass",
+      "errors": [],
+      "allowed": [
+        "console: Failed to find a valid digest in the 'integrity' attribute for resource 'http://127.0.0.1:36713/vendor/js/seedrandom.js' with computed SHA-384 integrity 'Qj6XJWUAR0RXLEb7I9aNoEMBOPRraB1dFw5WXtFDYrLgA3N/qQWVtz9YLeo0IZV+'. The resource has been blocked. @ http://127.0.0.1:36713/fixtures/platform_probe.html"
+      ],
+      "external": [],
+      "generator": null
+    },
+    {
+      "label": "🗂️ platform matrix",
+      "url": "/test-results/evidence/platform-matrix.html",
+      "viewport": "1280x800",
+      "steps": [
+        "click text=Pixel 7"
+      ],
+      "status": "pass",
+      "errors": [],
+      "allowed": [],
+      "external": [],
+      "generator": "web_ui d55e14fcf3f088522259295e4a8cf9564beb5721"
+    },
+    {
+      "label": "📱 platform matrix",
+      "url": "/test-results/evidence/platform-matrix.html",
+      "viewport": "392x848",
+      "steps": [],
+      "status": "pass",
+      "errors": [],
+      "allowed": [],
+      "external": [],
+      "generator": "web_ui d55e14fcf3f088522259295e4a8cf9564beb5721"
+    }
+  ],
+  "plan": [
+    {
+      "label": "🏠 fixture",
+      "url": "/fixtures/index.html",
+      "viewport": "1280x800",
+      "steps": [
+        {
+          "fill": [
+            "#name",
+            "Myon"
+          ]
+        },
+        {
+          "click": "#submit"
+        }
+      ]
+    },
+    {
+      "label": "📱 fixture",
+      "url": "/fixtures/index.html",
+      "viewport": "392x848",
+      "steps": [
+        {
+          "fill": [
+            "#name",
+            "スマホ"
+          ]
+        },
+        {
+          "click": "#submit"
+        }
+      ]
+    },
+    {
+      "label": "🖱️ interaction",
+      "url": "/fixtures/interaction.html",
+      "viewport": "1280x800",
+      "steps": [
+        {
+          "click": "#quiet"
+        },
+        {
+          "scroll": 1400
+        },
+        {
+          "eval": "document.getElementById('target').click()"
+        }
+      ]
+    },
+    {
+      "label": "🔎 page inspect",
+      "url": "/fixtures/page_inspect.html",
+      "viewport": "1280x800"
+    },
+    {
+      "label": "🧭 route trail",
+      "url": "/fixtures/route_trail.html",
+      "viewport": "1280x800"
+    },
+    {
+      "label": "🎯 hit probe",
+      "url": "/fixtures/hit_probe.html",
+      "viewport": "392x848"
+    },
+    {
+      "label": "🧪 platform probe",
+      "url": "/fixtures/platform_probe.html",
+      "viewport": "1280x800",
+      "allow": [
+        "integrity"
+      ]
+    },
+    {
+      "label": "🗂️ platform matrix",
+      "url": "/test-results/evidence/platform-matrix.html",
+      "viewport": "1280x800",
+      "steps": [
+        {
+          "click": "text=Pixel 7"
+        }
+      ]
+    },
+    {
+      "label": "📱 platform matrix",
+      "url": "/test-results/evidence/platform-matrix.html",
+      "viewport": "392x848"
+    }
+  ]
+}

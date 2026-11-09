@@ -1,20 +1,15 @@
 """settle: a quiet window without an LLM (Stagehand quietWait rule); redaction ported from Stagehand."""
-import functools
-import json
-import subprocess
-import sys
-import threading
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
+import functools, json, subprocess, sys, threading
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer; from pathlib import Path
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT / "tools"))
 
 import btk  # noqa: E402
 
-SCRIPT = ROOT / "scripts" / "btk.py"
+SCRIPT = ROOT / "tools" / "btk.py"
 
 SETTLES = """<!doctype html><meta charset="utf-8"><title>settles</title><p id="p">0</p>
 <script>

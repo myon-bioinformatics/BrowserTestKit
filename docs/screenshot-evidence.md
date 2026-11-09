@@ -166,3 +166,123 @@ isolated temporary copies (missing image, wrong hash, stale run ID, failed recei
 and requires each to fail the same validator. It never modifies the actual evidence.
 Use the same expect/captures/SHA/run/attempt and receipt pattern as the real lane.
 A mixed-engine bundle must be named honestly; it is not an individual engine project.
+
+## README GIF evidence (`tools/evidence_gif.py`)
+
+A README wants one picture a reviewer can watch, not a bundle to download. `tools/evidence_gif.py`
+records a plan of shots (page × viewport × steps: `click`, `fill`, `select`, `press`, `scroll`, `wait`,
+`eval`, ⏺ `record`, 🔍 `zoom`) in Chromium, Firefox or WebKit (`--browser`) and writes
+`docs/evidence/browser.gif` plus `docs/evidence/browser.json`.
+
+```
+uv run --project ../BrowserTestKit --group pages --group browser \
+  python ../BrowserTestKit/tools/evidence_gif.py docs/evidence/browser.gif --serve _site --plan docs/evidence/browser.json
+```
+
+🔌 Where the bytes go — Python drives, the browser does the pixel work, nothing is shipped twice:
+
+```
+page ──📸 PNG──▶ Python ──(identical? ♻️ skip)──▶ encoder page ──🎞️ GIF──▶ Python
+                 sha256          one call per shot (≤ 4 MiB base64)    once, at the end
+```
+
+- 📸 Playwright's screenshot is the only image that crosses the socket, once. A byte-identical screenshot
+  (a step that changed nothing) is not sent again; ⏺ `record` with `clip` sends only the element's box and the
+  encoder lays it on the last full screenshot.
+- 🧱 The encoder page is PySaiyanWeBoo's `web_ui.gif_recorder_document()`, built from Python. The browser decodes,
+  fits, zooms and captions on a canvas (Meiryo, Japanese fallbacks; no font file), and `gif.js` adds only what no
+  browser offers: a 6-bit bucket histogram while frames arrive, changed rectangles only, one global palette
+  (exact when it fits, else median cut + refinement), tight delta frames (transparent where unchanged when that
+  is smaller), 12-bit LZW → GIF89a. No Pillow, no image library, in any engine.
+- 🔍 `zoom` eases onto an element (outlined) in `steps` frames over `ms` and holds — all drawn from one capture.
+- ⏺ `record` captures every `every` ms for `for` ms (delays are the measured ones), for animations and transitions.
+- 🎚️ Limits: `--colors` (≤ 255), `--max-bytes 800K` (fewer colours, then fewer ⏺ frames, until it fits; over
+  budget is reported, not fatal), `--max-frames` (⏺ frames are cut first), `--hold`, `--last-hold`,
+  `--width/--height` (multiples of 8). Delays are centiseconds ≥ 2 (browsers stretch 0–1 cs to 10 cs), rounded on
+  the real timeline so the total stays true; the GIF loops forever.
+- 🌐 For served (`/…`) shots every request leaving 127.0.0.1 is refused and listed under `external`; it
+  does not fail the shot, so the evidence never depends on the network. `--map PREFIX=DIR` answers a pinned
+  CDN prefix (jsDelivr web-ui CSS, cdn.plot.ly) from a local checkout so the page is recorded styled.
+- ⛔ A page error, console error (with its URL) or HTTP ≥ 400 fails the shot; `"allow": ["text"]` keeps
+  errors a fixture raises on purpose (a deliberately wrong SRI hash) under `allowed` instead. Exit 1 still
+  writes the GIF so the failure can be seen.
+- 🏷️ Each shot records the page's `<meta name="generator">` as `generator` (PySaiyanWeBoo's `web_ui` writes
+  `web_ui <commit>`), so the receipt says which generator drew what the GIF shows.
+- 🧾 The receipt (`btk-evidence-gif/2`) holds the GIF's sha256, frames, browser, tested commit, per-shot results,
+  the encoder's report (colours, buckets, merged / synthesised frames, budget steps), `transfer` (screenshots,
+  PNG KiB, identical skipped, patches, KiB sent, calls, GIF KiB) and the plan itself, so `--plan
+  docs/evidence/browser.json` re-records the same GIF.
+
+📊 Re-recording every repository's existing plan with this encoder (same frames): 2635 → 2134 KiB (−19 %), each
+GIF encoded in 0.1–0.3 s inside the browser. `tests/python/test_evidence_gif.py` records in each engine and reads
+the GIF back with a stdlib block parser, the engine itself and Pillow where installed; PySaiyanWeBoo checks
+`gif.js` against an independently written decoder (`tests/gif.node.js`) and in every engine (`GifBrowserTests`).
+It is review evidence, not a pixel baseline: GIF bytes depend on the browser build and fonts.
+
+### Portable execution from a consumer checkout
+
+Keep the recorder in BrowserTestKit and the encoder in PySaiyanWeBoo. Consumers
+keep their own plan, build/start commands, served directory and pinned CDN maps.
+The parent can coordinate these commands using its existing repository inventory;
+a second copy of the recorder or encoder is unnecessary. The recorder is also
+included by the existing `tools/` module packaging (`python -m evidence_gif` after
+installation). Pin the kit checkout and use its committed lock, including both
+`pages` and `browser` groups; install the matching Playwright engine once in that
+environment. This branch's recorder must reach the chosen upstream ref before
+consumers can adopt it from that ref.
+
+Run from the consumer root after building the served site from the intended
+checkout. Resolve the kit path before changing directories. For Bash on a host
+with GNU `timeout`, this preserves recording/timeout failures even when trimming
+console output:
+
+```bash
+set -euo pipefail
+# KIT is an absolute path to the explicitly pinned BrowserTestKit checkout.
+: "${KIT:?Set KIT to the pinned BrowserTestKit checkout}"
+tested_sha=$(git rev-parse HEAD)
+mkdir -p artifacts/evidence
+timeout 600 uv run --locked --project "$KIT" --group pages --group browser \
+  python "$KIT/tools/evidence_gif.py" artifacts/evidence/browser.gif \
+  --plan docs/evidence/browser.json --serve _site --sha "$tested_sha" \
+  2>&1 | tee artifacts/evidence/record.log | tail -2
+```
+
+Replace `_site` with the consumer's actual build directory and append its `--map`
+arguments. Keep generated run output separate from the committed input receipt
+until it has been reviewed. `--sha` records the consumer checkout, not the kit's
+SHA; it does not verify that a pre-existing build came from that checkout. Record
+the kit SHA and build command in the run log too. Do not reuse a successful old
+GIF/receipt after a failed new attempt; use a clean per-attempt output directory.
+
+For a consumer with a live backend, start it before recording, require a successful
+HTTP readiness check with a bounded deadline, and arrange cleanup with an `EXIT`
+trap. Stop and wait for only the PID started by that invocation; avoid a global
+`pkill -f` that could stop another consumer's server. A readiness timeout must fail
+the attempt rather than proceed with a stale or missing backend. Keep these
+application-specific startup commands in the owning repository.
+
+A parent batch should preserve each consumer's exit code, continue collecting the
+remaining results if desired, and exit nonzero if any required consumer failed.
+Retain the full log and any GIF/JSON produced on failure. CI reruns and polling
+are operational follow-up, not part of the recording plan; a successful rerun
+must still be checked against the current PR head.
+
+
+### Shared failure reports with Err-o-RoadRunner
+
+[Err-o-RoadRunner #64](https://github.com/myon-bioinformatics/Err-o-RoadRunner/pull/64)
+adds `btk-evidence-gif/2` outcome aggregation to its existing `digest` command.
+Once that change is adopted at an explicit commit, run from the consumer outputs:
+
+```bash
+python -S "$ROADRUNNER/triage.py" digest artifacts/*/browser.json
+```
+
+It reports failed shots across receipts alongside JUnit failures (exit 1), and
+rejects malformed/inconsistent receipts (exit 2). It does not prove freshness,
+complete consumer coverage or GIF contents. Wrap each recorder with the existing
+RoadRunner `sentinel --exit-mode child` when command-level diagnostics are wanted;
+preserve the original command's failure even when no receipt was written. Keep
+aggregation in RoadRunner and app preparation/plans in the consumer. Reduced,
+redacted failure fixtures belong upstream in RoadRunner's regression tests.

@@ -1,15 +1,11 @@
 """Real browsers exercise shared navigation, readiness and resumable execution."""
-import asyncio
-import importlib.util
-import json
-import subprocess
-import sys
+import asyncio, importlib.util, json, subprocess, sys
 from pathlib import Path
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-spec = importlib.util.spec_from_file_location("route_trail", ROOT / "scripts" / "route_trail.py")
+spec = importlib.util.spec_from_file_location("route_trail", ROOT / "tools" / "route_trail.py")
 route_trail = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(route_trail)
 BASE = (ROOT / "fixtures" / "route_trail_delayed.html").as_uri()
@@ -76,7 +72,7 @@ def test_async_walk(browser_name, tmp_path):
 @pytest.mark.browser
 @pytest.mark.parametrize("backend", ("python", "python-async"))
 def test_cli_run_from_stdlib_parent(backend):
-    args = [sys.executable, "-S", str(ROOT / "scripts/route_trail.py"), "🏠 ↔ 🌍",
+    args = [sys.executable, "-S", str(ROOT / "tools/route_trail.py"), "🏠 ↔ 🌍",
             "--registry", str(ROOT / "fixtures/route_trail_execution.json"), "--base", BASE,
             "--run", "--backend", backend, "--json"]
     child = subprocess.run(args, capture_output=True, text=True, timeout=30)

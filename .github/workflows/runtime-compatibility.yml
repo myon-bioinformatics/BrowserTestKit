@@ -26,11 +26,14 @@ jobs:
           version: "latest"
           python-version: "${{ matrix.python }}"
           activate-environment: true
-          enable-cache: false
+          enable-cache: true
+          # Pull requests restore the cache and never write it; only main saves it.
+          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          prune-cache: true
       - name: Dependency-free source tests
         run: python -S -m unittest discover -s tests/stdlib -v
       - name: Image CLI help without site packages
-        run: python -S scripts/image_diff.py --help
+        run: python -S tools/image_diff.py --help
       - name: Install the base distribution with no runtime dependencies
         run: |
           uv pip install --no-deps .
@@ -52,7 +55,10 @@ jobs:
           version: "latest"
           python-version: "3.11"
           activate-environment: true
-          enable-cache: false
+          enable-cache: true
+          # Pull requests restore the cache and never write it; only main saves it.
+          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          prune-cache: true
       - name: Fetch pinned shared vendor tool
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -63,7 +69,7 @@ jobs:
       - name: Resolve all supported groups from the lock
         run: uv sync --locked --all-groups
       - name: Image CLI at the supported floor
-        run: python -S scripts/image_diff.py --help
+        run: python -S tools/image_diff.py --help
       - name: Full browserless regression suite at the supported floor
         run: uv run --locked python -m pytest tests/python -q -m 'not browser'
       - name: Build and inspect the distributable package

@@ -9,7 +9,7 @@ There is deliberately no ``conftest.py`` anywhere in this kit that would load
 this plugin implicitly -- browser-test-kit is used across projects, and a
 pytest plugin that starts writing files just because it is importable would
 surprise every one of them. Loading it with ``-p`` and PYTHONPATH pointing at
-``scripts/`` (or installing it) is the only way it activates; without
+``tools/`` (or installing it) is the only way it activates; without
 ``--btk-events`` it registers no behavior at all.
 
 Per test, this writes one ``event: "test_result"`` btk-event/1 record (see
@@ -52,10 +52,8 @@ that merely inspects this file (for example ``python -S -m pytest_btk_events
 """
 from __future__ import annotations
 
-import argparse
-import os
-from pathlib import Path
-from typing import Any, Union
+import argparse, os
+from pathlib import Path; from typing import Any, Union
 
 import btk_events
 

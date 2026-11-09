@@ -9,7 +9,7 @@ import { pathToFileURL } from 'node:url';
 let workerBudget, choice;
 test.beforeAll(async () => {
   ({ workerBudget, choice } = await new Function('url', 'return import(url)')(
-    pathToFileURL(path.resolve('scripts/browser_execution.mjs')).href));
+    pathToFileURL(path.resolve('tools/browser_execution.mjs')).href));
 });
 
 test('small/container runners stay bounded; explicit diagnostics can serialize', () => {
@@ -85,7 +85,7 @@ test('actual Playwright workers overlap, replace a failed worker, and finish rem
 test('bounded exploration preserves receipts, original failures and listener cleanup', async () => {
   const { EventEmitter } = await import('node:events');
   const { explore, ExplorationError } = await new Function('url', 'return import(url)')(
-    pathToFileURL(path.resolve('scripts/browser_execution.mjs')).href);
+    pathToFileURL(path.resolve('tools/browser_execution.mjs')).href);
   let inputs = 0;
   const page = Object.assign(new EventEmitter(), {
     locator: () => ({ count: async () => 0 }),
@@ -122,7 +122,7 @@ test('bounded exploration preserves receipts, original failures and listener cle
 test('a candidate that vanishes after enumeration is recorded without a long wait', async () => {
   const { EventEmitter } = await import('node:events');
   const { explore, ExplorationError } = await new Function('url', 'return import(url)')(
-    pathToFileURL(path.resolve('scripts/browser_execution.mjs')).href);
+    pathToFileURL(path.resolve('tools/browser_execution.mjs')).href);
   const timeout = Object.assign(new Error('candidate is no longer present'), { name: 'TimeoutError' });
   let checks = 0;
   const candidate = { isVisible: async () => true,
@@ -153,7 +153,7 @@ test('a candidate that vanishes after enumeration is recorded without a long wai
 test('a selected action timeout remains a failure instead of being reclassified as absent', async () => {
   const { EventEmitter } = await import('node:events');
   const { explore } = await new Function('url', 'return import(url)')(
-    pathToFileURL(path.resolve('scripts/browser_execution.mjs')).href);
+    pathToFileURL(path.resolve('tools/browser_execution.mjs')).href);
   const cause = Object.assign(new Error('selected input disappeared'), { name: 'TimeoutError' });
   const item = { isVisible: async () => true, isEditable: async () => true,
     getAttribute: async () => { throw cause; } };
@@ -175,7 +175,7 @@ test('a selected action timeout remains a failure instead of being reclassified 
 test('repeated availability races cannot exhaust the whole page test budget', async () => {
   const { EventEmitter } = await import('node:events');
   const { explore } = await new Function('url', 'return import(url)')(
-    pathToFileURL(path.resolve('scripts/browser_execution.mjs')).href);
+    pathToFileURL(path.resolve('tools/browser_execution.mjs')).href);
   const item = { isVisible: async () => true, isEditable: async () => {
     await new Promise(resolve => setTimeout(resolve, 260));
     throw Object.assign(new Error('gone'), { name: 'TimeoutError' });

@@ -1,19 +1,14 @@
 """Dependency-free support checks, run with python -S on Python 3.11+."""
-import base64
-import importlib
-import pathlib
-import subprocess
-import sys
-import unittest
+import base64, importlib, pathlib, subprocess, sys, unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT / "tools"))
 sys.path.insert(0, str(ROOT / "tools"))
 
 
 class StdlibSupport(unittest.TestCase):
     def test_imports_without_site_packages(self):
-        for source in sorted((ROOT / "scripts").glob("*.py")) + sorted((ROOT / "tools").glob("*.py")):
+        for source in sorted((ROOT / "tools").glob("*.py")):
             if source.name == "pytest_btk_events.py":
                 continue  # Explicit pytest plugin belongs to the 3.11+ dev lane.
             with self.subTest(module=source.stem):
@@ -40,7 +35,7 @@ class StdlibSupport(unittest.TestCase):
         for name in ("check_png", "page_text", "image_diff"):
             with self.subTest(module=name):
                 result = subprocess.run(
-                    [sys.executable, "-S", str(next(d / (name + ".py") for d in (ROOT / "scripts", ROOT / "tools") if (d / (name + ".py")).exists())), "--help"],
+                    [sys.executable, "-S", str(ROOT / "tools" / (name + ".py")), "--help"],
                     capture_output=True, text=True, timeout=30,
                 )
                 self.assertEqual(result.returncode, 0, result.stderr)

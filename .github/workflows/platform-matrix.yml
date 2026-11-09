@@ -36,7 +36,10 @@ jobs:
           version: "latest"
           python-version: "3.15"
           activate-environment: true
-          enable-cache: false
+          enable-cache: true
+          # Pull requests restore the cache and never write it; only main saves it.
+          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          prune-cache: true
       - name: System libraries (apt on Linux, bounded; installed before the browsers)
         if: runner.os == 'Linux'
         timeout-minutes: 20 # Match the published WebKit lane's bounded apt allowance.
@@ -96,10 +99,11 @@ jobs:
         with:
           pattern: platform-*
           path: platform-results
-      - name: Merge and render the tabbed comparison
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - name: Merge and render the tabbed comparison (the page is built with PySaiyanWeBoo's web_ui)
         run: |
           python -S tools/platform_probe.py merge platform-results --out platform-matrix/dataset.json
-          python -S tools/platform_probe.py render platform-matrix/dataset.json --out platform-matrix/index.html
+          uv run --locked --group pages python tools/platform_probe.py render platform-matrix/dataset.json --out platform-matrix/index.html
           python -S tools/platform_probe.py summary platform-matrix/dataset.json > platform-matrix/summary.txt || true
           { echo '```text'; cat platform-matrix/summary.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

@@ -3,7 +3,7 @@ import importlib.util
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-spec = importlib.util.spec_from_file_location("btk", ROOT / "scripts" / "btk.py")
+spec = importlib.util.spec_from_file_location("btk", ROOT / "tools" / "btk.py")
 pip = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(pip)
 
@@ -84,7 +84,7 @@ def test_platform_matrix_keeps_the_unflagged_install(capsys):
     assert 'collect --browser "$browser" --profile "$profile"' in workflow
     assert pip.plan_cli([str(ROOT)]) == 0
     out = capsys.readouterr().out
-    assert "platform-matrix.yml:48 full + shell (job uses both the full build and the shell)" in out
+    assert "platform-matrix.yml:51 full + shell (job uses both the full build and the shell)" in out
     assert "suggest" not in out
 
 

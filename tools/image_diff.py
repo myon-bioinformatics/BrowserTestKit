@@ -7,13 +7,7 @@ Source forms: PATH or ZIP::member. Exit 0 = identical (within --tolerance), 1 = 
 """
 from __future__ import annotations
 
-import argparse
-import importlib.util
-import io
-import math
-import os
-import sys
-import zipfile
+import argparse, importlib.util, io, math, os, sys, zipfile
 from pathlib import Path
 
 

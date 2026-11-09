@@ -1,20 +1,8 @@
 #!/usr/bin/env python3
 """Manual Linux experiment; all evidence is written outside the checkout."""
 from __future__ import annotations
-import argparse
-import hashlib
-import importlib.util
-import json
-import os
-from pathlib import Path
-import shutil
-import subprocess
-import sys
-import time
-import urllib.request
-import zipfile
-import io
-from types import SimpleNamespace
+import argparse, hashlib, importlib.util, io, json, os, shutil, subprocess, sys, time, urllib.request, zipfile
+from pathlib import Path; from types import SimpleNamespace
 import nano_bun as adapter
 
 PARENT = '3128b4019b9949a6ccc80c686cd84c93f04af119'
@@ -130,10 +118,10 @@ def measure(job, cache):
             'receipt': json.loads((job / 'receipt.json').read_text())}
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     root = args.output.resolve()
     root.mkdir(mode=0o700, parents=True, exist_ok=False)
     summary = {'status': 'failed', 'conditions': {}, 'parent': PARENT, 'helper_sha256': HELPER_SHA,

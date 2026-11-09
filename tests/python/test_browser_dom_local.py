@@ -1,11 +1,6 @@
 """Exercise real Chromium against a deterministic local HTTP fixture."""
-import functools
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-import json
-from pathlib import Path
-import subprocess
-import sys
-import threading
+import functools, json, subprocess, sys, threading
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer; from pathlib import Path
 import pytest
 
 

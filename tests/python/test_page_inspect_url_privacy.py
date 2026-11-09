@@ -1,18 +1,11 @@
 """URL evidence drops values without changing the URLs sent to the browser."""
-import functools
-import json
-import os
-import shutil
-import subprocess
-import sys
-import threading
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
+import functools, json, os, shutil, subprocess, sys, threading
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer; from pathlib import Path
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT / "tools"))
 import btk
 
 QUERY = "private-query-42"
@@ -71,9 +64,9 @@ def run_cli(entrypoint, args):
         node = shutil.which("node")
         assert node, "Node 26+ is required for the URL privacy parity checks"
         command = [node, str(ROOT / "vendor" / "py_launch.cjs"), "--env-var", "BTK_PYTHON", "--site",
-                   str(ROOT / "scripts" / "btk.py")]
+                   str(ROOT / "tools" / "btk.py")]
     else:
-        command = [sys.executable, str(ROOT / "scripts" / "btk.py")]
+        command = [sys.executable, str(ROOT / "tools" / "btk.py")]
     return subprocess.run(command + args, capture_output=True, text=True, timeout=120,
                           env={**os.environ, "PYTHON": sys.executable, "BTK_PYTHON": sys.executable})
 

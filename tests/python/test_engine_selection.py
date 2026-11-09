@@ -1,7 +1,5 @@
 """BTK_BROWSER_ENGINES chooses which optional engines a browser lane collects (offline collect-only)."""
-import os
-import subprocess
-import sys
+import os, subprocess, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]

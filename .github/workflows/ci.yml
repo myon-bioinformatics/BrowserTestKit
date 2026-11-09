@@ -28,7 +28,10 @@ jobs:
           version: "latest"
           python-version: "3.15"
           activate-environment: true
-          enable-cache: false
+          enable-cache: true
+          # Pull requests restore the cache and never write it; only main saves it.
+          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          prune-cache: true
       - run: npm ci --ignore-scripts
       - run: npm run test:browserless
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -215,7 +218,10 @@ jobs:
           version: "latest"
           python-version: "3.15"
           activate-environment: true
-          enable-cache: false
+          enable-cache: true
+          # Pull requests restore the cache and never write it; only main saves it.
+          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          prune-cache: true
       - name: Fetch pinned shared vendor tool
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -291,35 +297,38 @@ jobs:
           version: "latest"
           python-version: "3.15"
           activate-environment: true
-          enable-cache: false
+          enable-cache: true
+          # Pull requests restore the cache and never write it; only main saves it.
+          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          prune-cache: true
       - name: Install browsers (first attempt)
         id: install_first
         continue-on-error: true
         timeout-minutes: 6
-        run: uv run --locked --no-dev --group browser-test python -m playwright install --only-shell chromium
+        run: uv run --locked --no-dev --group browser-test --group pages python -m playwright install --only-shell chromium
       - name: Install browsers (retry a stalled first attempt)
         if: steps.install_first.outcome == 'failure'
         timeout-minutes: 6
-        run: uv run --locked --no-dev --group browser-test python -m playwright install --only-shell chromium
+        run: uv run --locked --no-dev --group browser-test --group pages python -m playwright install --only-shell chromium
       - name: System libraries for the headless shell (apt only when ldd reports missing ones)
         run: |
           shell=$(find "$HOME/.cache/ms-playwright" -name chrome-headless-shell -print -quit)
           test -n "$shell"
           libs=$(for f in "$(dirname "$shell")"/*; do ldd "$f" 2>/dev/null || true; done)
           if ! grep -q '=>' <<<"$libs" || grep -q 'not found' <<<"$libs"; then
-            uv run --locked --no-dev --group browser-test python -m playwright install-deps --only-shell chromium
+            uv run --locked --no-dev --group browser-test --group pages python -m playwright install-deps --only-shell chromium
           else
             echo 'headless shell libraries are present; skipping apt'
           fi
       - name: Node launch tests (py_launch --site; observe, act, scenario in Chromium)
         run: |
-          BTK_PYTHON="$(uv run --locked --no-dev --group browser-test python -c 'import sys; print(sys.executable)')"
+          BTK_PYTHON="$(uv run --locked --no-dev --group browser-test --group pages python -c 'import sys; print(sys.executable)')"
           export BTK_PYTHON
           BTK_REQUIRE_PLAYWRIGHT=1 node --test tests/node-unit/page_inspect.test.mjs tests/node-launch/btk_playwright.test.mjs
       - name: Run Python browser tests with JUnit (Chromium only)
         env:
           BTK_BROWSER_ENGINES: chromium
-        run: uv run --locked --no-dev --group browser-test python -m pytest tests/python -q -m browser --junitxml=test-results/junit/python-browser-3.15.xml
+        run: uv run --locked --no-dev --group browser-test --group pages python -m pytest tests/python -q -m browser --junitxml=test-results/junit/python-browser-3.15.xml
       - name: Preserve browser JUnit
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -333,7 +342,7 @@ jobs:
         run: python tools/check_evidence.py test-results/python --pattern '*.json' --expect chromium-desktop,chromium-mobile
       - name: Python Playwright CLI screenshot (Chromium)
         run: |
-          uv run --locked --no-dev --group browser-test python -m playwright screenshot --browser=chromium --device="Desktop Chrome" --full-page "file://$GITHUB_WORKSPACE/fixtures/index.html" test-results/python-cli-chromium.png
+          uv run --locked --no-dev --group browser-test --group pages python -m playwright screenshot --browser=chromium --device="Desktop Chrome" --full-page "file://$GITHUB_WORKSPACE/fixtures/index.html" test-results/python-cli-chromium.png
           python tools/check_png.py test-results/python-cli-chromium.png
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
@@ -361,11 +370,14 @@ jobs:
           version: "latest"
           python-version: "3.15"
           activate-environment: true
-          enable-cache: false
+          enable-cache: true
+          # Pull requests restore the cache and never write it; only main saves it.
+          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          prune-cache: true
       - name: Check system libraries (dry run, no changes)
         id: deps_check
         continue-on-error: true
-        run: uv run --locked --no-dev --group browser-test python -m playwright install-deps --dry-run firefox webkit
+        run: uv run --locked --no-dev --group browser-test --group pages python -m playwright install-deps --dry-run firefox webkit
       # Same apt download cache as the node job (only main writes it).
       - name: Restore apt downloads (written only by main)
         if: steps.deps_check.outcome == 'failure'
@@ -384,7 +396,7 @@ jobs:
           before=$(debs)
           echo "Dir::Cache::Archives \"$archives/\";" | sudo tee /etc/apt/apt.conf.d/90-ci-archives >/dev/null
           sudo DEBIAN_FRONTEND=noninteractive dpkg --configure -a
-          uv run --locked --no-dev --group browser-test python -m playwright install-deps firefox webkit
+          uv run --locked --no-dev --group browser-test --group pages python -m playwright install-deps firefox webkit
           sudo apt-get autoclean -qq
           sudo rm -rf "$archives/partial" "$archives/lock"; sudo chown -R "$(id -u):$(id -g)" "$archives"
           [ "$(debs)" = "$before" ] || echo changed=true >> "$GITHUB_OUTPUT"
@@ -398,15 +410,15 @@ jobs:
         id: install_first
         continue-on-error: true
         timeout-minutes: 6
-        run: uv run --locked --no-dev --group browser-test python -m playwright install firefox webkit
+        run: uv run --locked --no-dev --group browser-test --group pages python -m playwright install firefox webkit
       - name: Install browsers (retry a stalled first attempt)
         if: steps.install_first.outcome == 'failure'
         timeout-minutes: 6
-        run: uv run --locked --no-dev --group browser-test python -m playwright install firefox webkit
+        run: uv run --locked --no-dev --group browser-test --group pages python -m playwright install firefox webkit
       - name: Run Firefox and WebKit browser tests with JUnit
         env:
           BTK_BROWSER_ENGINES: firefox,webkit
-        run: uv run --locked --no-dev --group browser-test python -m pytest tests/python -q -m browser -k "firefox or webkit" --junitxml=test-results/junit/python-browser-optional-3.15.xml
+        run: uv run --locked --no-dev --group browser-test --group pages python -m pytest tests/python -q -m browser -k "firefox or webkit" --junitxml=test-results/junit/python-browser-optional-3.15.xml
       - name: Preserve Firefox and WebKit JUnit
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -420,7 +432,7 @@ jobs:
         run: python tools/check_evidence.py test-results/python --pattern '*.json' --expect firefox-desktop,firefox-mobile,webkit-desktop,webkit-mobile
       - name: Python Playwright CLI screenshot (WebKit)
         run: |
-          uv run --locked --no-dev --group browser-test python -m playwright screenshot --browser=webkit --device="iPhone 13" --full-page "file://$GITHUB_WORKSPACE/fixtures/index.html" test-results/python-cli-webkit-mobile.png
+          uv run --locked --no-dev --group browser-test --group pages python -m playwright screenshot --browser=webkit --device="iPhone 13" --full-page "file://$GITHUB_WORKSPACE/fixtures/index.html" test-results/python-cli-webkit-mobile.png
           python tools/check_png.py test-results/python-cli-webkit-mobile.png
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
@@ -450,7 +462,10 @@ jobs:
         version: "latest"
         python-version: "3.15"
         activate-environment: true
-        enable-cache: false
+        enable-cache: true
+        # Pull requests restore the cache and never write it; only main saves it.
+        save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        prune-cache: true
     - name: Fetch pinned shared vendor tool
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:

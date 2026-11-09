@@ -1,6 +1,6 @@
 # Measured input and side-effect records
 
-`scripts/interaction.mjs` (Node) and `scripts/interaction.py` (Python sync/async)
+`tools/interaction.mjs` (Node) and `tools/interaction.py` (Python sync/async)
 are small helpers for an existing Playwright Page. They have no dependency of
 their own; the caller owns Playwright, the Page and the Locator. Both produce the
 same JSON records, so results can be collected first and checked at the end.
@@ -18,7 +18,7 @@ another node, so `locator.click()` fails as "intercepts pointer events" while
 4. returns a `pointer-press/1` record, including which element was on top at the point.
 
 ```js
-import {press} from './scripts/interaction.mjs';
+import {press} from './tools/interaction.mjs';
 const record = await press(page, page.getByText('Photo Studio', {exact: true}).first(),
   {touch: testInfo.project.use.hasTouch});
 ```
@@ -54,7 +54,7 @@ do the actual matching. This record is for comparing boxes, not for re-implement
 accessible-name computation.
 
 ```js
-import {inventory, press} from './scripts/interaction.mjs';
+import {inventory, press} from './tools/interaction.mjs';
 const listed = await inventory(page, {selector: 'flt-semantics'});
 ```
 
@@ -77,7 +77,7 @@ For tools that accept untrusted input (pasted HTML, files), record requests,
 dialogs (dismissed), uncaught errors, popups and Web Storage changes:
 
 ```js
-import {watch} from './scripts/interaction.mjs';
+import {watch} from './tools/interaction.mjs';
 const w = await watch(page);
 await page.locator('#paste-load').click();
 const report = await w.stop();   // side-effects/1, report.quiet === true when nothing happened
@@ -104,8 +104,8 @@ could not be read (for example blocked storage). With
 ## Assert late
 
 ```sh
-python -S scripts/interaction.py check records.json         # a record, a list, or JSON lines
-python -S scripts/interaction.py check records.json --json
+python -S tools/interaction.py check records.json         # a record, a list, or JSON lines
+python -S tools/interaction.py check records.json --json
 ```
 
 Exit 0 when every side-effects record is quiet, 1 otherwise, 2 for invalid input.

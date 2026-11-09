@@ -90,7 +90,10 @@ jobs:
           version: "latest"
           python-version: "3.15"
           activate-environment: true
-          enable-cache: false
+          enable-cache: true
+          # Pull requests restore the cache and never write it; only main saves it.
+          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          prune-cache: true
       # The .deb downloads are most of this step; keep them in a cache that only main writes
       # (apt still checks each file against the signed indexes). Profiles share one browser prefix.
       - name: Restore apt downloads (written only by main)
@@ -172,10 +175,11 @@ jobs:
         with:
           pattern: platform-app-*
           path: app-results
-      - name: Render observed results (job failures remain failures)
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - name: Render observed results (job failures remain failures; the page is built with PySaiyanWeBoo's web_ui)
         run: |
           python -S tools/platform_probe.py merge app-results --out app-matrix/dataset.json
-          python -S tools/platform_probe.py render app-matrix/dataset.json --out app-matrix/index.html
+          uv run --locked --group pages python tools/platform_probe.py render app-matrix/dataset.json --out app-matrix/index.html
           python -S tools/platform_probe.py summary app-matrix/dataset.json > app-matrix/summary.txt || true
           { echo '```text'; cat app-matrix/summary.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
       - name: Compare captured screenshots (differences are diagnostic only)
@@ -193,7 +197,7 @@ jobs:
         if: always() && hashFiles('app-matrix/screenshots/report.json') != ''
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: myon-bioinformatics/web-ui
+          repository: myon-bioinformatics/PySaiyanWeBoo
           ref: b35ed9b77d4222b946d9813298243489a69e624a
           path: .web-ui
           persist-credentials: false
@@ -220,7 +224,7 @@ jobs:
           SHOT: ${{ needs.plan.outputs.shot }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          python -S tools/app_digest.py app-results --ironmate .ironmate --runners-json "$RUNNERS_JSON" \
+          uv run --locked --group pages python tools/app_digest.py app-results --ironmate .ironmate --runners-json "$RUNNERS_JSON" \
             --shot "$SHOT" --out app-digest --run-url "$RUN_URL"
           cat app-digest/summary.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

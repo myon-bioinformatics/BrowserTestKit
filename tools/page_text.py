@@ -46,19 +46,8 @@ Exit codes: 0 = OK (or EQUAL comparison); 1 = no ``--find`` match, non-EQUAL com
 """
 from __future__ import annotations
 
-import argparse
-import datetime
-import difflib
-import http.client
-import json
-import re
-import sys
-import urllib.error
-import urllib.parse
-import urllib.request
-from html.parser import HTMLParser
-from pathlib import Path
-from typing import Any, Callable
+import argparse, datetime, difflib, http.client, json, re, sys, urllib.error, urllib.parse, urllib.request
+from html.parser import HTMLParser; from pathlib import Path; from typing import Any, Callable
 
 USER_AGENT = "browser-test-kit-page-text/1"
 # Never rendered as page text; dropped together with all descendants.

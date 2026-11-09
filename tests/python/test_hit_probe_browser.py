@@ -4,9 +4,7 @@ The probe is the browser's own hit test (document.elementFromPoint); each cell's
 is the fraction of its 2x2 integer sub-points that land on the target, a 0..1 value like a Jev
 confidence. Observations are collected first and asserted at the end (assert-late).
 """
-import importlib.util
-import json
-import os
+import importlib.util, json, os
 from pathlib import Path
 
 import pytest
@@ -17,7 +15,7 @@ RESULTS = ROOT / "test-results" / "hit-probe"
 BROWSERS = ("chromium", "firefox", "webkit")
 CELL, PAD = 2, 8
 
-spec = importlib.util.spec_from_file_location("hit_probe", ROOT / "scripts" / "hit_probe.py")
+spec = importlib.util.spec_from_file_location("hit_probe", ROOT / "tools" / "hit_probe.py")
 hit_probe = importlib.util.module_from_spec(spec)
 assert spec.loader
 spec.loader.exec_module(hit_probe)

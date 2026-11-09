@@ -7,20 +7,8 @@ through installation AND tests because Bun may hardlink cache files into jobs.
 """
 from __future__ import annotations
 
-import argparse
-from collections import Counter
-from contextlib import contextmanager
-import hashlib
-import json
-import os
-from pathlib import Path
-import platform
-import re
-import signal
-import stat
-import subprocess
-import tempfile
-import time
+import argparse, hashlib, json, os, platform, re, signal, stat, subprocess, tempfile, time
+from collections import Counter; from contextlib import contextmanager; from pathlib import Path
 
 FEATURE = "browser-test-kit-document-mirrors"
 SOURCE_COMMIT = "111f6d78befae28acfb198a45b72e5aa0e59dcde"
@@ -356,12 +344,12 @@ def run(args):
         raise
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("prepared", "work-root", "cache-root", "node", "bun", "python"):
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--allow-network", action="store_true", help="explicitly permit fixed package downloads; default is offline")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     try:
         print(run(args))
     except (Error, OSError, subprocess.SubprocessError, KeyError, json.JSONDecodeError) as exc:

@@ -1,6 +1,5 @@
 """check_font_family: Meiryo first in CSS and Plotly, monospace and inherit allowed, bundled plotly.js skipped."""
-import importlib.util
-import json
+import importlib.util, json
 from pathlib import Path
 
 import pytest

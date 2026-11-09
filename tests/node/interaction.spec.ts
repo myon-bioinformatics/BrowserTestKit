@@ -7,7 +7,7 @@ let press, watch, inventory;
 test.beforeAll(async () => {
   // Native import avoids the CommonJS test runner transforming the ESM asset.
   ({press, watch, inventory} = await new Function('url', 'return import(url)')(
-    pathToFileURL(resolve('scripts/interaction.mjs')).href));
+    pathToFileURL(resolve('tools/interaction.mjs')).href));
 });
 const url = pathToFileURL(resolve('fixtures/interaction.html')).href;
 
@@ -27,7 +27,7 @@ test('press uses real input where the DOM node is not the hit target', async ({p
   await expect(page.locator('#log')).toHaveText('synthetic');
   const path = testInfo.outputPath('interaction-records.json');
   writeFileSync(path, JSON.stringify([record]));
-  const check = spawnSync('python', ['-S', 'scripts/interaction.py', 'check', path], {encoding: 'utf8'});
+  const check = spawnSync('python', ['-S', 'tools/interaction.py', 'check', path], {encoding: 'utf8'});
   expect(check.status, check.stderr).toBe(0);
 });
 

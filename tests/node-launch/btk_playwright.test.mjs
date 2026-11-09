@@ -13,8 +13,7 @@ const required = process.env.BTK_REQUIRE_PLAYWRIGHT === "1";
 const probe = spawnSync(python, ["-c", "import playwright"], {encoding: "utf8"});
 const skip = probe.status !== 0 && !required ? "BTK_PYTHON に Playwright が入っていません" : false;
 const ENTRIES = [
-  ["py_launch", ["vendor/py_launch.cjs", "--env-var", "BTK_PYTHON", "--site", "scripts/btk.py"]],
-  ["page_inspect.cjs", ["scripts/page_inspect.cjs"]],
+  ["py_launch", ["vendor/py_launch.cjs", "--env-var", "BTK_PYTHON", "--site", "tools/btk.py"]],
 ];
 
 function listen() {

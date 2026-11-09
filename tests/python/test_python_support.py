@@ -90,3 +90,18 @@ def test_built_wheel_image_diff_outside_checkout(tmp_path, layout):
             assert result.returncode == golden[name]['returncode'], result.stderr
             assert result.stdout.strip() == golden[name]['stdout']
             assert result.stderr == ''
+
+
+def test_removed_shared_tools_are_not_reintroduced_by_layout_migration():
+    """Consolidating scripts into tools must preserve the #153 deletions."""
+    import json
+
+    removed = {
+        'app_digest_comment.py', 'fetch_member.py', 'gh_identity.py',
+        'gh_ops.py', 'git_commit.py', 'publish_check.py', 'py_matrix.py',
+        'pytest_brief.py', 'recreate_locked_vendor.py', 'repo_overview.py',
+    }
+    for directory in ('scripts', 'tools'):
+        assert not {p.name for p in (ROOT / directory).glob('*.py')} & removed
+    lock = json.loads((ROOT / 'vendor.lock.json').read_text())
+    assert not {Path(entry['destination']).name for entry in lock['files']} & removed

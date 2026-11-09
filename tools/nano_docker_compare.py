@@ -1,18 +1,8 @@
 #!/usr/bin/env python3
 """Opt-in same-host Docker/npm image versus private offline Bun + Node jobs."""
 from __future__ import annotations
-import argparse
-import json
-import os
+import argparse, json, os, platform, re, shutil, statistics, subprocess, sys, time, uuid
 from pathlib import Path
-import platform
-import re
-import shutil
-import statistics
-import subprocess
-import sys
-import time
-import uuid
 import nano_bun as adapter
 import nano_bun_experiment as experiment
 
@@ -183,11 +173,11 @@ def comparison(samples, expected):
             for kind in ('nano', 'docker')}
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--base-image', required=True)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     image_ref(args.base_image)
     root = args.output.resolve()
     checkout = TOOLS.parent

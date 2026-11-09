@@ -1,15 +1,11 @@
 """btk fetch: integrity first, then only the named members; no traversal; fixed host list."""
-import base64
-import hashlib
-import io
-import sys
-import tarfile
+import base64, hashlib, io, sys, tarfile
 from pathlib import Path
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT / "tools"))
 
 import btk  # noqa: E402
 

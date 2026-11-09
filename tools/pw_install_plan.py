@@ -19,15 +19,13 @@ the same job runs afterwards and at the Playwright configs, then prints one line
 Heuristics, not a proof: commands are matched by text and configs by regex.
 Stdlib only; runs under ``python -S``::
 
-    python -S scripts/pw_install_plan.py [ROOT]
+    python -S tools/pw_install_plan.py [ROOT]
 
 Exit codes: 0 = every install line already matches; 1 = a suggestion; 2 = usage error.
 """
 from __future__ import annotations
 
-import os
-import re
-import sys
+import os, re, sys
 
 INSTALL = re.compile(r"playwright(?:@[\w.]+)?\s+install\b([^\n]*)")
 CONFIG_NAMES = re.compile(r"^playwright\.config\.(?:ts|js|mjs|cjs)$")

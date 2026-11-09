@@ -1,11 +1,10 @@
-import importlib.util
-import json
+import importlib.util, json
 from pathlib import Path
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-spec = importlib.util.spec_from_file_location("route_trail", ROOT / "scripts" / "route_trail.py")
+spec = importlib.util.spec_from_file_location("route_trail", ROOT / "tools" / "route_trail.py")
 route_trail = importlib.util.module_from_spec(spec)
 assert spec.loader
 spec.loader.exec_module(route_trail)

@@ -1,18 +1,12 @@
 """observe --step: a sequence of declared actions, one snapshot per step, text never recorded."""
-import functools
-import importlib.util
-import json
-import subprocess
-import sys
-import threading
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
+import functools, importlib.util, json, subprocess, sys, threading
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer; from pathlib import Path
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = ROOT / "scripts" / "btk.py"
-_spec = importlib.util.spec_from_file_location("route_trail", ROOT / "scripts" / "route_trail.py")
+SCRIPT = ROOT / "tools" / "btk.py"
+_spec = importlib.util.spec_from_file_location("route_trail", ROOT / "tools" / "route_trail.py")
 route_trail = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(route_trail)
 ROUTES = route_trail.load_registry((ROOT / "fixtures" / "page_inspect_routes.json").read_text(encoding="utf-8"))

@@ -1,20 +1,15 @@
 """network and console come from Playwright events; user-agent shadow roots are not author roots."""
-import functools
-import json
-import subprocess
-import sys
-import threading
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
+import functools, json, subprocess, sys, threading
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer; from pathlib import Path
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT / "tools"))
 
 import btk  # noqa: E402
 
-SCRIPT = ROOT / "scripts" / "btk.py"
+SCRIPT = ROOT / "tools" / "btk.py"
 
 PAGE = """<!doctype html><meta charset="utf-8"><title>events fixture</title>
 <img src="http://example.invalid/blocked.png" alt="">
