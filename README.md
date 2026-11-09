@@ -1,10 +1,14 @@
-# browser-test-kit
+# BrowserTestKit
 
 <img src="docs/assets/brand/validation-buddy.png" alt="Validation Buddy: browser, desktop, and mobile inputs leading to screenshot validation" width="191" height="212">
 
 Cross-browser testing reference kit for Playwright Node/Python, screenshots, mobile web, and GitHub Actions. Stagehand and Replay lanes are planned but not yet implemented.
 
 [Artwork and icon usage](docs/assets/brand/README.md) describes the supplied visual marks and their separate roles.
+
+## Name origin
+
+The name says what it is: a kit of tools for testing and observing with a browser. It was formerly named browser-test-kit, and the `btk` abbreviation is kept for the CLI and environment variables.
 
 ## Scope
 
@@ -87,7 +91,7 @@ repair status; the first record covers flutter_navigation_basic PR #128 (merged)
 
 ### Provenance
 
-The initial rules were distilled from working patterns and incidents in `mcp-toolcall-lab`, `flutter_navigation_basic`, `web-ui`, `markdown`, and `Ironmate`.
+The initial rules were distilled from working patterns and incidents in `mcp-toolcall-lab`, `flutter_navigation_basic`, `PySaiyanWeBoo`, `markdown`, and `Ironmate`.
 
 Notable portable lessons include WebKit producing a PNG before a non-zero shutdown, browser-config/install parity tests, exact Playwright CLI argv regression tests, staged visual-regression rollout, `python -m playwright screenshot` for simple Python CLI capture, and keeping Stagehand separate from deterministic Playwright.
 
@@ -197,7 +201,7 @@ python -m element_overlay --file elements.json --format css
 
 ### Page observe, locate, and act (`scripts/btk.py`)
 
-Separate commands for a loopback page: passive observe, offline locate, and one declared action. The design follows REA's browser observation notes (morluto/rea, MIT), not that project's server. See [REA observation](docs/rea-observation.md). Later phases stay on [issue 117](https://github.com/myon-bioinformatics/browser-test-kit/issues/117).
+Separate commands for a loopback page: passive observe, offline locate, and one declared action. The design follows REA's browser observation notes (morluto/rea, MIT), not that project's server. See [REA observation](docs/rea-observation.md). Later phases stay on [issue 117](https://github.com/myon-bioinformatics/BrowserTestKit/issues/117).
 
 ```bash
 python scripts/btk.py observe http://127.0.0.1:8765/page --json --out observe.json
@@ -249,7 +253,7 @@ Implemented:
 
 1. Documentation and evidence contract (`docs/`, `docs/evidence-events.md`).
 2. Shared local deterministic fixtures and artifact validators (`fixtures/`, `tools/evidence_board.py`).
-3. Playwright Node matrix (`.github/workflows/playwright.yml`, `platform-matrix.yml`).
+3. Playwright Node matrix (`.github/workflows/ci.yml`, `platform-matrix.yml`).
 4. Playwright Python API and CLI matrix (`tools/platform_probe.py`).
 5. Browser parity guards (Node `tests/node-launch` runs observe, act, and scenario through `vendor/py_launch.cjs` in Chromium).
 7. terminal-browser quick CLI/TUI lane (`tools/terminal_browser.py`).
