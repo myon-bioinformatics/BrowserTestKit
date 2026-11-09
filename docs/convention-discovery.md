@@ -22,7 +22,7 @@ replace `../xprobe/xprobe.py` with that checkout's path. They use Python's
 standard library and work with `python -S`.
 
 ```sh
-python -S ../xprobe/xprobe.py --symbols . --include 'scripts/*.py' --symbol-pattern '*probe*' --symbol-pattern '*capture*' --symbol-pattern '*validate*' --brief
+python -S ../xprobe/xprobe.py --symbols . --include 'tools/*.py' --symbol-pattern '*probe*' --symbol-pattern '*capture*' --symbol-pattern '*validate*' --brief
 python -S ../xprobe/xprobe.py --discover --root . --include '*.yml' --include '*.toml' --include-hidden --brief
 ```
 

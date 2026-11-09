@@ -5,7 +5,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer; from pathli
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT / "tools"))
 import btk as api
 import page_inspect_scenarios as scenarios
 
@@ -104,7 +104,7 @@ def server():
 
 
 def run(url, case, browser="chromium", *extra, host="python"):
-    prefix = [sys.executable, "scripts/btk.py"] if host == "python" else [shutil.which("node"), "vendor/py_launch.cjs", "--env-var", "BTK_PYTHON", "--site", "scripts/btk.py"]
+    prefix = [sys.executable, "tools/btk.py"] if host == "python" else [shutil.which("node"), "vendor/py_launch.cjs", "--env-var", "BTK_PYTHON", "--site", "tools/btk.py"]
     done = subprocess.run([*prefix, "scenario", url, "--browser", browser, "--case", case, *extra, "--json"],
                           cwd=ROOT, capture_output=True, text=True, timeout=90,
                           env={**os.environ, "PYTHON": sys.executable, "BTK_PYTHON": sys.executable})
@@ -176,7 +176,7 @@ def test_upload_reset_download_cleanup_and_node_bridge(server):
 def test_unknown_fixture_state_fails_without_leaking_it(server):
     url, state = server
     state["fixture"] = state["fixture"].replace(b'</script>', b'display.dataset.scheme = "PRIVATE";</script>')
-    done = subprocess.run([sys.executable, "scripts/btk.py", "scenario", url, "--case", "display", "--json"], cwd=ROOT, capture_output=True, text=True, timeout=60)
+    done = subprocess.run([sys.executable, "tools/btk.py", "scenario", url, "--case", "display", "--json"], cwd=ROOT, capture_output=True, text=True, timeout=60)
     assert done.returncode == 2
     assert "PRIVATE" not in done.stdout + done.stderr
     assert json.loads(done.stdout)["stage"] == "inspect"

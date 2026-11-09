@@ -1,6 +1,6 @@
 {
   "schema": "btk-parts-lock/1",
-  "purpose": "the parts a Python and Node run needs; fetch one part at a time with scripts/btk.py fetch --lock",
+  "purpose": "the parts a Python and Node run needs; fetch one part at a time with tools/btk.py fetch --lock",
   "parts": {
     "node": {
       "role": "Node runtime for vendor/py_launch.cjs: Node 26 or later, no upper bound",

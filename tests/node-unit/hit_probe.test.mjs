@@ -4,7 +4,7 @@ import {spawnSync} from 'node:child_process';
 import {mkdtempSync, writeFileSync, rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import * as hp from '../../scripts/hit_probe.mjs';
+import * as hp from '../../tools/hit_probe.mjs';
 
 const python = process.env.PYTHON || 'python';
 export function oracle(cases) {
@@ -89,21 +89,21 @@ test('scale uses modern Python compensated sum and imports have no CLI side effe
   assert.equal(version.status, 0, version.stderr);
   if (version.stdout.trim() === '1') assert.deepEqual(await evaluate(make(3, 1, x => values[x], {stride: 1, threshold: 0})),
     oracle([make(3, 1, x => values[x], {stride: 1, threshold: 0})])[0]);
-  for (const args of [['--input-type=module', '-'], ['--input-type=module', '-e', 'await import("./scripts/hit_probe.mjs")']]) {
-    const run = spawnSync(process.execPath, args, {input: 'await import("./scripts/hit_probe.mjs")', encoding: 'utf8'});
+  for (const args of [['--input-type=module', '-'], ['--input-type=module', '-e', 'await import("./tools/hit_probe.mjs")']]) {
+    const run = spawnSync(process.execPath, args, {input: 'await import("./tools/hit_probe.mjs")', encoding: 'utf8'});
     assert.equal(run.status, 0, run.stderr); assert.equal(run.stdout, '');
   }
 });
 
 test('CLI output and error exits agree with Python', () => {
   const dir = mkdtempSync(join(tmpdir(), 'hit-probe-')), path = join(dir, 'map.json');
-  const run = args => spawnSync(process.execPath, ['scripts/hit_probe.mjs', ...args], {encoding: 'utf8'});
+  const run = args => spawnSync(process.execPath, ['tools/hit_probe.mjs', ...args], {encoding: 'utf8'});
   try {
     for (const data of [{map: ['1100', '1110', '0011']}, ['1'.repeat(80), '0'.repeat(80)], {map: ['', '']}]) {
       writeFileSync(path, JSON.stringify(data));
       for (const rank of [1, 2, 5]) {
         const args = ['factorize', path, '--rank', String(rank)], node = run(args);
-        const py = spawnSync(python, ['-S', 'scripts/hit_probe.py', ...args], {encoding: 'utf8'});
+        const py = spawnSync(python, ['-S', 'tools/hit_probe.py', ...args], {encoding: 'utf8'});
         assert.equal(node.status, 0, node.stderr); assert.equal(node.stdout, py.stdout);
       }
     }

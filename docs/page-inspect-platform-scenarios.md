@@ -11,7 +11,7 @@ not an arbitrary application probe or a real device.
 ## Node 26
 
 The workspace `.nvmrc` selects major 26. With nvm, run `nvm install` followed
-by `nvm use`. The `vendor/py_launch.cjs --env-var BTK_PYTHON --site scripts/btk.py` launch
+by `nvm use`. The `vendor/py_launch.cjs --env-var BTK_PYTHON --site tools/btk.py` launch
 requires Node 26 or newer. This change does not edit workflows, change their
 existing newer Node pins, add a Node download during tests, or change permissions.
 A local Node 26 runtime can execute the dependency-free fixture contract suite:

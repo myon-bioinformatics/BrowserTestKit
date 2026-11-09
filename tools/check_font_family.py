@@ -125,7 +125,7 @@ def main(argv: list[str]) -> int:
         print("usage: check_font_family.py FILE_OR_DIR [...]", file=sys.stderr)
         return 2
     if argv[0] in {"-h", "--help"}:
-        print(__doc__)
+        print("usage: check_font_family.py FILE_OR_DIR [...]\n" + __doc__)
         return 0
     try:
         paths = files(argv)

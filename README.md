@@ -32,17 +32,42 @@ replace it. The outcomes describe the kit's intended uses, not a guarantee
 that every browser or environment has been tested.
 [Additional panel provenance](docs/assets/repository-concept-v2.json).
 
+## 🎞️ Browser evidence
+
+![BrowserTestKit fixtures, interaction and platform matrix in Chromium](docs/evidence/browser.gif)
+
+🗓️ 2026-11-07 · 🧭 Chromium 153 (Playwright 1.64 test harness) · 🐧 Linux · receipt [`docs/evidence/browser.json`](docs/evidence/browser.json) (sha256, per-shot status, page errors)
+
+| 🧪 Suite | ✅ | ⏭️ | 🚫 Not run here |
+| --- | ---: | ---: | --- |
+| `pytest -m browser` (Python) | 72 | 1 | 37 Firefox/WebKit cases (engines not installed) |
+| Playwright Test `chromium` + `mobile-chromium` | 36 | 2 | `firefox` / `webkit` / `mobile-webkit` projects |
+| 🎞️ `tools/evidence_gif.py` shots | 9 | 0 | — |
+
+🔁 Re-record (the receipt is also the plan):
+
+```sh
+python tools/platform_probe.py collect --browser chromium --profile desktop --out /tmp/rec
+python tools/platform_probe.py collect --browser chromium --profile pixel --out /tmp/rec
+uv run --group pages python tools/platform_probe.py render /tmp/rec --out test-results/evidence/platform-matrix.html
+uv run --group pages --group browser python tools/evidence_gif.py docs/evidence/browser.gif --serve . --plan docs/evidence/browser.json
+```
+
+`tools/evidence_gif.py` is the shared recorder the other repositories use for their README GIFs: page × viewport × steps (⏺ `record` bursts, 🔍 `zoom` from one capture), captioned in Meiryo, in Chromium, Firefox or WebKit. Only screenshots cross the socket (identical ones skipped, ⏺ `clip` sends just the element); PySaiyanWeBoo's `gif.js` does palette, delta frames and LZW in the browser — no Pillow — under `--colors` / `--max-bytes` / `--max-frames`. Network refused and listed (`external`), pinned CDN assets answered locally with `--map PREFIX=DIR`. See [docs/screenshot-evidence.md](docs/screenshot-evidence.md#readme-gif-evidence-toolsevidence_gifpy).
+
 ## Python support
 
 - Stdlib-only modules and the base package: **Python 3.11+**, with no runtime dependencies.
   Run a source script with `python -S tools/check_png.py --help`, or install the
-  base package with `uv venv && uv pip install .` (an active virtual environment is required) and use `python -m btk --help`. Tools under `tools/` are
-  repository tooling; original `scripts/` entries and installed modules remain supported.
-- Image diff (`scripts/image_diff.py` / `python -m image_diff`): **Python 3.11+**, using the vendored stdlib-only `pillow_min.py` backend. See [image comparison](docs/image-diff.md).
+  base package with `uv venv && uv pip install .` (an active virtual environment is required) and use `python -m btk --help`. Every tool lives
+  under `tools/` (the former `scripts/` copies were merged into it); installed modules keep their names.
+- Image diff (`tools/image_diff.py` / `python -m image_diff`): **Python 3.11+**, using the vendored stdlib-only `pillow_min.py` backend. See [image comparison](docs/image-diff.md).
 - Development, tests, browser integrations, and this repository's **uv project
   environment/lockfile: Python 3.11+**. Use
   `uv run --locked --python 3.11 pytest tests/python -q -m "not browser"`. Add `--group browser` for browser
-  integration dependencies. The requirements-test files have the same floor.
+  integration dependencies; `--group pages` (included in `dev`) adds [PySaiyanWeBoo](https://github.com/myon-bioinformatics/PySaiyanWeBoo)'s
+  `web_ui`, pinned to a commit, which builds the platform-matrix and app-digest pages (`render` / `app_digest.py`;
+  `collect` / `merge` / `summary` stay stdlib-only). The requirements-test files have the same floor.
 
 The Python support CI checks actual 3.11 stdlib execution and base wheel
 installation without test dependencies, and the complete browserless test suite at the 3.11 floor. Existing browser CI
@@ -120,13 +145,13 @@ python tools/page_text.py <URL> --compare-rendered page.json   # capture_browser
 - JavaScript is not run and CSS is not evaluated, so an empty result on a single-page app is `PAGE_TEXT_AS_RENDERED_TEXT`, not an empty page. Core tests use only local fixtures and a local HTTP server.
 - `--compare-rendered FILE` compares static extracted text against Playwright's `inner_text()` (or terminal-browser's rendered text) from a file or stdin, classifying differences into `EQUAL`, `JS_RENDERED_ADDED`, `CSS_HIDDEN_REMOVED`, or `MUTATED_TEXT`. A `capture_browser_dom.py` JSON file contributes its `visible` (`innerText`); `textContent` and `html` are never used as rendered text. A truncated static text (`--max-chars`) is refused with exit 2.
 
-### Hit maps with few probes (`scripts/hit_probe.py` / `scripts/hit_probe.mjs`, `littlebit-approx`)
+### Hit maps with few probes (`tools/hit_probe.py` / `tools/hit_probe.mjs`, `littlebit-approx`)
 
 Stdlib-only (`python -S`) search for where a target really receives clicks, Minesweeper-style: probe a coarse lattice, infer blocks whose corners agree, and split and probe again only where they disagree or score near the threshold. Scores are 0..1 (in the browser test, the fraction of a cell's 2x2 sub-points that `elementFromPoint` lands on the target), so a near-threshold cell is treated like a low-confidence Jev decision. The map is then described LittleBit-style as a few binary row-mask x column-mask rectangles with a scale (mean probed score); a plain box is rank 1 with no residual, while rounded corners, rotation, or an overlay leave a residual or need more rank.
 
 ```bash
-python -S scripts/hit_probe.py factorize test-results/hit-probe/map.json --rank 3
-node scripts/hit_probe.mjs factorize test-results/hit-probe/map.json --rank 3
+python -S tools/hit_probe.py factorize test-results/hit-probe/map.json --rank 3
+node tools/hit_probe.mjs factorize test-results/hit-probe/map.json --rank 3
 node --test tests/node-unit/hit_probe.test.mjs
 ```
 
@@ -144,16 +169,16 @@ node --test tests/node-unit/hit_probe.test.mjs
   - Each run prints one `::notice` per browser (probes, exact match, clicks, factors, residual), so the numbers are readable from the check annotations without downloading artifacts.
 - Exit codes: 0 OK; 2 input error.
 
-### Emoji page trails to URLs (`scripts/route_trail.py`)
+### Emoji page trails to URLs (`tools/route_trail.py`)
 
 Stdlib-only (`python -S`). Pages are named by their emoji identity, and a trail is walked in order: `A → B` goes to B, `A ↔ B` goes to B and back (ASCII `->` / `<->` also work). The registry is a JSON object or any source file with `'/route': '🏠'` pairs, such as flutter_navigation_basic's generated `page_identities.g.dart` (`--map pageEmojis`; values that are routes, i.e. alias maps, are skipped).
 
 The `page_identities.g.dart` example needs a flutter_navigation_basic checkout; `fixtures/route_trail_registry.json` works without one.
 
 ```bash
-python -S scripts/route_trail.py '🏠 → 🗺 → 🌍 ↔ 🕶' --registry lib/shared/navigation/page_identities.g.dart \
+python -S tools/route_trail.py '🏠 → 🗺 → 🌍 ↔ 🕶' --registry lib/shared/navigation/page_identities.g.dart \
   --map pageEmojis --base https://myon-bioinformatics.github.io/flutter_navigation_basic/
-python -S scripts/route_trail.py '🏠 ↔ 🗺' --registry fixtures/route_trail_registry.json --json   # emoji, route, url
+python -S tools/route_trail.py '🏠 ↔ 🗺' --registry fixtures/route_trail_registry.json --json   # emoji, route, url
 ```
 
 - Emoji are compared without variation selectors (`EMOJI_VARIATION_SELECTOR`); an emoji naming two routes after that is a registry error.
@@ -163,7 +188,7 @@ python -S scripts/route_trail.py '🏠 ↔ 🗺' --registry fixtures/route_trail
 
 Execution APIs and CLI (`--run`) are documented in [route trail execution](docs/route-trail-execution.md).
 
-Measured mouse/touch `press` for canvas-painted UIs (Flutter Web) and a `watch` that records requests, dialogs, errors and storage while untrusted input is handled: [interaction](docs/interaction.md) (`scripts/interaction.mjs` / `scripts/interaction.py`).
+Measured mouse/touch `press` for canvas-painted UIs (Flutter Web) and a `watch` that records requests, dialogs, errors and storage while untrusted input is handled: [interaction](docs/interaction.md) (`tools/interaction.mjs` / `tools/interaction.py`).
 
 Browserless mirror tests — several independent implementations (markdown-it / marked, ExcelJS / SheetJS / a stdlib OOXML reader, your own code) must agree on one artifact: [mirror tests](docs/mirror-tests.md) (`tools/mirror_facts.mjs` / `tools/mirror_check.py`).
 
@@ -179,7 +204,7 @@ Opens `fixtures/platform_probe.html` in one environment and records `btk-platfor
 python tools/platform_probe.py collect --browser webkit --profile iphone --out platform-results
 xvfb-run -a python tools/platform_probe.py collect --browser chromium --headed --out platform-results
 python -S tools/platform_probe.py summary platform-results            # one line each; exit 1 if any fail
-python -S tools/platform_probe.py render platform-results --out matrix.html
+uv run --group pages python tools/platform_probe.py render platform-results --out matrix.html  # the page comes from PySaiyanWeBoo's web_ui
 ```
 
 - `matrix.html` is self-contained: tab rows for OS, browser (engine or channel), device and mode. Switching a tab highlights every value that changed from the previous selection; `*` marks values that differ anywhere in the dataset; a scaled diagram shows screen, available area, window, viewport and scrollbar.
@@ -188,41 +213,41 @@ python -S tools/platform_probe.py render platform-results --out matrix.html
 - Adopted third-party JS (`js-adopt`, see the parent's `js_adopt.py`) is checked here too: the fixture loads every file in `js.lock.json` with its SRI, and an environment passes only if DOMPurify sanitizes, seedrandom returns the same first value as every other engine, and a tag with a deliberately wrong `integrity` is refused. `collect` serves the fixture over a local HTTP server because SRI with `crossorigin` does not apply to `file://` pages.
 - Only `collect` needs Playwright. Exit codes: 0 OK; 1 an environment failed; 2 input error.
 
-### Element annotation overlay, DOM highlight CSS, and TAP assertions (`scripts/element_overlay.py` / `scripts/element_overlay.mjs`)
+### Element annotation overlay, DOM highlight CSS, and TAP assertions (`tools/element_overlay.py` / `tools/element_overlay.mjs`)
 
-Target coordinate calculation, SVG annotation overlays, DOM element highlight CSS, and Poku-style TAP element assertions: [element overlay](docs/element-overlay.md) (`scripts/element_overlay.py` / `scripts/element_overlay.mjs`). Absorbs patterns from SeleniumBase, Callstack agent-device, Midscene, Poku, and PuppetSharp.
+Target coordinate calculation, SVG annotation overlays, DOM element highlight CSS, and Poku-style TAP element assertions: [element overlay](docs/element-overlay.md) (`tools/element_overlay.py` / `tools/element_overlay.mjs`). Absorbs patterns from SeleniumBase, Callstack agent-device, Midscene, Poku, and PuppetSharp.
 
 ```bash
-python -S scripts/element_overlay.py --file elements.json --viewport 1280x720
-python -S scripts/element_overlay.py --file elements.json --format svg --out overlay.svg
-python -S scripts/element_overlay.py --file elements.json --assert-role button --format tap
+python -S tools/element_overlay.py --file elements.json --viewport 1280x720
+python -S tools/element_overlay.py --file elements.json --format svg --out overlay.svg
+python -S tools/element_overlay.py --file elements.json --assert-role button --format tap
 python -m element_overlay --file elements.json --format css
 ```
 
-### Page observe, locate, and act (`scripts/btk.py`)
+### Page observe, locate, and act (`tools/btk.py`)
 
 Separate commands for a loopback page: passive observe, offline locate, and one declared action. The design follows REA's browser observation notes (morluto/rea, MIT), not that project's server. See [REA observation](docs/rea-observation.md). Later phases stay on [issue 117](https://github.com/myon-bioinformatics/BrowserTestKit/issues/117).
 
 ```bash
-python scripts/btk.py observe http://127.0.0.1:8765/page --json --out observe.json
-python -S scripts/btk.py locate observe.json --query "Save draft" --unique --json
-python scripts/btk.py act http://127.0.0.1:8765/page --action click --locator id:save-draft --json
-node vendor/py_launch.cjs --env-var BTK_PYTHON --site scripts/btk.py locate observe.json --query "Save draft" --unique --json
-python -S scripts/btk.py compare before.json after.json --json
-python scripts/btk.py observe http://127.0.0.1:8765/page --viewport 390x844 \
+python tools/btk.py observe http://127.0.0.1:8765/page --json --out observe.json
+python -S tools/btk.py locate observe.json --query "Save draft" --unique --json
+python tools/btk.py act http://127.0.0.1:8765/page --action click --locator id:save-draft --json
+node vendor/py_launch.cjs --env-var BTK_PYTHON --site tools/btk.py locate observe.json --query "Save draft" --unique --json
+python -S tools/btk.py compare before.json after.json --json
+python tools/btk.py observe http://127.0.0.1:8765/page --viewport 390x844 \
   --step focus:id:search --step type:id:search=env:SEARCH --step press:Enter \
   --step wait:id:results --step click:id:result-1 --out obs.json
-python scripts/btk.py observe http://127.0.0.1:8765/page --out before.json --after-action click:id:next --after-out after.json
+python tools/btk.py observe http://127.0.0.1:8765/page --out before.json --after-action click:id:next --after-out after.json
 ```
 
 - `observe --step` records a `btk-page-observe/1` snapshot before the steps and after each step, then compares each pair with the existing `compare` function. The file schema is `btk-page-observe-run/1`. `--out-dir DIR` also writes each of those observation objects as `00-initial.json` and `NN-action.json` in an existing directory. Those files are slices of the run, not a second schema. `--after-action` (`click:`, `hover:`, `scroll:DX,DY`, `scroll-into:`) and `--after-click` are one step from that same performer, written to two snapshot files.
 - Steps cover keyboard (`type`, `fill`, `clear`, `press`, `shortcut`, `focus`, `blur`), mouse (`click`, `dblclick`, `rightclick`, `hover`, `drag`, `scroll`, `scroll-into-view`), form (`check`, `uncheck`, `select`, `set-files`, `submit`), page (`goto`, `back`, `forward`, `reload`, `wait`, `resize`, `settle`), and touch (`tap` on every engine when `hasTouch` is set; `long-press`, `swipe`, and `touch-scroll` on Chromium via CDP Input, and `unsupported` on Firefox and WebKit because those protocols only have a point tap). `settle` is Chromium-only: readyState past loading and no DOM mutation for 400 ms, from CDP lifecycle and DOM events, with `quiet: false` on timeout. Firefox and WebKit report `settle` unsupported because they have no CDP DOM mutation stream. `Primary` is Playwright `ControlOrMeta`. Values from `env:NAME` and `file:PATH` are redacted in full. Exception text and JSON output also apply Stagehand's key redaction (query keys, `sk-` keys, Browserbase keys, `AIza` keys, and bearer tokens).
 - `compare` reads two observe files offline. Each section is `same`, `different`, or `unknown` (a missing or truncated section is never `same`), with open, closed, and total shadow-root counts and their deltas. It reports when the browser, profile, touch, emulation, or viewport differ.
 - Targets are `http://127.0.0.1:PORT/...` or `http://[::1]:PORT/...` only. Hostnames, file URLs, and missing ports are rejected.
-- `observe` on Chromium reads CDP and does not call the page. It counts author open and closed shadow roots in a pierced DOM (`shadow_roots` section) without entering them; Chromium user-agent shadow roots are reported separately as `user_agent`. Child frames are listed by name, URL, and origin in document order (`frames.items`) and their documents are not entered. Firefox and WebKit report CDP unavailable instead of inventing a DOM. Storage is keys and SHA-256 fingerprints, never values. A missing section is not a claim that two captures match. `python -S scripts/btk.py fetch --lock parts.lock.json --part node --dest DIR` checks one archive's integrity and extracts the named member. Playwright there is `>=1.64.1`, a lower bound with no upper bound. The Node package `@playwright/test` uses the same lower bound.
+- `observe` on Chromium reads CDP and does not call the page. It counts author open and closed shadow roots in a pierced DOM (`shadow_roots` section) without entering them; Chromium user-agent shadow roots are reported separately as `user_agent`. Child frames are listed by name, URL, and origin in document order (`frames.items`) and their documents are not entered. Firefox and WebKit report CDP unavailable instead of inventing a DOM. Storage is keys and SHA-256 fingerprints, never values. A missing section is not a claim that two captures match. `python -S tools/btk.py fetch --lock parts.lock.json --part node --dest DIR` checks one archive's integrity and extracts the named member. Playwright there is `>=1.64.1`, a lower bound with no upper bound. The Node package `@playwright/test` uses the same lower bound.
 - iPhone and Pixel profiles are Playwright device emulation (`real_device: false`). `--viewport` is only a size. `--touch` sets `hasTouch` without naming a phone.
 - `act` runs one action from the same vocabulary. It re-queries the locator and rejects `h:N`. Dialogs are recorded and dismissed unless `--dialog-policy accept`.
-- From Node, run `btk.py` through the vendored `vendor/py_launch.cjs` CLI (Node 26 or later, no upper bound): `node vendor/py_launch.cjs --env-var BTK_PYTHON --site scripts/btk.py ...`. `--site` keeps site-packages so Playwright is importable. `BTK_PYTHON` picks the interpreter; when it is set there is no fallback, and an interpreter that cannot run fails the launch with exit 2. Without it the launcher tries `PYTHON`, `python3`, then `python`. `scripts/page_inspect.cjs` is a thin compatibility entry that does the same. It is CLI-only now: the former `require()` API (`module.exports`, including JS helpers such as `similarity`) is gone. The former `scripts/btk.cjs` and the `twin_parity.py` helper-parity design were removed; Python is the single implementation of score, loopback, fingerprint, and evidence comparison.
+- From Node, run `btk.py` through the vendored `vendor/py_launch.cjs` CLI (Node 26 or later, no upper bound): `node vendor/py_launch.cjs --env-var BTK_PYTHON --site tools/btk.py ...`. `--site` keeps site-packages so Playwright is importable. `BTK_PYTHON` picks the interpreter; when it is set there is no fallback, and an interpreter that cannot run fails the launch with exit 2. Without it the launcher tries `PYTHON`, `python3`, then `python`. `tools/page_inspect.cjs` is a thin compatibility entry that does the same. It is CLI-only now: the former `require()` API (`module.exports`, including JS helpers such as `similarity`) is gone. The former `tools/btk.cjs` and the `twin_parity.py` helper-parity design were removed; Python is the single implementation of score, loopback, fingerprint, and evidence comparison.
 - Whitespace steps (`--step "fill id:q TEXT"`) and `--trail` retain the previous per-file envelope; colon steps use `btk-page-observe-run/1`. Emoji routes from `pages --routes-out` work with `observe --routes --trail` and `act --action goto --routes --text`. Both syntaxes use the same action performer and URL evidence privacy rules.
 - Exit codes: `0` success; `1` no match or a shared top score; `2` usage, a bad snapshot, or launch/navigate/inspect/cleanup failure. Headless is the default.
 
@@ -234,10 +259,10 @@ It uses the same `btk-page-observe/1` envelope and Node `vendor/py_launch.cjs --
 launch without replacing `observe --step`, `act`, or `compare`.
 
 ```bash
-python scripts/btk.py scenario http://127.0.0.1:8765/scenarios --case display --viewport 390x844 --color-scheme dark --reduced-motion reduce --locale ja-JP --timezone Asia/Tokyo --json
-python scripts/btk.py scenario http://127.0.0.1:8765/scenarios --case offline --json
-python scripts/btk.py scenario http://127.0.0.1:8765/scenarios --case permission --permission geolocation --permission-state grant --json
-node vendor/py_launch.cjs --env-var BTK_PYTHON --site scripts/btk.py scenario http://127.0.0.1:8765/scenarios --case shortcut --json
+python tools/btk.py scenario http://127.0.0.1:8765/scenarios --case display --viewport 390x844 --color-scheme dark --reduced-motion reduce --locale ja-JP --timezone Asia/Tokyo --json
+python tools/btk.py scenario http://127.0.0.1:8765/scenarios --case offline --json
+python tools/btk.py scenario http://127.0.0.1:8765/scenarios --case permission --permission geolocation --permission-state grant --json
+node vendor/py_launch.cjs --env-var BTK_PYTHON --site tools/btk.py scenario http://127.0.0.1:8765/scenarios --case shortcut --json
 ```
 
 The local test fixture is `fixtures/page_inspect_scenarios.html`, served with the
@@ -257,7 +282,7 @@ Implemented:
 4. Playwright Python API and CLI matrix (`tools/platform_probe.py`).
 5. Browser parity guards (Node `tests/node-launch` runs observe, act, and scenario through `vendor/py_launch.cjs` in Chromium).
 7. terminal-browser quick CLI/TUI lane (`tools/terminal_browser.py`).
-10. Passive page observe, locate, and a fixed act vocabulary (`scripts/btk.py`). Stagehand is still a separate, unimplemented lane.
+10. Passive page observe, locate, and a fixed act vocabulary (`tools/btk.py`). Stagehand is still a separate, unimplemented lane.
 
 Not yet implemented in this repository:
 
@@ -288,7 +313,7 @@ with `pytest -p pytest_btk_events --btk-events PATH`.
 
 ### Shared bounded browser exploration
 
-`scripts/browser_execution.mjs` owns resource-aware `workerBudget`, stateless
+`tools/browser_execution.mjs` owns resource-aware `workerBudget`, stateless
 seeded `choice`, and bounded `explore` on an existing Playwright-compatible Page.
 Applications supply readiness, allowed button names and input values; the helper
 returns `browser-exploration/1` receipts and preserves partial receipts on errors.

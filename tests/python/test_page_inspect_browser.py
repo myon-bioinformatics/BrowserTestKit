@@ -6,8 +6,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = (ROOT / "fixtures" / "page_inspect.html").read_bytes()
-SCRIPT = ROOT / "scripts" / "btk.py"
-sys.path.insert(0, str(ROOT / "scripts"))
+SCRIPT = ROOT / "tools" / "btk.py"
+sys.path.insert(0, str(ROOT / "tools"))
 RESULTS = ROOT / "test-results" / "page-inspect"
 
 

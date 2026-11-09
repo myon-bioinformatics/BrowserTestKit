@@ -1,6 +1,6 @@
 /**
  * Element annotation overlay, DOM highlight CSS, and TAP element assertions.
- * Twin JavaScript ES Module for scripts/element_overlay.py.
+ * Twin JavaScript ES Module for tools/element_overlay.py.
  */
 
 export const SCHEMA = "btk-element-overlay/1";

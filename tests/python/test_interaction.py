@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-spec = importlib.util.spec_from_file_location("interaction", ROOT / "scripts" / "interaction.py")
+spec = importlib.util.spec_from_file_location("interaction", ROOT / "tools" / "interaction.py")
 interaction = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(interaction)
 URL = (ROOT / "fixtures" / "interaction.html").as_uri()
@@ -42,7 +42,7 @@ def test_cli_check_is_assert_late(tmp_path):
     bad.write_text(json.dumps([_side(False, requests=["http://x.invalid/"])]), encoding="utf-8")
     junk = tmp_path / "junk.json"
     junk.write_text(json.dumps({"schema": "other"}), encoding="utf-8")
-    run = lambda *a: subprocess.run([sys.executable, "-S", str(ROOT / "scripts" / "interaction.py"), "check", *a],
+    run = lambda *a: subprocess.run([sys.executable, "-S", str(ROOT / "tools" / "interaction.py"), "check", *a],
                                     capture_output=True, text=True)
     done = run(str(good))
     assert done.returncode == 0 and "self=False" in done.stdout and "PASS 2 records" in done.stdout
@@ -133,7 +133,7 @@ def test_async_press_and_watch_chromium():
 
 
 def test_node_and_python_share_the_page_functions():
-    mjs = (ROOT / "scripts" / "interaction.mjs").read_text(encoding="utf-8")
+    mjs = (ROOT / "tools" / "interaction.mjs").read_text(encoding="utf-8")
     assert interaction._STORAGE in mjs and interaction._INVENTORY in mjs
     assert f"INVENTORY_SELECTOR = '{interaction.INVENTORY_SELECTOR}'" in mjs
 
@@ -199,7 +199,7 @@ def test_inventory_raw_labels_and_accessible_names(browser_name, touch):
             node = driver / ("node.exe" if sys.platform == "win32" else "node")
             selector = ", ".join(case["selector"] for case in NAME_CASES)
             payload = {"package": str(driver / "package"),
-                       "module": (ROOT / "scripts" / "interaction.mjs").as_uri(),
+                       "module": (ROOT / "tools" / "interaction.mjs").as_uri(),
                        "browser": browser_name, "touch": touch, "viewport": VIEW,
                        "url": NAMES_URL, "selector": selector}
             script = r"""

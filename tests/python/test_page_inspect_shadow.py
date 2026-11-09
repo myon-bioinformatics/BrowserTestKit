@@ -5,7 +5,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer; from path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT / "tools"))
 
 import btk  # noqa: E402
 
@@ -49,7 +49,7 @@ def test_observe_reports_shadow_root_section(tmp_path):
     threading.Thread(target=server.serve_forever, daemon=True).start()
     try:
         url = f"http://127.0.0.1:{server.server_port}/index.html"
-        run = subprocess.run([sys.executable, str(ROOT / "scripts" / "btk.py"), "observe", url, "--json"],
+        run = subprocess.run([sys.executable, str(ROOT / "tools" / "btk.py"), "observe", url, "--json"],
                              capture_output=True, text=True, timeout=180)
     finally:
         server.shutdown()

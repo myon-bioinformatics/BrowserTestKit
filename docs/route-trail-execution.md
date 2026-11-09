@@ -13,8 +13,8 @@ It accepts legacy emoji → route JSON or Dart string maps, and a portable JSON 
 Use emoji or `@id` in a trail; they can be mixed:
 
 ```sh
-python -S scripts/route_trail.py '🏠 ↔ 🌍' --registry pages.json --base https://example.test --run --json
-python -S scripts/route_trail.py '🏠 ↔ @world' --registry pages.json --base https://example.test --run --json
+python -S tools/route_trail.py '🏠 ↔ 🌍' --registry pages.json --base https://example.test --run --json
+python -S tools/route_trail.py '🏠 ↔ @world' --registry pages.json --base https://example.test --run --json
 ```
 
 An emoji is matched as a complete registry identity, including ZWJ sequences,
@@ -45,10 +45,10 @@ Avoid non-unique readiness selectors. Title is metadata, not a document-title as
 Planning still works with `python -S`, without installed Playwright:
 
 ```sh
-python -S scripts/route_trail.py '@home ↔ @world' --registry pages.json --base https://example.test --json
-python -S scripts/route_trail.py '@home ↔ @world' --registry pages.json --base https://example.test --run --json
-python -S scripts/route_trail.py '@home ↔ @world' --registry pages.json --base https://example.test --run --backend python-async --json
-python -S scripts/route_trail.py '@home ↔ @world' --registry pages.json --base https://example.test --run --backend node --node-cwd /path/to/existing/node/project --json
+python -S tools/route_trail.py '@home ↔ @world' --registry pages.json --base https://example.test --json
+python -S tools/route_trail.py '@home ↔ @world' --registry pages.json --base https://example.test --run --json
+python -S tools/route_trail.py '@home ↔ @world' --registry pages.json --base https://example.test --run --backend python-async --json
+python -S tools/route_trail.py '@home ↔ @world' --registry pages.json --base https://example.test --run --backend node --node-cwd /path/to/existing/node/project --json
 ```
 
 Execution starts **one worker, one browser and one Page for the entire trail**.
@@ -96,7 +96,7 @@ order (step includes zero-based index). Explicit `False` fails a hook. Sync
 execution rejects awaitables; async execution accepts sync or async hooks.
 
 ```js
-import {walk, walkSteps} from './scripts/route_trail_node.mjs';
+import {walk, walkSteps} from './tools/route_trail_node.mjs';
 // steps are JSON records from the Python planner; Node does not duplicate its parser.
 const result = await walk(page, steps, {check: async (page, step) => inspect(page, step)});
 for await (const step of walkSteps(page, steps)) await inspect(page, step);
@@ -155,7 +155,7 @@ const result = await walk(page, steps, {check: (p, s) => p.screenshot({path: `${
 A shell command using the Python API (install Playwright/browser binaries first):
 
 ```sh
-PYTHONPATH=scripts python - pages.json https://example.test '🏠 ↔ 🌍' screenshots <<'PY'
+PYTHONPATH=tools python - pages.json https://example.test '🏠 ↔ 🌍' screenshots <<'PY'
 import json, sys
 from pathlib import Path
 from playwright.sync_api import sync_playwright
@@ -177,7 +177,7 @@ PY
 
 The built-in `--run` currently emits receipts; screenshot capture uses these
 API hooks, not a new CLI screenshot flag. For an installed kit, omit
-`PYTHONPATH=scripts`. Existing sync/async Python and Node browser matrix tests
+`PYTHONPATH=tools`. Existing sync/async Python and Node browser matrix tests
 capture each step and check that actual PNG files were produced; Node retains
 them in its CI artifact. This validates capture, not visual-baseline comparison.
 

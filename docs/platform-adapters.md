@@ -59,7 +59,7 @@ python tools/platform_probe.py collect --browser chromium --profile desktop \
   --adapter adapters/flutter-counter.json --widths 320 384 \
   --out app-results --evidence-dir app-results/counter/screenshots
 python -S tools/platform_probe.py merge app-results --out app-matrix/dataset.json
-python -S tools/platform_probe.py render app-matrix/dataset.json --out app-matrix/index.html
+uv run --group pages python tools/platform_probe.py render app-matrix/dataset.json --out app-matrix/index.html
 ```
 
 `--url https://.../#/route` overrides the adapter URL, for example for a locally
@@ -195,7 +195,7 @@ layout/click failure before attributing a difference to an application defect.
 
 ```sh
 python -S tools/app_comparison.py app-results --runners-json '["ubuntu-24.04"]' --page 'portal-*' --env '*-chromium-*' --list
-python -S tools/app_digest.py app-results --runners-json '["ubuntu-24.04"]' --page 'flutter-home' --env 'Linux-*' --ironmate .ironmate --out digest
+uv run --group pages python tools/app_digest.py app-results --runners-json '["ubuntu-24.04"]' --page 'flutter-home' --env 'Linux-*' --ironmate .ironmate --out digest
 ```
 
 Both commands accept repeatable case-sensitive `--page` adapter filename-stem

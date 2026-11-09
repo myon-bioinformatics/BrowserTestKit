@@ -5,7 +5,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer; from path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = ROOT / "scripts" / "btk.py"
+SCRIPT = ROOT / "tools" / "btk.py"
 
 
 def _load(name, path):
@@ -16,7 +16,7 @@ def _load(name, path):
 
 
 btk = _load("btk_under_test", SCRIPT)
-route_trail = _load("route_trail", ROOT / "scripts" / "route_trail.py")
+route_trail = _load("route_trail", ROOT / "tools" / "route_trail.py")
 
 INDEX = ('<!doctype html><meta charset="utf-8"><title>home</title>'
          '<a href="form.html">Form</a> <a href="result.html">Result</a> <a href="https://example.com/">away</a>\n')

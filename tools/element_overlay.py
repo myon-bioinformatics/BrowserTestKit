@@ -7,8 +7,8 @@ Absorbs patterns from SeleniumBase (highlight overlays), Callstack agent-device
 
 Stdlib-only; runs under ``python -S``::
 
-    python -S scripts/element_overlay.py --file dom.json --format svg --out overlay.svg
-    python -S scripts/element_overlay.py --file dom.json --find "submit" --format tap
+    python -S tools/element_overlay.py --file dom.json --format svg --out overlay.svg
+    python -S tools/element_overlay.py --file dom.json --find "submit" --format tap
     python -c "import element_overlay; print(element_overlay.build_highlight_css(['#submit-btn']))"
 
 Exit codes: 0 OK; 1 assertion failure or no search match; 2 usage or input error.

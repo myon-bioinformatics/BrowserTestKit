@@ -6,7 +6,7 @@ import {pathToFileURL} from 'node:url';
 
 let hp;
 test.beforeAll(async () => {
-  hp = await new Function('url', 'return import(url)')(pathToFileURL(resolve('scripts/hit_probe.mjs')).href);
+  hp = await new Function('url', 'return import(url)')(pathToFileURL(resolve('tools/hit_probe.mjs')).href);
 });
 const fixture = pathToFileURL(resolve('fixtures/hit_probe.html')).href;
 const sub = [[0, 0], [1, 0], [0, 1], [1, 1]], cell = 2, pad = 8;

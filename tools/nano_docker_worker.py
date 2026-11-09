@@ -82,4 +82,8 @@ def test():
 
 
 if __name__ == '__main__':
+    if len(sys.argv) != 2 or sys.argv[1] not in ('prepare', 'test'):
+        print('usage: nano_docker_worker.py prepare|test  (inside the nano Docker image; see nano_docker_compare.py)',
+              file=sys.stdout if sys.argv[1:] in (['-h'], ['--help']) else sys.stderr)
+        raise SystemExit(0 if sys.argv[1:] in (['-h'], ['--help']) else 2)
     {'prepare': prepare, 'test': test}[sys.argv[1]]()

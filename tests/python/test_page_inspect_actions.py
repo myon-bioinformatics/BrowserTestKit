@@ -5,11 +5,11 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer; from path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT / "tools"))
 
 import btk as page_inspect  # noqa: E402
 
-SCRIPT = ROOT / "scripts" / "btk.py"
+SCRIPT = ROOT / "tools" / "btk.py"
 BROWSERS = ("chromium", "firefox", "webkit")
 
 PAGE = """<!doctype html>
@@ -742,7 +742,7 @@ def test_chromium_settle_is_quiet_without_page_script_and_busy_pages_time_out(tm
     busy_step = busy_payload["steps"][0]
     assert busy_step["status"] == "done" and busy_step["quiet"] is False
     assert busy_payload["ok"] is True
-    assert ".evaluate(" not in (ROOT / "scripts" / "btk.py").read_text(encoding="utf-8")
+    assert ".evaluate(" not in (ROOT / "tools" / "btk.py").read_text(encoding="utf-8")
 
 
 @pytest.mark.browser

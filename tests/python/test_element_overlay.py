@@ -3,7 +3,7 @@ from pathlib import Path
 
 import element_overlay
 
-SCRIPTS = Path(__file__).resolve().parents[2] / "scripts"
+SCRIPTS = Path(__file__).resolve().parents[2] / "tools"
 
 
 def test_annotate_elements_basic():

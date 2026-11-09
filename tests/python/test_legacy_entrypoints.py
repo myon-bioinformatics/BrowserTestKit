@@ -14,7 +14,7 @@ LEGACY = ('app_comparison app_digest btk_events check_capture_evidence '
 
 def test_legacy_modules_remain_distributed():
     for name in LEGACY:
-        assert (ROOT / 'scripts' / (name + '.py')).is_file(), name
+        assert (ROOT / 'tools' / (name + '.py')).is_file(), name
     for wheel in (ROOT / 'dist').glob('*.whl'):
         with zipfile.ZipFile(wheel) as archive:
             assert set(name + '.py' for name in LEGACY) <= set(archive.namelist())
@@ -25,11 +25,11 @@ def test_legacy_inspection_runs_current_privacy_and_error_contract(tmp_path, run
     # Node: page_inspect.cjs against btk.py through vendor/py_launch.cjs (btk.cjs is gone).
     def command(entry):
         if runtime == 'python':
-            return [sys.executable, str(ROOT / 'scripts' / (entry + '.py'))]
+            return [sys.executable, str(ROOT / 'tools' / (entry + '.py'))]
         if entry == 'page_inspect':
-            return ['node', str(ROOT / 'scripts' / 'page_inspect.cjs')]
+            return ['node', str(ROOT / 'tools' / 'page_inspect.cjs')]
         return ['node', str(ROOT / 'vendor' / 'py_launch.cjs'), '--env-var', 'BTK_PYTHON', '--site',
-                str(ROOT / 'scripts' / 'btk.py')]
+                str(ROOT / 'tools' / 'btk.py')]
     def run(entry, args):
         return subprocess.run([*command(entry), *args],
                               env={**os.environ, 'PYTHON': sys.executable, 'BTK_PYTHON': sys.executable},
@@ -49,7 +49,7 @@ def test_legacy_inspection_runs_current_privacy_and_error_contract(tmp_path, run
 
 
 def test_legacy_python_api_including_private_helpers():
-    spec = importlib.util.spec_from_file_location('legacy_inspect', ROOT / 'scripts/page_inspect.py')
+    spec = importlib.util.spec_from_file_location('legacy_inspect', ROOT / 'tools/page_inspect.py')
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     tree = {'shadowRoots': [{'shadowRootType': 'open'}, {'shadowRootType': 'closed'},

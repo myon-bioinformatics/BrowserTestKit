@@ -5,7 +5,7 @@ PR #206. It imports Node standard libraries and the existing `interaction.mjs`
 real-pointer helper; it does not launch/install a browser or add a dependency.
 
 ```js
-import {workerBudget, explore} from './scripts/browser_execution.mjs';
+import {workerBudget, explore} from './tools/browser_execution.mjs';
 // Playwright config: workers: workerBudget({override: process.env.MY_WORKERS})
 const receipt = await explore(page, {
   route: '/sample', seed: 'recorded-seed', steps: 3,

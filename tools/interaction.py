@@ -15,11 +15,11 @@ overlays). watch() records requests, dialogs (dismissed), uncaught errors,
 popups and Web Storage changes (key count plus a fingerprint of the sorted
 key/value pairs, so overwriting an existing key counts; raw values are not
 recorded) while untrusted input is handled.
-Node twin: scripts/interaction.mjs (same records).
+Node twin: tools/interaction.mjs (same records).
 
 CLI (offline, assert-late): check saved `pointer-press/1` / `side-effects/1` records.
 
-    python -S scripts/interaction.py check records.json      # one record, a list, or JSON lines
+    python -S tools/interaction.py check records.json      # one record, a list, or JSON lines
 
 Exit codes: 0 all records OK, 1 a side-effects record is not quiet, 2 input error.
 """
