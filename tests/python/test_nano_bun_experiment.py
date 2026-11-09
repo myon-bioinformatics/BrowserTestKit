@@ -1,11 +1,6 @@
 """Offline failure gates for the manual experiment."""
-import importlib.util
-import json
-from pathlib import Path
-import sys
-import tempfile
-import unittest
-from unittest import mock
+import importlib.util, json, sys, tempfile, unittest
+from pathlib import Path; from unittest import mock
 
 TOOLS = Path(__file__).resolve().parents[2] / 'tools'
 spec = importlib.util.spec_from_file_location('nano_bun', TOOLS / 'nano_bun.py')

@@ -1,10 +1,5 @@
 """Dependency-free support checks, run with python -S on Python 3.11+."""
-import base64
-import importlib
-import pathlib
-import subprocess
-import sys
-import unittest
+import base64, importlib, pathlib, subprocess, sys, unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))

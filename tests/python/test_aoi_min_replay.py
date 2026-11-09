@@ -1,10 +1,6 @@
 """Offline replay preflight must reject bad evidence before importing any min."""
-import hashlib
-import importlib.util
-import json
+import hashlib, importlib.util, json, subprocess, sys
 from pathlib import Path
-import subprocess
-import sys
 
 import pytest
 

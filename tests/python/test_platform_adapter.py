@@ -1,6 +1,5 @@
 """Offline adapter contracts, dataset identity and app verdict gating."""
-import importlib.util
-import json
+import importlib.util, json
 from pathlib import Path
 
 import pytest

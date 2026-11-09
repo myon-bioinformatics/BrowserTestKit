@@ -1,9 +1,5 @@
 """mirror_check: N-way consensus, normalization, split answers, stdlib xlsx reader."""
-import importlib.util
-import json
-import subprocess
-import sys
-import zipfile
+import importlib.util, json, subprocess, sys, zipfile
 from pathlib import Path
 
 import pytest

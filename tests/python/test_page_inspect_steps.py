@@ -1,12 +1,6 @@
 """observe --step: a sequence of declared actions, one snapshot per step, text never recorded."""
-import functools
-import importlib.util
-import json
-import subprocess
-import sys
-import threading
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
+import functools, importlib.util, json, subprocess, sys, threading
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer; from pathlib import Path
 
 import pytest
 

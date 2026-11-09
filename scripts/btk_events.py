@@ -20,11 +20,8 @@ Stdlib only; runs under ``python -S``.
 """
 from __future__ import annotations
 
-import argparse
-import json
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, Iterable, NamedTuple, TextIO, Union
+import argparse, json
+from datetime import datetime, timezone; from pathlib import Path; from typing import Any, Iterable, NamedTuple, TextIO, Union
 
 SCHEMA = "btk-event/1"
 

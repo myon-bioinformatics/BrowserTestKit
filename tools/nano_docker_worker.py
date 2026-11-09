@@ -1,12 +1,7 @@
 #!/usr/bin/env python3
 """Image dependency preparation and one unchanged two-test Docker sample."""
-import json
-import os
+import json, os, shutil, subprocess, sys, time
 from pathlib import Path
-import shutil
-import subprocess
-import sys
-import time
 import nano_bun as adapter
 import nano_bun_experiment as experiment
 

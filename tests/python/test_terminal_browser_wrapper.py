@@ -1,12 +1,4 @@
-import importlib.util
-import io
-import json
-import os
-import signal
-import stat
-import subprocess
-import sys
-import time
+import importlib.util, io, json, os, signal, stat, subprocess, sys, time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]

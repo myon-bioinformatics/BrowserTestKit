@@ -1,7 +1,5 @@
 """Offline compare of two observe snapshots: section relations and counts, never browser-driven."""
-import json
-import subprocess
-import sys
+import json, subprocess, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]

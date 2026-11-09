@@ -1,13 +1,6 @@
 """Offline contracts for the opt-in Bun installer; never launch a real installer."""
-import copy
-import importlib.util
-import json
-import os
-from pathlib import Path
-import tempfile
-from types import SimpleNamespace
-import unittest
-from unittest import mock
+import copy, importlib.util, json, os, tempfile, unittest
+from pathlib import Path; from types import SimpleNamespace; from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[2]

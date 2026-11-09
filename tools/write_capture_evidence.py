@@ -5,11 +5,8 @@ Call only after the owning application's capture/assertion step. Clear old outpu
 before capture; this tool cannot tell whether an unchanged PNG was freshly taken.
 """
 from __future__ import annotations
-import argparse
-import hashlib
-import json
+import argparse, hashlib, json, sys
 from pathlib import Path
-import sys
 
 import check_capture_evidence as validator
 

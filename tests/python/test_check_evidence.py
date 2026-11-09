@@ -1,10 +1,6 @@
 from __future__ import annotations
 
-import importlib.util
-import json
-import struct
-import subprocess
-import sys
+import importlib.util, json, struct, subprocess, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]

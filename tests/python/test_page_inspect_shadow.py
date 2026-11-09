@@ -1,11 +1,6 @@
 """Shadow roots are counted (open and closed), never entered, and frames are not descended."""
-import functools
-import json
-import subprocess
-import sys
-import threading
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
+import functools, json, subprocess, sys, threading
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer; from pathlib import Path
 
 import pytest
 

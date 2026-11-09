@@ -1,20 +1,8 @@
 #!/usr/bin/env python3
 """Manual Linux experiment; all evidence is written outside the checkout."""
 from __future__ import annotations
-import argparse
-import hashlib
-import importlib.util
-import json
-import os
-from pathlib import Path
-import shutil
-import subprocess
-import sys
-import time
-import urllib.request
-import zipfile
-import io
-from types import SimpleNamespace
+import argparse, hashlib, importlib.util, io, json, os, shutil, subprocess, sys, time, urllib.request, zipfile
+from pathlib import Path; from types import SimpleNamespace
 import nano_bun as adapter
 
 PARENT = '3128b4019b9949a6ccc80c686cd84c93f04af119'

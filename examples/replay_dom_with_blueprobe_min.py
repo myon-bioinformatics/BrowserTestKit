@@ -3,14 +3,8 @@
 Offline only. The min file is caller-selected trusted Python code, not a sandbox.
 No bundle is downloaded, vendored or imported until the snapshot is verified.
 """
-import argparse
-import hashlib
-import importlib.util
-import json
-from pathlib import Path
-import re
-import sys
-from types import SimpleNamespace
+import argparse, hashlib, importlib.util, json, re, sys
+from pathlib import Path; from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 from page_text import find_elements

@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """Validate screenshot evidence without image-library dependencies."""
+import struct, sys
 from pathlib import Path
-import struct
-import sys
 
 PNG = b"\x89PNG\r\n\x1a\n"
 

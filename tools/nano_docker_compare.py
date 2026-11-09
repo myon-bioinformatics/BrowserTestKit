@@ -1,18 +1,8 @@
 #!/usr/bin/env python3
 """Opt-in same-host Docker/npm image versus private offline Bun + Node jobs."""
 from __future__ import annotations
-import argparse
-import json
-import os
+import argparse, json, os, platform, re, shutil, statistics, subprocess, sys, time, uuid
 from pathlib import Path
-import platform
-import re
-import shutil
-import statistics
-import subprocess
-import sys
-import time
-import uuid
 import nano_bun as adapter
 import nano_bun_experiment as experiment
 

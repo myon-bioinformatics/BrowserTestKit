@@ -1,8 +1,5 @@
 """Offline page-inspect operations: scores, addresses, pages, and the CLI."""
-import importlib.util
-import json
-import subprocess
-import sys
+import importlib.util, json, subprocess, sys
 from pathlib import Path
 
 import pytest

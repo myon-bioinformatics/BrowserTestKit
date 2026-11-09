@@ -7,20 +7,8 @@ through installation AND tests because Bun may hardlink cache files into jobs.
 """
 from __future__ import annotations
 
-import argparse
-from collections import Counter
-from contextlib import contextmanager
-import hashlib
-import json
-import os
-from pathlib import Path
-import platform
-import re
-import signal
-import stat
-import subprocess
-import tempfile
-import time
+import argparse, hashlib, json, os, platform, re, signal, stat, subprocess, tempfile, time
+from collections import Counter; from contextlib import contextmanager; from pathlib import Path
 
 FEATURE = "browser-test-kit-document-mirrors"
 SOURCE_COMMIT = "111f6d78befae28acfb198a45b72e5aa0e59dcde"

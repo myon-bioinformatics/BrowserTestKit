@@ -12,22 +12,7 @@ kit is vendored: nothing else in scripts/ is needed for these commands.
 """
 from __future__ import annotations
 
-import argparse
-import base64
-import binascii
-import contextvars
-import hashlib
-import io
-import json
-import math
-import os
-import platform
-import re
-import sys
-import tarfile
-import time
-import urllib.parse
-import urllib.request
+import argparse, base64, binascii, contextvars, hashlib, io, json, math, os, platform, re, sys, tarfile, time, urllib.parse, urllib.request
 from pathlib import Path
 
 # ---- fetch -----------------------------------------------------------------------------

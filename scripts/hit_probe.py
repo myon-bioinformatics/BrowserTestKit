@@ -21,9 +21,7 @@ Exit codes: 0 OK, 2 input error.
 """
 from __future__ import annotations
 
-import argparse
-import json
-import sys
+import argparse, json, sys
 
 SCHEMA = "btk-hit-probe/1"
 

@@ -1,12 +1,6 @@
 """Guard source-preserving branding and relative fixture icon references."""
-from hashlib import sha256
-from html.parser import HTMLParser
-import importlib.util
-import json
-from pathlib import Path
-import subprocess
-import sys
-import unittest
+import importlib.util, json, subprocess, sys, unittest
+from hashlib import sha256; from html.parser import HTMLParser; from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 BRAND = ROOT / "docs/assets/brand"

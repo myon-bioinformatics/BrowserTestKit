@@ -1,6 +1,5 @@
-import importlib.util
+import importlib.util, struct
 from pathlib import Path
-import struct
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]

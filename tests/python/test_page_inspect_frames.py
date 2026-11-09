@@ -1,11 +1,6 @@
 """Child frames are listed by name, URL, and origin; their contents are never entered."""
-import functools
-import json
-import subprocess
-import sys
-import threading
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
+import functools, json, subprocess, sys, threading
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer; from pathlib import Path
 
 import pytest
 

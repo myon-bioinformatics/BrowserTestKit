@@ -24,13 +24,7 @@ Stdlib only. Exit codes: 0 = all agree; 1 = some implementation deviates; 2 = in
 """
 from __future__ import annotations
 
-import argparse
-import collections
-import json
-import re
-import sys
-import xml.etree.ElementTree as ET
-import zipfile
+import argparse, collections, json, re, sys, xml.etree.ElementTree as ET, zipfile
 
 _LINK = re.compile(r"!?\[([^\]]*)\]\([^)]*\)")
 _TAG = re.compile(r"<[^>]+>")

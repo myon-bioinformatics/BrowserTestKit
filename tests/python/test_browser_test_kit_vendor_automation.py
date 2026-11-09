@@ -1,10 +1,6 @@
 """CI contract for vendor.lock.json verification (no promote/update sidecars)."""
-import hashlib
-import json
-import os
-import sys
+import hashlib, json, os, subprocess, sys
 from pathlib import Path
-import subprocess
 
 import pytest
 

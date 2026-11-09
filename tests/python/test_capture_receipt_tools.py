@@ -1,8 +1,6 @@
 """Exercise the adapters against each consumer's bundle shape, using real CLIs."""
-import json
+import json, subprocess, sys
 from pathlib import Path
-import subprocess
-import sys
 
 import pytest
 from test_check_capture_evidence import png, SHA

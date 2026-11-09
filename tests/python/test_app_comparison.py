@@ -1,7 +1,6 @@
 """Offline coverage and evidence interpretation; real codecs tested via explicit checkout."""
-import importlib.util
+import importlib.util, sys
 from pathlib import Path
-import sys
 
 import pytest
 
