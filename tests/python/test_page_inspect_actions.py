@@ -1,14 +1,6 @@
 """Stage 1-2 browser actions: Playwright methods, redacted values, explicit unsupported steps."""
-import functools
-import json
-import os
-import platform
-import subprocess
-import sys
-import threading
-import time
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
+import functools, json, os, platform, subprocess, sys, threading, time
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer; from pathlib import Path
 
 import pytest
 

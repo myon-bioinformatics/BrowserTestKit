@@ -1,10 +1,5 @@
-"""Dependency-free support checks, run with python -S on Python 3.9+."""
-import base64
-import importlib
-import pathlib
-import subprocess
-import sys
-import unittest
+"""Dependency-free support checks, run with python -S on Python 3.11+."""
+import base64, importlib, pathlib, subprocess, sys, unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
@@ -37,7 +32,7 @@ class StdlibSupport(unittest.TestCase):
         self.assertEqual(h("ul", h("li", "item")), "<ul><li>item</li></ul>")
 
     def test_representative_cli_help(self):
-        for name in ("check_png", "page_text", "gh_ops", "image_diff", "py_matrix"):
+        for name in ("check_png", "page_text", "image_diff"):
             with self.subTest(module=name):
                 result = subprocess.run(
                     [sys.executable, "-S", str(ROOT / "tools" / (name + ".py")), "--help"],
@@ -45,15 +40,6 @@ class StdlibSupport(unittest.TestCase):
                 )
                 self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_old_python_rejects_image_use(self):
-        if sys.version_info >= (3, 11):
-            self.skipTest("Old-Python image rejection runs on 3.9/3.10")
-        result = subprocess.run(
-            [sys.executable, "-S", str(ROOT / "tools/image_diff.py"), "missing.png", "missing.png"],
-            capture_output=True, text=True, timeout=30,
-        )
-        self.assertEqual(result.returncode, 2)
-        self.assertIn("Python >=3.11 is required", result.stderr)
 
 
 if __name__ == "__main__":

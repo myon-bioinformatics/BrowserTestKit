@@ -14,13 +14,8 @@ Uses the same trusted, pinned Ironmate checkout as app_comparison.py for PNG wor
 """
 from __future__ import annotations
 
-import argparse
-import base64
-import html
-import importlib
-import json
+import argparse, base64, html, importlib, json, sys
 from pathlib import Path
-import sys
 
 import app_comparison as comparison
 import platform_probe as probe

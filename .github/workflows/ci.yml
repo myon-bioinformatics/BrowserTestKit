@@ -1,4 +1,4 @@
-name: playwright-prototype
+name: CI
 on:
   pull_request:
   push:
@@ -40,7 +40,7 @@ jobs:
           retention-days: 14
 
   node:
-    needs: [changes, python, node-browserless, test-locked]
+    needs: [changes, python, node-browserless, vendor-locked]
     if: needs.changes.outputs.product_changed == 'true'
     runs-on: ubuntu-24.04
     steps:
@@ -252,7 +252,7 @@ jobs:
 
   python-browser:
     name: Python browser integration (Chromium)
-    needs: [changes, python, node-browserless, test-locked]
+    needs: [changes, python, node-browserless, vendor-locked]
     if: needs.changes.outputs.product_changed == 'true'
     permissions:
       contents: read
@@ -324,7 +324,7 @@ jobs:
 
   python-browser-optional:
     name: Python browser integration (Firefox and WebKit)
-    needs: [changes, python, node-browserless, test-locked]
+    needs: [changes, python, node-browserless, vendor-locked]
     if: needs.changes.outputs.product_changed == 'true'
     permissions:
       contents: read
@@ -387,7 +387,8 @@ jobs:
             !test-results/controlled-failure/**
           if-no-files-found: error
 
-  test-locked:
+  vendor-locked:
+    name: Vendor locked baseline
     permissions:
       contents: read
     needs: changes
@@ -417,7 +418,25 @@ jobs:
     - name: Recreate locked vendor files from GitHub
       shell: bash
       run: |
-        python -S tools/recreate_locked_vendor.py
+        # Staging materialize via parent vendor_sync; leave checkout untouched on failure.
+        python -S <<'PY'
+        import json, os, shutil, subprocess, sys, tempfile
+        from pathlib import Path
+        root = Path.cwd()
+        tool = Path(".vendor-sync-tools/vendor_sync.py")
+        manifest = root / "vendor.lock.json"
+        cmd = [sys.executable, "-S", str(tool)]
+        subprocess.run(cmd + ["check", "--root", str(root), "--manifest", "vendor.lock.json"], check=True)
+        with tempfile.TemporaryDirectory(prefix=".locked-vendor-", dir=root) as directory:
+            staging = Path(directory)
+            shutil.copyfile(manifest, staging / "vendor.lock.json")
+            for mode in ("materialize", "check"):
+                subprocess.run(cmd + [mode, "--root", str(staging), "--manifest", "vendor.lock.json"], check=True)
+            for entry in json.loads(manifest.read_text(encoding="utf-8"))["files"]:
+                relative = entry["destination"]
+                os.replace(staging / relative, root / relative)
+        subprocess.run(cmd + ["check", "--root", str(root), "--manifest", "vendor.lock.json"], check=True)
+        PY
     - run: uv run --locked python -m pytest tests/python -q -m "not browser"
     - name: Wrapper tests with btk-events plugin enabled
       run: |
@@ -448,11 +467,10 @@ jobs:
         path: build/vendor-evidence-locked
         if-no-files-found: error
         retention-days: 14
-    name: Locked baseline
     timeout-minutes: 20
 
 
-  junit-identity:
+  failure-identity:
     needs: [changes, python, node-browserless, python-browser, python-browser-optional]
     if: always() && needs.changes.outputs.product_changed == 'true'
     permissions:

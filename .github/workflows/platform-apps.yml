@@ -23,7 +23,6 @@ on:
       - 'tools/platform_facts.js'
       - 'tools/app_comparison.py'
       - 'tools/app_digest.py'
-      - 'tools/app_digest_comment.py'
       - '.github/workflows/platform-apps.yml'
 
 permissions:
@@ -135,7 +134,6 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
-      pull-requests: write  # one digest comment per run on same-repository pull requests
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -209,14 +207,6 @@ jobs:
           name: platform-app-digest
           path: app-digest
           retention-days: 30
-      - name: Comment the digest summary on the PR
-        if: always() && steps.digest.outcome == 'success' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_PROMPT_DISABLED: "1"
-          PR: ${{ github.event.pull_request.number }}
-        run: |
-          python -S tools/app_digest_comment.py "$GITHUB_REPOSITORY" "$PR" --file app-digest/summary.md
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:

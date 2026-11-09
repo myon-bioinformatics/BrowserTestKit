@@ -1,9 +1,5 @@
 """Expected URL decisions and preflight side effects for the Python and Node route trails."""
-import asyncio
-import importlib.util
-import json
-import shutil
-import subprocess
+import asyncio, importlib.util, json, shutil, subprocess
 from pathlib import Path
 
 import pytest

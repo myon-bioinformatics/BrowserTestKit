@@ -2,16 +2,8 @@
 as a real, separate `pytest -p pytest_btk_events` subprocess against a tiny
 temp test file. No pytester plugin is used or required.
 """
-import json
-import hashlib
-import importlib.util
-import os
-import signal
-import subprocess
-import sys
-import time
+import hashlib, importlib.util, json, os, signal, subprocess, sys, time, xml.etree.ElementTree as ET
 from pathlib import Path
-import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS = ROOT / "tools"

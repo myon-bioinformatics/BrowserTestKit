@@ -13,12 +13,7 @@ Exit codes: 0 OK, 1 execution failure, 2 input error (unknown emoji, bad trail o
 """
 from __future__ import annotations
 
-import argparse
-import copy
-import json
-import ipaddress
-import re
-import sys
+import argparse, copy, ipaddress, json, re, sys
 
 GO, ROUND = "→", "↔"
 _PAIR = re.compile(r"""['"](/[^'"]*)['"]\s*:\s*['"]([^'"]+)['"]""")

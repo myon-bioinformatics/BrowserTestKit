@@ -1,11 +1,6 @@
 """settle: a quiet window without an LLM (Stagehand quietWait rule); redaction ported from Stagehand."""
-import functools
-import json
-import subprocess
-import sys
-import threading
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
+import functools, json, subprocess, sys, threading
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer; from pathlib import Path
 
 import pytest
 

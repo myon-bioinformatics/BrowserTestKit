@@ -1,6 +1,5 @@
 """platform_probe offline: width search, verdict, dataset merge, summary gate, viewer HTML."""
-import importlib.util
-import json
+import importlib.util, json
 from pathlib import Path
 
 import pytest

@@ -1,15 +1,11 @@
 """CI contract for vendor.lock.json verification (no promote/update sidecars)."""
-import hashlib
-import json
-import os
-import sys
+import hashlib, json, os, subprocess, sys
 from pathlib import Path
-import subprocess
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-WORKFLOW = '.github/workflows/playwright.yml'
+WORKFLOW = '.github/workflows/ci.yml'
 TEST_JOB = 'python'
 LOCK = json.loads((ROOT / 'vendor.lock.json').read_text())
 SNAPSHOT = ['vendor.lock.json'] + [e['destination'] for e in LOCK['files']]
@@ -32,7 +28,7 @@ def test_public_vendor_ci_verifies_lock_without_repository_writes():
     assert "schedule" not in ci["on"]
     assert "resolve-vendor" not in ci["jobs"]
     jobs = ci["jobs"]
-    for job in (jobs[TEST_JOB], jobs["test-locked"]):
+    for job in (jobs[TEST_JOB], jobs["vendor-locked"]):
         assert job.get("permissions") == {"contents": "read"}
         assert "continue-on-error" not in job
     text = (ROOT / WORKFLOW).read_text(encoding="utf-8")
@@ -41,7 +37,7 @@ def test_public_vendor_ci_verifies_lock_without_repository_writes():
     assert "sync_vendor_provenance" not in text
     assert "provenance.json" not in text
     assert not any(x in text for x in ("secrets.", "VENDOR_UPDATE_TOKEN", "VENDOR_UPDATES_ENABLED", "GH_TOKEN"))
-    for name in (TEST_JOB, "test-locked"):
+    for name in (TEST_JOB, "vendor-locked"):
         steps = jobs[name]["steps"]
         check = next(s for s in steps if s.get("name") == "Verify checked-in vendor copies")
         assert check["run"] == "python -S .vendor-sync-tools/vendor_sync.py check --manifest vendor.lock.json"
@@ -53,11 +49,15 @@ def test_public_vendor_ci_verifies_lock_without_repository_writes():
                 assert step["with"]["persist-credentials"] == "false"
             assert not any(x in step.get("run", "") for x in ("|| true", "|| :", "set +e", "git push", "git commit", "gh pr"))
             assert "continue-on-error" not in step
-    locked = jobs["test-locked"]["steps"]
+    locked = jobs["vendor-locked"]["steps"]
     recreate = next(s for s in locked if s.get("name") == "Recreate locked vendor files from GitHub")
     assert recreate["shell"] == "bash"
-    assert recreate["run"].strip() == "python -S tools/recreate_locked_vendor.py"
-    assert "unlink" not in recreate["run"]
+    run = recreate["run"]
+    assert "tools/recreate_locked_vendor.py" not in run
+    assert ".vendor-sync-tools/vendor_sync.py" in run
+    assert "materialize" in run
+    assert "TemporaryDirectory" in run or "tempfile" in run
+    assert "unlink" not in run
     assert not any(s.get("uses", "").startswith("actions/download-artifact@") for s in locked)
     stage = next(s for s in locked if s.get("name") == "Stage canonical vendor evidence")
     assert "--kind locked" in stage["run"]
@@ -67,7 +67,7 @@ def test_public_vendor_ci_verifies_lock_without_repository_writes():
 
 def test_locked_baseline_runs_automatically_without_candidate_snapshot():
     ci = _workflow()
-    job = ci['jobs']['test-locked']
+    job = ci['jobs']['vendor-locked']
     assert job.get('needs') == ci['jobs'][TEST_JOB].get('needs')
     assert job.get('if') == ci['jobs'][TEST_JOB].get('if')
     matrix = job.get('strategy', {}).get('matrix', {})
@@ -113,3 +113,10 @@ def test_real_canonical_staging_preserves_locked_bytes(tmp_path):
         data = (output / name).read_bytes()
         assert data == (tmp_path / name).read_bytes()
         assert hashlib.sha256(data).hexdigest() == meta['sha256'][name]
+
+
+def test_launcher_pin_uses_canonical_first_parent_source():
+    entry = next(e for e in LOCK["files"] if e["destination"] == "vendor/py_launch.cjs")
+    assert entry["repository"] == "myon-bioinformatics/myon-bioinformatics"
+    assert entry["source"] == "py_launch.cjs"
+    assert entry["commit"] == entry["ref"] == "384f5dd532076062f7833038764e9a62322c387c"

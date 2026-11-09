@@ -3,13 +3,8 @@
 
 Exit 0: captured (not site/content validation); 1: ambiguous selector; 2: error.
 """
-import argparse
-from datetime import datetime, timezone
-import hashlib
-import json
-from pathlib import Path
-import sys
-from urllib.parse import urlsplit
+import argparse, hashlib, json, sys
+from datetime import datetime, timezone; from pathlib import Path; from urllib.parse import urlsplit
 
 
 

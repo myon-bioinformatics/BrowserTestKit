@@ -1,11 +1,5 @@
-import hashlib
-import importlib.util
-import json
+import hashlib, importlib.util, json, struct, subprocess, sys, zlib
 from pathlib import Path
-import struct
-import subprocess
-import sys
-import zlib
 
 import pytest
 

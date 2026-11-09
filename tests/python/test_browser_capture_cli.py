@@ -1,7 +1,6 @@
 """Dependency-free CLI contract checks, not browser execution certification."""
+import subprocess, sys
 from pathlib import Path
-import subprocess
-import sys
 import pytest
 
 SCRIPT=Path(__file__).resolve().parents[2]/'examples/capture_browser_dom.py'

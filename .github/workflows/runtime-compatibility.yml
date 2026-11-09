@@ -1,4 +1,4 @@
-name: Python support boundaries
+name: Stdlib runtime compatibility
 
 on:
   pull_request:
@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ['3.9', '3.10']
+        python: ['3.11']
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -36,7 +36,7 @@ jobs:
           uv pip install --no-deps .
           cd "$RUNNER_TEMP"
           python -m btk --help
-          python -c "from importlib.metadata import metadata; m = metadata('browser-test-kit-tools'); assert m['Requires-Python'] == '>=3.9'; assert m.get_all('Requires-Dist', []) == []"
+          python -c "from importlib.metadata import metadata; m = metadata('browser-test-kit-tools'); assert m['Requires-Python'] == '>=3.11'; assert m.get_all('Requires-Dist', []) == []"
 
   development-floor:
     name: Images and development / Python 3.11

@@ -84,7 +84,7 @@ Not ported: Stagehand's model tools, its `Runtime.callFunctionOn` scroll, and it
 
 `settle` is Stagehand's quiet wait (`packages/integrations/core/src/facade/runtime.ts`, MIT, no model call): readyState past `loading`, then 400 ms with no DOM mutation, checked about every 100 ms. The timeout ends the wait with `quiet: false` and status `done`. Chromium watches `Page.lifecycleEvent` plus `DOM.attributeModified`, `DOM.characterDataModified`, `DOM.childNodeInserted`, `DOM.childNodeRemoved`, and `DOM.documentUpdated` on the CDP session. Playwright's `wait_for_load_state("domcontentloaded")` supplies the load state it already tracked. No `page.evaluate` and no `Runtime.evaluate`. Firefox and WebKit are `unsupported` because they have no CDP DOM mutation stream; a page script is not substituted, and the no-evaluate guard on `tools/btk.py` stays intact. A Chromium step still carries the per-engine `support` map.
 
-`tools/fetch_member.py` and `parts.lock.json` (`btk-parts-lock/1`) are the integrity-checked single-member extract from `feat/page-inspect-shadow-roots`. Playwright in that lock is the lower bound `>=1.64.1`, matching `pyproject.toml`, with no upper bound. `@playwright/test` in `package.json` uses the same lower bound. The Node part stays an integrity-checked tarball with minimum 24.0.0 and no maximum.
+`btk fetch` (`python -S tools/btk.py fetch`) and `parts.lock.json` (`btk-parts-lock/1`) are the integrity-checked single-member extract from `feat/page-inspect-shadow-roots`. Playwright in that lock is the lower bound `>=1.64.1`, matching `pyproject.toml`, with no upper bound. `@playwright/test` in `package.json` uses the same lower bound. The Node part stays an integrity-checked tarball with minimum 24.0.0 and no maximum.
 
 ## Secret redaction
 

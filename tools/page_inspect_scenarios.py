@@ -5,10 +5,7 @@ fixture is driven; values, arbitrary paths and raw browser errors stay private.
 """
 from __future__ import annotations
 
-import math
-import re
-import time
-import urllib.parse
+import math, re, time, urllib.parse
 
 CASES = ("display", "shortcut", "offline", "http-error", "latency", "permission", "upload", "download")
 CHANNELS = ("chrome", "msedge")

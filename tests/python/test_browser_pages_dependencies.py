@@ -31,11 +31,11 @@ def _assert_browser_groups(workflow):
 
 
 def test_browser_lanes_include_pinned_page_renderer():
-    _assert_browser_groups(yaml.safe_load((ROOT / ".github/workflows/playwright.yml").read_text()))
+    _assert_browser_groups(yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text()))
 
 
 def test_browser_contract_rejects_missing_pages_or_masked_tests():
-    workflow = yaml.safe_load((ROOT / ".github/workflows/playwright.yml").read_text())
+    workflow = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())
     _assert_browser_groups(workflow)
     for name in ("python-browser", "python-browser-optional"):
         for mutation in ("missing-pages", "masked-failure", "skip"):

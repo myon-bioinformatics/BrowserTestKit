@@ -25,9 +25,7 @@ Exit codes: 0 = every install line already matches; 1 = a suggestion; 2 = usage 
 """
 from __future__ import annotations
 
-import os
-import re
-import sys
+import os, re, sys
 
 INSTALL = re.compile(r"playwright(?:@[\w.]+)?\s+install\b([^\n]*)")
 CONFIG_NAMES = re.compile(r"^playwright\.config\.(?:ts|js|mjs|cjs)$")

@@ -1,13 +1,6 @@
 """Platform/fault evidence contracts, independent of generic action/step PRs."""
-import json
-import os
-import shutil
-import subprocess
-import sys
-import threading
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
-from types import SimpleNamespace
+import json, os, shutil, subprocess, sys, threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer; from pathlib import Path; from types import SimpleNamespace
 
 import pytest
 

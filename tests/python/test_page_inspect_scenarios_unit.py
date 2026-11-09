@@ -1,9 +1,6 @@
 """Offline boundary tests for the platform and fault scenario command."""
-import json
-import subprocess
-import sys
-from pathlib import Path
-from types import SimpleNamespace
+import json, subprocess, sys
+from pathlib import Path; from types import SimpleNamespace
 
 import pytest
 

@@ -13,9 +13,7 @@ declaration at all; 2 input error.
 """
 from __future__ import annotations
 
-import json
-import re
-import sys
+import json, re, sys
 from pathlib import Path
 
 SUFFIXES = {".html", ".htm", ".css", ".js", ".json"}

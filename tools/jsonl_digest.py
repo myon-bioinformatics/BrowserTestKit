@@ -32,13 +32,8 @@ Exit codes: 0 = digested (even if it contains errors); 1 = no JSON records
 """
 from __future__ import annotations
 
-import argparse
-import json
-import math
-import sys
-from collections import Counter, deque
-from datetime import datetime
-from pathlib import Path
+import argparse, json, math, sys
+from collections import Counter, deque; from datetime import datetime; from pathlib import Path
 
 KIND_KEYS = ("event", "type", "kind", "method")
 TIME_KEYS = ("time", "timestamp", "ts", "created_at", "at")

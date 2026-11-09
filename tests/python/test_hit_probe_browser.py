@@ -4,9 +4,7 @@ The probe is the browser's own hit test (document.elementFromPoint); each cell's
 is the fraction of its 2x2 integer sub-points that land on the target, a 0..1 value like a Jev
 confidence. Observations are collected first and asserted at the end (assert-late).
 """
-import importlib.util
-import json
-import os
+import importlib.util, json, os
 from pathlib import Path
 
 import pytest

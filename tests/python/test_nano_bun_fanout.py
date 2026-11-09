@@ -1,6 +1,4 @@
-import pathlib
-import sys
-import unittest
+import pathlib, sys, unittest
 from unittest.mock import patch
 
 TOOLS = pathlib.Path(__file__).resolve().parents[2] / 'tools'

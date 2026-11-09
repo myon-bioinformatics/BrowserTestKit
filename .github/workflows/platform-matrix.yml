@@ -1,4 +1,4 @@
-name: platform-matrix
+name: Platform matrix
 
 # Measure the same fixture on Windows, macOS and Linux x Chromium/Firefox/WebKit
 # (+ branded Chrome/Edge) x desktop/iPhone/Pixel x headless/headed, then build one
@@ -88,7 +88,6 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
-      pull-requests: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -104,27 +103,6 @@ jobs:
           uv run --locked --group pages python tools/platform_probe.py render platform-matrix/dataset.json --out platform-matrix/index.html
           python -S tools/platform_probe.py summary platform-matrix/dataset.json > platform-matrix/summary.txt || true
           { echo '```text'; cat platform-matrix/summary.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
-      # Results that live only in artifacts are unreadable after retention, from a phone, or for
-      # agents without blob access (EVIDENCE_ONLY_IN_ARTIFACTS): keep one updated PR comment.
-      - name: Comment the summary on the PR
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_PROMPT_DISABLED: "1"
-          PR: ${{ github.event.pull_request.number }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          # Markdown backticks are literal text, not shell command substitutions.
-          # shellcheck disable=SC2016
-          body="$(printf '<!-- platform-matrix -->\n### platform-matrix\n\nTabbed viewer: artifact `platform-matrix` (index.html) of [this run](%s).\n\n```text\n%s\n```\n' \
-            "$RUN_URL" "$(cat platform-matrix/summary.txt)")"
-          id=$(timeout 60 gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
-            --jq '.[] | select(.body | startswith("<!-- platform-matrix -->")) | .id' | tail -n 1)
-          if [ -n "$id" ]; then
-            timeout 60 gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -f body="$body" > /dev/null
-          else
-            timeout 60 gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -f body="$body" > /dev/null
-          fi
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: platform-matrix

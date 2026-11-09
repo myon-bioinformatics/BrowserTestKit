@@ -1,12 +1,6 @@
 """btk.py emoji routes: pages discovers same-origin pages, observe --trail and goto take emoji, and the trail grammar matches route_trail.py."""
-import functools
-import importlib.util
-import json
-import subprocess
-import sys
-import threading
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
+import functools, importlib.util, json, subprocess, sys, threading
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer; from pathlib import Path
 
 import pytest
 

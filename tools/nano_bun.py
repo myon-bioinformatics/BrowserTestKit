@@ -7,20 +7,8 @@ through installation AND tests because Bun may hardlink cache files into jobs.
 """
 from __future__ import annotations
 
-import argparse
-from collections import Counter
-from contextlib import contextmanager
-import hashlib
-import json
-import os
-from pathlib import Path
-import platform
-import re
-import signal
-import stat
-import subprocess
-import tempfile
-import time
+import argparse, hashlib, json, os, platform, re, signal, stat, subprocess, tempfile, time
+from collections import Counter; from contextlib import contextmanager; from pathlib import Path
 
 FEATURE = "browser-test-kit-document-mirrors"
 SOURCE_COMMIT = "111f6d78befae28acfb198a45b72e5aa0e59dcde"
@@ -130,7 +118,7 @@ def probe_runtime(node, bun, python, env):
             and int(info["version"].split(".")[0][1:]) >= 24
             and str(info.get("abi", "")).isdigit(), "Node >=24 with an explicit ABI is required")
     py = json.loads(output([python, "-I", "-B", "-S", "-c", "import json,sys; print(json.dumps(list(sys.version_info[:3])))"]))
-    require(py[0] == 3 and py[1] >= 9, "Python 3.9+ comparator interpreter required")
+    require(py[0] == 3 and py[1] >= 11, "Python 3.11+ comparator interpreter required")
     return {"platform": info["platform"], "arch": info["arch"], "node_version": info["version"],
             "node_abi": info["abi"], "node_sha256": sha256(node.read_bytes()),
             "bun_version": BUN_VERSION, "bun_sha256": BUN_SHA256, "python_version": py}

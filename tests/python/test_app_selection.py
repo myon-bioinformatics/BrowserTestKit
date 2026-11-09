@@ -1,8 +1,6 @@
 """Selected plans stay consistent across comparison and digest entry points."""
-import json
+import json, subprocess, sys
 from pathlib import Path
-import subprocess
-import sys
 
 import pytest
 

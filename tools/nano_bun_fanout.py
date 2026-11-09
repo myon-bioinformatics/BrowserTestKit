@@ -1,17 +1,8 @@
 #!/usr/bin/env python3
 """Ten offline independent workers, using private copies of one warmed cache."""
 from __future__ import annotations
-import argparse
-from concurrent.futures import ThreadPoolExecutor
-import json
-import os
-from pathlib import Path
-import shutil
-import signal
-import subprocess
-import sys
-import time
-from threading import Event
+import argparse, json, os, shutil, signal, subprocess, sys, time
+from concurrent.futures import ThreadPoolExecutor; from pathlib import Path; from threading import Event
 import nano_bun_experiment as experiment
 import nano_bun as adapter
 

@@ -38,8 +38,8 @@ For a quick review the report job also writes `platform-app-digest`, a separate 
 artifact: `digest.html` is one self-contained page (every page x environment, thumbnail as
 a data URI, pass/fail, failure reasons, deployed build), with thumbnails starting at 64x128
 px and halved in each direction (a quarter of the pixels) until the page fits 1 MB, and
-`summary.md`, a short table that also goes to the job summary and to one comment per run
-on same-repository pull requests (an exact repeated summary is skipped). The full matrix artifact stays for detailed checks.
+`summary.md`, a short table that also goes to the job summary. The full matrix artifact
+stays for detailed checks. GitHub comment posting is not part of this workflow.
 
 This is deliberately a selected-control contract, not a guarantee for every screen,
 all painted text, or every app feature. Flutter's invisible semantics labels do not

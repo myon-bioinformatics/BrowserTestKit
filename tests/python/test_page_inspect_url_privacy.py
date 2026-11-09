@@ -1,13 +1,6 @@
 """URL evidence drops values without changing the URLs sent to the browser."""
-import functools
-import json
-import os
-import shutil
-import subprocess
-import sys
-import threading
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
+import functools, json, os, shutil, subprocess, sys, threading
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer; from pathlib import Path
 
 import pytest
 

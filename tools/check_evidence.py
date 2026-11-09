@@ -20,10 +20,7 @@ invalid evidence; 2 = usage error.
 """
 from __future__ import annotations
 
-import argparse
-import importlib.util
-import json
-import sys
+import argparse, importlib.util, json, sys
 from pathlib import Path
 
 _spec = importlib.util.spec_from_file_location("check_png", Path(__file__).with_name("check_png.py"))
