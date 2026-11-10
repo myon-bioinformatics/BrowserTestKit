@@ -171,7 +171,9 @@ def test_frame_marks_one_frame_and_takes_no_clicks(tmp_path, browser_name):
                                          "<button id=b>go</button><p id=n></p><script src=page.js></script>", encoding="utf-8")
     marks = "n.textContent += document.querySelectorAll('[data-btk-frame]').length"
     out = tmp_path / "frame.gif"
-    code = eg.main([str(out), "--browser", browser_name, "--serve", str(tmp_path), "--plan", str(_plan(tmp_path, [{"url": "/index.html", "steps": [
+    code = eg.main([str(out), "--browser", browser_name, "--serve", str(tmp_path), "--plan", str(_plan(tmp_path, [{"url": "/index.html",
+        "allow": ["Refused to apply a stylesheet"],     # WebKit: the caret-hiding <style> Playwright adds for a screenshot, refused by this CSP
+        "steps": [
         {"frame": {"selector": "#b", "shape": "ellipse", "color": "#1565c0"}}, {"click": "#b"},     # the mark is gone when the click lands
         {"frame": {"selector": "#b", "keep": True}}, {"click": "#b"},                              # a kept mark covers the button and lets the click through
         {"eval": "const m = document.querySelector('[data-btk-frame]'); if (document.title !== 'b' || getComputedStyle(m).position !== 'fixed') throw new Error('mark')"},
