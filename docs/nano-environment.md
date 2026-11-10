@@ -174,9 +174,10 @@ still execute under the explicit Node binary. Installer improvements therefore
 do not imply faster algorithm execution under Node or a Bun runtime migration.
 
 The reviewed adapter currently supports Linux x86_64 and the official
-`bun-linux-x64` **1.4.4** executable (its bytes are verified), existing Node 24+
-and a Python 3.11+ comparator. Node 24.22.1 was exercised locally; other Node
-versions are separated by cache key, not claimed to have been benchmarked.
+`bun-linux-x64` **1.4.4** executable (its bytes are verified), existing Node 26+
+and a Python 3.11+ comparator. Historical Node 24.22.1 measurements predate
+the Node 26 floor; they do not establish Node 26 performance. Node versions
+are separated by cache key.
 The adapter downloads or upgrades **no runtime**. Use the preparation from
 section 1 above and already available, explicitly selected executables:
 
@@ -250,3 +251,9 @@ Existing PR/main CI still runs Python-support jobs and change detection for
 docs-only changes. Browser/product lanes normally skip on a reliable docs-only
 diff, but the existing detector fails open on an unreliable diff; Draft status
 does not suppress Actions. No workflow, permission or Pages setting is changed.
+
+### Optional local resource observations
+
+The retained Bun-to-Node adapter can be wrapped with the standard-library
+resource meter. See [resource measurement](nano-resource-measurement.md) for
+the command, measurement boundaries and the retired experimental paths.

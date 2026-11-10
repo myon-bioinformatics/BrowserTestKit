@@ -115,8 +115,8 @@ def probe_runtime(node, bun, python, env):
             and info.get("arch") == "x64" and Path(info.get("execPath", "")) == node,
             "expected the explicit real Node executable, not Bun or a launcher")
     require(re.fullmatch(r"v\d+\.\d+\.\d+", info.get("version", "")) is not None
-            and int(info["version"].split(".")[0][1:]) >= 24
-            and str(info.get("abi", "")).isdigit(), "Node >=24 with an explicit ABI is required")
+            and int(info["version"].split(".")[0][1:]) >= 26
+            and str(info.get("abi", "")).isdigit(), "Node >=26 with an explicit ABI is required")
     py = json.loads(output([python, "-I", "-B", "-S", "-c", "import json,sys; print(json.dumps(list(sys.version_info[:3])))"]))
     require(py[0] == 3 and py[1] >= 11, "Python 3.11+ comparator interpreter required")
     return {"platform": info["platform"], "arch": info["arch"], "node_version": info["version"],

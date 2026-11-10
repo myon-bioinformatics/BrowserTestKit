@@ -203,7 +203,7 @@ class PreparedInputTests(TemporaryTests):
 
 def runtime():
     return {"platform": "linux", "arch": "x64", "bun_version": "1.4.4", "bun_sha256": "a" * 64,
-            "node_version": "v24.22.1", "node_abi": "137", "node_sha256": "b" * 64,
+            "node_version": "v26.0.0", "node_abi": "137", "node_sha256": "b" * 64,
             "python_version": [3, 12, 14]}
 
 
@@ -272,7 +272,7 @@ class RuntimeTests(TemporaryTests):
     def setUp(self):
         super().setUp()
         self.node, self.bun, self.python = [self.executable(name) for name in ("node", "bun", "python")]
-        self.node_info = {"release": "node", "bun": False, "version": "v24.22.1", "abi": "137",
+        self.node_info = {"release": "node", "bun": False, "version": "v26.0.0", "abi": "137",
                           "platform": "linux", "arch": "x64", "execPath": str(self.node)}
 
     def probe(self, info=None, python=None, bun_version=None):
@@ -287,12 +287,12 @@ class RuntimeTests(TemporaryTests):
 
     def test_explicit_node_and_abi_are_recorded(self):
         value = self.probe()
-        self.assertEqual(value["node_version"], "v24.22.1")
+        self.assertEqual(value["node_version"], "v26.0.0")
         self.assertEqual(value["node_abi"], "137")
 
     def test_wrong_runtime_release_bun_launcher_or_old_node_is_rejected(self):
         for field, value in (("release", "bun"), ("bun", True), ("execPath", "/other/node"),
-                             ("version", "v22.0.0"), ("abi", ""), ("platform", "darwin"), ("arch", "arm64")):
+                             ("version", "v22.0.0"), ("version", "v24.22.1"), ("abi", ""), ("platform", "darwin"), ("arch", "arm64")):
             with self.subTest(field=field), self.assertRaises(nano.Error):
                 self.probe(dict(self.node_info, **{field: value}))
 
