@@ -138,7 +138,8 @@ def check_step(step) -> dict:
 
 
 def frame_svg(box: dict, viewport: tuple[int, int], frame: dict) -> str:
-    """The 🔲 overlay: one viewport-sized SVG with ``frame["shape"]`` drawn around (``arrow``: pointing at) the padded ``box``."""
+    """The 🔲 overlay: one viewport-sized SVG with ``frame["shape"]`` drawn around (``arrow``: pointing at) the padded ``box``.
+    It carries no ``style`` attribute (a page's ``style-src 'self'`` would refuse it): draw_frame places it through the CSSOM."""
     pad, colour, line = frame["pad"], frame["color"], frame["width"]
     x, y, w, h = box["x"] - pad, box["y"] - pad, box["width"] + 2 * pad, box["height"] + 2 * pad
     cx, cy = x + w / 2, y + h / 2
@@ -155,8 +156,7 @@ def frame_svg(box: dict, viewport: tuple[int, int], frame: dict) -> str:
                 f'<polygon points="{tip:g},{cy:g} {tip + side * head:g},{cy - head / 2:g} {tip + side * head:g},{cy + head / 2:g}" fill="{colour}"/>')
     else:
         body = f'<rect x="{x:g}" y="{y:g}" width="{w:g}" height="{h:g}" rx="4" {stroke}/>'
-    return (f'<svg xmlns="http://www.w3.org/2000/svg" {FRAME_MARK}="{"keep" if frame["keep"] else "once"}" width="{viewport[0]}" height="{viewport[1]}" '
-            f'style="position:fixed;left:0;top:0;z-index:2147483647;pointer-events:none;overflow:visible">{body}</svg>')
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" {FRAME_MARK}="{"keep" if frame["keep"] else "once"}" width="{viewport[0]}" height="{viewport[1]}">{body}</svg>')
 
 
 def clear_frame(page, *, kept: bool = False) -> None:
@@ -173,7 +173,10 @@ def draw_frame(page, frame: dict) -> str:
         raise ValueError(f"frame: {frame['selector']} has no box (hidden?)")
     clear_frame(page, kept=True)
     size = page.evaluate("() => [document.documentElement.clientWidth, document.documentElement.clientHeight]")
-    page.evaluate("svg => document.documentElement.insertAdjacentHTML('beforeend', svg)", frame_svg(box, (size[0], size[1]), frame))
+    page.evaluate("""svg => { document.documentElement.insertAdjacentHTML('beforeend', svg);
+        Object.assign(document.documentElement.lastElementChild.style, { position: 'fixed', left: '0', top: '0', zIndex: '2147483647',
+                                                                         pointerEvents: 'none', overflow: 'visible' }); }""",
+                  frame_svg(box, (size[0], size[1]), frame))
     return f"🔲 {frame['selector']}"
 
 

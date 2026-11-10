@@ -153,7 +153,7 @@ def test_frame_step_checks_and_shapes():
     draw = lambda **o: eg.frame_svg(box, (392, 848), eg.check_step({"frame": {"selector": "#x", **o}})["frame"])  # noqa: E731
     rect = draw(color="#1565c0", width=8, pad=0)
     assert '<rect x="100" y="50" width="40" height="20"' in rect and 'stroke="#1565c0" stroke-width="8"' in rect
-    assert 'data-btk-frame="once"' in rect and "pointer-events:none" in rect and 'width="392" height="848"' in rect
+    assert 'data-btk-frame="once"' in rect and "style=" not in rect and 'width="392" height="848"' in rect
     assert 'data-btk-frame="keep"' in draw(keep=True)
     assert '<ellipse cx="120" cy="60"' in draw(shape="ellipse") and '<polygon points="120,6 64,78 176,78"' in draw(shape="triangle")
     assert 'x1="28" y1="60" x2="76" y2="60"' in draw(shape="arrow")                     # room on the left: it comes from there
@@ -165,17 +165,21 @@ def test_frame_step_checks_and_shapes():
 @pytest.mark.parametrize("browser_name", ["chromium", "firefox", "webkit"])
 def test_frame_marks_one_frame_and_takes_no_clicks(tmp_path, browser_name):
     pytest.importorskip("web_ui")
-    (tmp_path / "index.html").write_text("<button id=b onclick=\"this.textContent=document.querySelectorAll('[data-btk-frame]').length\">go</button>"
-                                         "<p id=n></p>", encoding="utf-8")
+    (tmp_path / "page.js").write_text("b.onclick = () => { b.textContent = document.querySelectorAll('[data-btk-frame]').length; };\n"
+                                      "addEventListener('click', e => { document.title = e.target.id; });", encoding="utf-8")
+    (tmp_path / "index.html").write_text("<meta http-equiv=Content-Security-Policy content=\"default-src 'self'; style-src 'self'\">"   # no inline style
+                                         "<button id=b>go</button><p id=n></p><script src=page.js></script>", encoding="utf-8")
     marks = "n.textContent += document.querySelectorAll('[data-btk-frame]').length"
     out = tmp_path / "frame.gif"
     code = eg.main([str(out), "--browser", browser_name, "--serve", str(tmp_path), "--plan", str(_plan(tmp_path, [{"url": "/index.html", "steps": [
         {"frame": {"selector": "#b", "shape": "ellipse", "color": "#1565c0"}}, {"click": "#b"},     # the mark is gone when the click lands
+        {"frame": {"selector": "#b", "keep": True}}, {"click": "#b"},                              # a kept mark covers the button and lets the click through
+        {"eval": "const m = document.querySelector('[data-btk-frame]'); if (document.title !== 'b' || getComputedStyle(m).position !== 'fixed') throw new Error('mark')"},
         {"frame": {"selector": "#b", "keep": True}}, {"eval": marks}, {"frame": {"selector": "#n", "shape": "arrow"}}, {"eval": marks},
-        {"eval": "if (b.textContent !== '0' || n.textContent !== '10') throw new Error(b.textContent + '/' + n.textContent)"},
+        {"eval": "if (b.textContent !== '1' || n.textContent !== '10') throw new Error(b.textContent + '/' + n.textContent)"},
         {"frame": "#missing"}]}]))])
     shot = json.loads(out.with_suffix(".json").read_text(encoding="utf-8"))["shots"][0]
-    assert code == 1 and shot["steps"][:3] == ["🔲 #b", "click #b", "🔲 #b"] and len(shot["steps"]) == 7      # only the missing selector failed
+    assert code == 1 and shot["steps"][:3] == ["🔲 #b", "click #b", "🔲 #b"] and len(shot["steps"]) == 10      # only the missing selector failed
     assert len(shot["errors"]) == 1 and "TimeoutError" in shot["errors"][0]
     assert len(gif_blocks(out.read_bytes())["frames"]) >= 4                             # the marked frames differ from their neighbours
 
