@@ -14,7 +14,6 @@ const probe = spawnSync(python, ["-c", "import playwright"], {encoding: "utf8"})
 const skip = probe.status !== 0 && !required ? "BTK_PYTHON に Playwright が入っていません" : false;
 const ENTRIES = [
   ["py_launch", ["vendor/py_launch.cjs", "--env-var", "BTK_PYTHON", "--site", "tools/btk.py"]],
-  ["page_inspect.cjs", ["tools/page_inspect.cjs"]],
 ];
 
 function listen() {

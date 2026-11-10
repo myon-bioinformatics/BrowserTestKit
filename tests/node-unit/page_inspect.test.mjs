@@ -1,8 +1,8 @@
-// btk.py の Node 入口（vendor/py_launch.cjs と tools/page_inspect.cjs）を確かめる。ブラウザは使わない。
+// btk.py の Node 入口（vendor/py_launch.cjs の直接呼び出し。専用の .cjs ラッパーはない）を確かめる。ブラウザは使わない。
 import test from "node:test";
 import assert from "node:assert/strict";
 import {spawnSync} from "node:child_process";
-import {mkdtempSync, writeFileSync} from "node:fs";
+import {existsSync, mkdtempSync, writeFileSync} from "node:fs";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 
@@ -18,9 +18,9 @@ function pythonBin() {
 const python = pythonBin();
 const env = {...process.env, BTK_PYTHON: python};
 const LAUNCH = ["vendor/py_launch.cjs", "--env-var", "BTK_PYTHON", "--site", "tools/btk.py"];
-const ENTRIES = [["py_launch", LAUNCH], ["page_inspect.cjs", ["tools/page_inspect.cjs"]]];
+const ENTRIES = [["py_launch", LAUNCH]];
 
-test("help goes through btk.py for both Node entries", () => {
+test("help goes through btk.py from the Node entry", () => {
   for (const [label, prefix] of ENTRIES) {
     const help = spawnSync(process.execPath, [...prefix, "--help"], {encoding: "utf8", env});
     assert.equal(help.status, 0, `${label}: ${help.stderr}`);
@@ -62,4 +62,9 @@ test("exit codes from btk.py pass through unchanged", () => {
     const done = spawnSync(process.execPath, [...prefix, "locate", "/nonexistent/observe.json", "--query", "x", "--json"], {encoding: "utf8", env});
     assert.equal(done.status, 2, `${label}: ${done.stdout}${done.stderr}`);
   }
+});
+
+test("there is no per-tool .cjs wrapper next to btk.py", () => {
+  assert.equal(existsSync("tools/page_inspect.cjs"), false);
+  assert.equal(existsSync("tools/btk.cjs"), false);
 });

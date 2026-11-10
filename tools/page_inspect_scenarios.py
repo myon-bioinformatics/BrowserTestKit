@@ -5,7 +5,7 @@ fixture is driven; values, arbitrary paths and raw browser errors stay private.
 """
 from __future__ import annotations
 
-import math, re, time, urllib.parse
+import math, re, time, urllib.parse, sys
 
 CASES = ("display", "shortcut", "offline", "http-error", "latency", "permission", "upload", "download")
 CHANNELS = ("chrome", "msedge")
@@ -315,7 +315,12 @@ def run_scenario(args, api):
     return api._finish(playwright, browser, failure, result)
 
 
-if __name__ == "__main__":
+def main(argv=None):
+    argv = sys.argv[1:] if argv is None else list(argv)
     import argparse
     parser = argparse.ArgumentParser(prog="page_inspect_scenarios", description="Internal adapter; use page_inspect.py scenario.")
-    parser.parse_args()
+    parser.parse_args(argv)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

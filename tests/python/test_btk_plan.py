@@ -84,7 +84,7 @@ def test_platform_matrix_keeps_the_unflagged_install(capsys):
     assert 'collect --browser "$browser" --profile "$profile"' in workflow
     assert pip.plan_cli([str(ROOT)]) == 0
     out = capsys.readouterr().out
-    assert "platform-matrix.yml:48 full + shell (job uses both the full build and the shell)" in out
+    assert "platform-matrix.yml:51 full + shell (job uses both the full build and the shell)" in out
     assert "suggest" not in out
 
 

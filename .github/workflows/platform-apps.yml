@@ -90,15 +90,41 @@ jobs:
           version: "latest"
           python-version: "3.15"
           activate-environment: true
-          enable-cache: false
+          enable-cache: true
+          # Pull requests restore the cache and never write it; only main saves it.
+          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          prune-cache: true
+      # The .deb downloads are most of this step; keep them in a cache that only main writes
+      # (apt still checks each file against the signed indexes). Profiles share one browser prefix.
+      - name: Restore apt downloads (written only by main)
+        if: runner.os == 'Linux'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/apt-archives
+          key: apt-${{ matrix.os }}-${{ matrix.browser }}-${{ github.run_id }}-${{ matrix.profile }}
+          restore-keys: apt-${{ matrix.os }}-${{ matrix.browser }}-
       - name: System libraries (apt on Linux, bounded; installed before the browser)
+        id: apt
         if: runner.os == 'Linux'
         # WebKit downloads ~117 MB of system packages; a slow apt mirror exceeded 8 minutes.
         # Each isolated profile runner needs its own libraries; install-deps runs only once.
         timeout-minutes: ${{ matrix.browser == 'webkit' && 20 || 8 }}
         run: |
+          archives="$RUNNER_TEMP/apt-archives"; mkdir -p "$archives/partial"
+          debs() { find "$archives" -maxdepth 1 -name '*.deb' | sort | sha256sum; }
+          before=$(debs)
+          echo "Dir::Cache::Archives \"$archives/\";" | sudo tee /etc/apt/apt.conf.d/90-ci-archives >/dev/null
           sudo DEBIAN_FRONTEND=noninteractive dpkg --configure -a
           uv run --locked --group browser python -m playwright install-deps ${{ matrix.browser }}
+          sudo apt-get autoclean -qq
+          sudo rm -rf "$archives/partial" "$archives/lock"; sudo chown -R "$(id -u):$(id -g)" "$archives"
+          [ "$(debs)" = "$before" ] || echo changed=true >> "$GITHUB_OUTPUT"
+      - name: Save apt downloads (main only, when they changed)
+        if: steps.apt.outputs.changed == 'true' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/apt-archives
+          key: apt-${{ matrix.os }}-${{ matrix.browser }}-${{ github.run_id }}-${{ matrix.profile }}
       - name: Install browser
         timeout-minutes: 8
         run: uv run --locked --group browser python -m playwright install --only-shell ${{ matrix.browser }}
