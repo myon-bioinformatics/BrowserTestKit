@@ -171,7 +171,7 @@ A mixed-engine bundle must be named honestly; it is not an individual engine pro
 
 A README wants one picture a reviewer can watch, not a bundle to download. `tools/evidence_gif.py`
 records a plan of shots (page × viewport × steps: `click`, `fill`, `select`, `press`, `scroll`, `wait`,
-`eval`, ⏺ `record`, 🔍 `zoom`) in Chromium, Firefox or WebKit (`--browser`) and writes
+`eval`, ⏺ `record`, 🔍 `zoom`, 🔲 `frame`) in Chromium, Firefox or WebKit (`--browser`) and writes
 `docs/evidence/browser.gif` plus `docs/evidence/browser.json`.
 
 ```
@@ -194,6 +194,10 @@ page ──📸 PNG──▶ Python ──(identical? ♻️ skip)──▶ enco
   browser offers: a 6-bit bucket histogram while frames arrive, changed rectangles only, one global palette
   (exact when it fits, else median cut + refinement), tight delta frames (transparent where unchanged when that
   is smaller), 12-bit LZW → GIF89a. No Pillow, no image library, in any engine.
+- 🔲 `frame` marks an element for one frame with a coloured shape — `rect`, `ellipse`, `triangle` around it or an
+  `arrow` pointing at it (Ironmate's shape names), `color` `#rgb`/`#rrggbb`, `width`, `pad` — so the viewer sees
+  where the next step lands. The mark is an overlay that takes no clicks and is removed before the next step acts;
+  `"keep": true` leaves it until the next 🔲 or the end of the shot.
 - 🔍 `zoom` eases onto an element (outlined) in `steps` frames over `ms` and holds — all drawn from one capture.
 - ⏺ `record` captures every `every` ms for `for` ms (delays are the measured ones), for animations and transitions.
 - 🎚️ Limits: `--colors` (≤ 255), `--max-bytes 800K` (fewer colours, then fewer ⏺ frames, until it fits; over

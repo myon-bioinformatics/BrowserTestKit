@@ -7,7 +7,12 @@
 
 A shot is ``label|url|WIDTHxHEIGHT`` or, in ``--plan`` JSON, ``{"label", "url", "viewport", "steps", "hold", "allow"}``. A step is
 ``{"click": sel}``, ``{"fill": [sel, text]}``, ``{"select": [sel, value]}``, ``{"press": key}``, ``{"scroll": y}``, ``{"wait": ms}``,
-``{"eval": js}`` (each adds a frame showing what it did), and two that shape the GIF itself:
+``{"eval": js}`` (each adds a frame showing what it did), and three that shape the GIF itself:
+
+* 🔲 ``{"frame": sel}`` or ``{"frame": {"selector": sel, "shape": "rect", "color": "#e53935", "width": 4, "pad": 8, "keep": false}}``
+  — one frame with the element marked by a coloured shape (``rect`` / ``ellipse`` / ``triangle`` around it, ``arrow``
+  pointing at it; the same shape names as Ironmate's layers), so the viewer sees where the next step lands. The mark is
+  an overlay that takes no clicks; it goes when the next step starts, or with ``keep`` stays until the next 🔲 / the shot's end.
 
 * ⏺ ``{"record": {"every": 200, "for": 2000, "clip": sel}}`` — frames every ``every`` ms for ``for`` ms (an animation, a
   transition); delays are the measured ones. With ``clip`` only that element's box is captured and laid on the last full
@@ -57,7 +62,9 @@ import time
 
 CAPTION = 32
 SCHEMA = "btk-evidence-gif/2"
-STEP_KEYS = ("click", "fill", "select", "press", "scroll", "wait", "eval", "record", "zoom")
+STEP_KEYS = ("click", "fill", "select", "press", "scroll", "wait", "eval", "record", "zoom", "frame")
+FRAME_SHAPES = ("rect", "ellipse", "triangle", "arrow")
+FRAME_MARK = "data-btk-frame"         # the overlay's attribute: what clear_frame removes
 ENGINES = ("chromium", "firefox", "webkit")
 BATCH_BYTES = 4 << 20                 # base64 per call to the encoder page: one shot is usually one call
 MIN_EVERY = 20                        # ms: a GIF frame cannot be shorter (2 cs) without browsers stretching it
@@ -116,7 +123,61 @@ def check_step(step) -> dict:
         if not (1 <= zoom["steps"] <= 30 and 0 <= zoom["ms"] <= 10000 and 0 <= zoom["hold"] <= 60000 and 1 <= zoom["scale"] <= 8):
             raise ValueError(f"zoom: 1-30 steps, ms <= 10000, hold <= 60000, scale 1-8: {step!r}")
         return {"zoom": zoom}
+    if kind == "frame":
+        value = {"selector": value} if isinstance(value, str) else value
+        if not isinstance(value, dict) or not isinstance(value.get("selector"), str) or set(value) - {"selector", "shape", "color", "width", "pad", "keep"}:
+            raise ValueError(f"frame takes a selector (and shape, color, width, pad, keep): {step!r}")
+        frame = {"selector": value["selector"], "shape": value.get("shape", "rect"), "color": str(value.get("color", "#e53935")),
+                 "width": int(value.get("width", 4)), "pad": int(value.get("pad", 8)), "keep": value.get("keep", False)}
+        colour = frame["color"]
+        if (frame["shape"] not in FRAME_SHAPES or frame["keep"] not in (True, False) or not 1 <= frame["width"] <= 32 or not 0 <= frame["pad"] <= 64
+                or len(colour) not in (4, 7) or colour[0] != "#" or any(c not in "0123456789abcdefABCDEF" for c in colour[1:])):
+            raise ValueError(f"frame: shape {' / '.join(FRAME_SHAPES)}, color #rgb or #rrggbb, width 1-32, pad 0-64, keep true/false: {step!r}")
+        return {"frame": frame}
     return step
+
+
+def frame_svg(box: dict, viewport: tuple[int, int], frame: dict) -> str:
+    """The 🔲 overlay: one viewport-sized SVG with ``frame["shape"]`` drawn around (``arrow``: pointing at) the padded ``box``.
+    It carries no ``style`` attribute (a page's ``style-src 'self'`` would refuse it): draw_frame places it through the CSSOM."""
+    pad, colour, line = frame["pad"], frame["color"], frame["width"]
+    x, y, w, h = box["x"] - pad, box["y"] - pad, box["width"] + 2 * pad, box["height"] + 2 * pad
+    cx, cy = x + w / 2, y + h / 2
+    stroke = f'fill="none" stroke="{colour}" stroke-width="{line}" stroke-linejoin="round"'
+    if frame["shape"] == "ellipse":                                   # the ellipse through the padded box's corners
+        body = f'<ellipse cx="{cx:g}" cy="{cy:g}" rx="{w / 2 ** .5:g}" ry="{h / 2 ** .5:g}" {stroke}/>'
+    elif frame["shape"] == "triangle":                                # apex one box height above: the box's top edge just fits
+        body = f'<polygon points="{cx:g},{y - h:g} {x - w / 2:g},{y + h:g} {x + w + w / 2:g},{y + h:g}" {stroke}/>'
+    elif frame["shape"] == "arrow":                                   # from the side with room, tip on the box's edge
+        head, tail = 4 * line, 64
+        side = -1 if x >= tail else 1                                 # -1: comes from the left
+        tip = x if side < 0 else x + w
+        body = (f'<line x1="{tip + side * tail:g}" y1="{cy:g}" x2="{tip + side * head:g}" y2="{cy:g}" stroke="{colour}" stroke-width="{line}"/>'
+                f'<polygon points="{tip:g},{cy:g} {tip + side * head:g},{cy - head / 2:g} {tip + side * head:g},{cy + head / 2:g}" fill="{colour}"/>')
+    else:
+        body = f'<rect x="{x:g}" y="{y:g}" width="{w:g}" height="{h:g}" rx="4" {stroke}/>'
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" {FRAME_MARK}="{"keep" if frame["keep"] else "once"}" width="{viewport[0]}" height="{viewport[1]}">{body}</svg>')
+
+
+def clear_frame(page, *, kept: bool = False) -> None:
+    """Remove the 🔲 overlay before the next step acts (``kept``: also one drawn with ``keep``)."""
+    page.evaluate("([mark, kept]) => document.querySelectorAll(kept ? `[${mark}]` : `[${mark}=once]`).forEach(e => e.remove())", [FRAME_MARK, kept])
+
+
+def draw_frame(page, frame: dict) -> str:
+    """Mark the element (scrolled into view) with the overlay; returns the step's note."""
+    target = page.locator(frame["selector"]).first
+    target.scroll_into_view_if_needed(timeout=5000)
+    box = target.bounding_box()
+    if not box:
+        raise ValueError(f"frame: {frame['selector']} has no box (hidden?)")
+    clear_frame(page, kept=True)
+    size = page.evaluate("() => [document.documentElement.clientWidth, document.documentElement.clientHeight]")
+    page.evaluate("""svg => { document.documentElement.insertAdjacentHTML('beforeend', svg);
+        Object.assign(document.documentElement.lastElementChild.style, { position: 'fixed', left: '0', top: '0', zIndex: '2147483647',
+                                                                         pointerEvents: 'none', overflow: 'visible' }); }""",
+                  frame_svg(box, (size[0], size[1]), frame))
+    return f"🔲 {frame['selector']}"
 
 
 def parse_bytes(text: str | int | None) -> int | None:
@@ -195,6 +256,8 @@ def resolve(url: str, origin: str | None) -> str:
 def run_step(page, step: dict) -> str:
     """Do one interaction step and wait for it to settle; returns its caption note (⏺ / 🔍 are captured by capture_step)."""
     kind, value = next(iter(step.items()))
+    if kind == "frame":
+        return draw_frame(page, value)
     if kind == "click":
         page.click(value)
     elif kind == "fill":
@@ -379,6 +442,7 @@ def record(out: Path, shots: list[dict], *, serve_dir: Path | None = None, width
                     generator = page_generator(page)
                     captures.full(page, w, "", shot["hold"])
                     for group, step in enumerate(shot["steps"], 1):
+                        clear_frame(page)                              # a 🔲 mark shows on its own frame only (unless keep)
                         if "record" in step or "zoom" in step:
                             done.append(capture_step(page, step, captures, w, shot["hold"], budget, group + 1000 * index))
                         else:
