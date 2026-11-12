@@ -29,7 +29,8 @@ it asks for geolocation permission. Screenshots are stored per page and environm
 (`app-results/<adapter>/<OS>-<browser>-<profile>/`).
 
 After the screenshot comparison (`tools/app_comparison.py` with the pinned Ironmate),
-the report job adds web-ui's `tool/capture_matrix.py` at a pinned merged commit:
+the report job adds web-ui's `tools/capture_matrix.py` at a pinned merged commit (the page
+table comes from `web_ui.py --example flutter-pages`):
 `screenshots/viewer.html` shows one section per page, opened from its emoji, with each
 environment's tile, pass/fail and deployed build. Update the web-ui SHA together with its
 test when the viewer changes.
