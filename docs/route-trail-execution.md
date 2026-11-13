@@ -197,7 +197,7 @@ hosts and `xn--` IDN labels are deliberately unsupported until a shared IDNA
 implementation exists; Python's IDNA2003 and WHATWG do not share a contract.
 This tightens the Unicode-host acceptance once proposed in the (since removed)
 `twin_parity.py` design; the contract is now checked by
-`tests/python/test_execution_url_contract.py`.
+`tests/python/test_route_trail.py`.
 Unicode remains supported in paths, queries and fragments. URL length is at
 most 4096 Unicode code points in both runtimes.
 

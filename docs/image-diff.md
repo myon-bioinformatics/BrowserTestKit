@@ -24,7 +24,7 @@ See also [screenshot-evidence.md](screenshot-evidence.md) for how this fits next
 Install test dependencies (`uv run --locked`) and run:
 
 ```bash
-uv run --locked pytest tests/python/test_browser_test_kit_image_diff.py
+uv run --locked pytest tests/python/test_evidence.py
 ```
 
 Golden stdout lines and PNG inputs live under `tests/fixtures/image_diff/` so regressions do not depend on Pillow. The missing-backend exit-2 diagnostic is tested by pointing `image_diff` at a non-existent vendored copy.

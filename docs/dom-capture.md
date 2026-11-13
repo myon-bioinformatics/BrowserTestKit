@@ -52,7 +52,7 @@ The recorded browser innerText did not show the `¶` permalink. Static page_text
 and GHI selected-body extraction both retain it because CSS hides it in the live
 page. Their token sequences matched in an optional local cross-check against GHI
 #24; this is not an assertion of browser-visible equivalence. No parser was copied
-between repositories. `test_documentation_dom.py` uses existing page_text and
+between repositories. `test_page_text.py` uses existing page_text and
 find_elements, and verifies link resolution. Consumers may adopt this fixture at
 an explicit revision for their own contract, without adopting a second parser.
 
@@ -62,7 +62,7 @@ it does not force the browser's encoding or hide the problem in comparison logic
 
 ## Static extraction regressions from saved DOM
 
-`tests/python/test_page_text_live_regressions.py` reuses saved Alpine and Deno
+`tests/python/test_page_text.py` reuses saved Alpine and Deno
 DOM fragments. Explicit `hidden` and inline `display:none` subtrees are excluded
 without text deduplication; `aria-hidden` alone is not visual hiding. Hidden void
 and nested elements must neither leak text nor swallow following siblings.

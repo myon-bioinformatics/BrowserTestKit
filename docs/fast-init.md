@@ -117,4 +117,4 @@ See [antipatterns.md](./antipatterns.md) for the stable catalogue, [sibling-brow
 
 This order keeps the repository useful as documentation before it becomes another source of CI complexity.
 
-Status: steps 1–4 are on `main`. Step 5 so far has the browser config/install parity test and the evidence-expectation parity test (`tests/python/test_browser_parity.py`). Steps 6–8 have not started.
+Status: steps 1–4 are on `main`. Step 5 so far has the browser config/install parity test and the evidence-expectation parity test (`tests/python/test_smoke.py`). Steps 6–8 have not started.

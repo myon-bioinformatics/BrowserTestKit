@@ -156,7 +156,7 @@ python tools/evidence_board.py test-results/*.jsonl --allow unavailable --step-s
 
 ### Same-run JUnit / xprobe bridge (test-only)
 
-`tests/python/test_pytest_btk_events.py::test_same_child_junit_xprobe_and_btk_bridge`
+`tests/python/test_evidence.py::test_same_child_junit_xprobe_and_btk_bridge`
 starts one controlled child pytest invocation that writes both `--junitxml`
 and `--btk-events`. The child exits **1**, its session summary retains **1**,
 and the evidence board exits **1** without allowing failed/error statuses.
@@ -205,7 +205,7 @@ requires explicit review of provenance, failure layer, fix and regression
 guard; automatic chat ingestion, reproducer linkage, downstream native
 rollout and cross-repository learning are not completed by this fixture.
 
-Run it with `uv run pytest tests/python/test_pytest_btk_events.py -q`.
+Run it with `uv run pytest tests/python/test_evidence.py -q`.
 The existing Python CI suite collects this regression directly.
 
 - `tools/btk_events.py` -- `emit()`, `read()`, `classify_terminal_browser()`;
