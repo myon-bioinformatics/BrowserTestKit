@@ -176,7 +176,7 @@ jobs:
           pattern: platform-app-*
           path: app-results
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-      - name: Render observed results (job failures remain failures; the page is built with PySaiyanWeBoo's web_ui)
+      - name: Render observed results (job failures remain failures; the page is built with PySaiyanWeBoo's pysaiyanweboo)
         run: |
           python -S tools/platform_probe.py merge app-results --out app-matrix/dataset.json
           uv run --locked --group pages python tools/platform_probe.py render app-matrix/dataset.json --out app-matrix/index.html
@@ -198,12 +198,11 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: myon-bioinformatics/PySaiyanWeBoo
-          ref: 635f2f265ea64d41326772b6b55011d7ad82037c
+          ref: bbe5c0b0087f40ff3fffd53bec5111c2ba2d747d
           path: .web-ui
           persist-credentials: false
           sparse-checkout: |
             /pysaiyanweboo.py
-            /web_ui.py
             /tools/
           sparse-checkout-cone-mode: false
       - name: Page viewer (one section per page, opened by emoji)
