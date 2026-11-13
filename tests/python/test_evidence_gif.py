@@ -73,7 +73,7 @@ def gif_blocks(data: bytes) -> dict:
 @pytest.mark.browser
 @pytest.mark.parametrize("browser_name", ["chromium", "firefox", "webkit"])
 def test_records_frames_and_receipt(tmp_path, browser_name):
-    pytest.importorskip("web_ui")
+    pytest.importorskip("pysaiyanweboo")
     site = tmp_path / "site"
     site.mkdir()
     (site / "index.html").write_text("<meta name=generator content='web_ui " + "a" * 40 + "'><h1>ok</h1><button id=b onclick=\"this.textContent='done'\">go</button><select id=s><option>a<option>b</select><img src='https://example.invalid/x.png'><link rel=stylesheet href='https://cdn.example.test/pin/site.css'>"
@@ -158,16 +158,34 @@ def test_frame_step_checks_marks():
     assert eg.static_frames(eg.check_plan([{"url": "/a", "steps": [{"frame": "#a"}, {"click": "#a"}]}])) == 3
 
 
-def test_still_names_say_where_they_came_from():
-    assert eg.still_name("", 1, "🏠 Top", (1280, 800), 0, "page", "") == "01-top-1280x800-00-page.png"
-    assert eg.still_name("run7-", 12, "📱 トップ/画面", (392, 848), 3, "💾 保存ボタン #save", "-dark") == "run7-12-トップ-画面-392x848-03-保存ボタン-save-dark.png"
-    assert eg.slug("🔲🔲") == "x" and len(eg.slug("a" * 80)) == 32
+def test_output_names_follow_pysaiyanweboo_rules(tmp_path, monkeypatch):
+    assert eg.still_stem(1, "🏠 Top", (1280, 800), 0, "page") == "01-top-1280x800-00-page"
+    assert eg.still_stem(12, "📱 トップ/画面", (392, 848), 3, "💾 保存ボタン #save") == "12-トップ-画面-392x848-03-保存ボタン-save"
+    assert eg.slug("🔲🔲") == "x" and len(eg.still_stem(1, "a" * 80, (8192, 8192), 99, "b" * 80)) <= 64
+    shots = eg.check_plan([{"label": "🏠 Top", "url": "/a", "viewport": "392x320", "steps": [{"frame": {"selector": "#s", "label": "保存"}}, {"click": "#s"}]}])
+    gif, stills = eg.output_names(tmp_path / "browser.gif", shots, stills=tmp_path / "s", stills_prefix="p-", stills_suffix="-dark")
+    assert gif == tmp_path / "browser.gif" and [p.name for p in stills.values()] == ["p-01-top-392x320-00-page-dark.png", "p-01-top-392x320-01-保存-dark.png"]
+    from datetime import datetime, timezone
+    run = datetime(2026, 11, 13, 2, 15, tzinfo=timezone.utc)
+    gif, stills = eg.output_names(tmp_path / "browser.gif", shots, stills=tmp_path / "s", run_details=("timestamp",), now=run)
+    assert gif.name == "browser-20261113T021500Z.gif" and all(p.name.endswith("-20261113T021500Z.png") for p in stills.values())
+    (tmp_path / "browser.gif").write_bytes(b"x")                                      # a rerun without --timestamp is refused …
+    with pytest.raises(FileExistsError, match="--force"):
+        eg.output_names(tmp_path / "browser.gif", shots)
+    assert eg.output_names(tmp_path / "browser.gif", shots, force=True)[0] == tmp_path / "browser.gif"   # … unless --force
+    assert eg.output_names(tmp_path / "browser.gif", shots, run_details=("timestamp",), now=run)[0] == gif   # --timestamp: its own file
+    with pytest.raises(Exception, match="letters, digits"):                            # PySaiyanWeBoo's name-part check
+        eg.output_names(tmp_path / "b.gif", shots, stills=tmp_path / "s", stills_prefix="a b", force=True)
+    monkeypatch.setitem(sys.modules, "pysaiyanweboo", None)                            # 🪶 without PySaiyanWeBoo: plain names, no run details
+    assert [p.name for p in eg.output_names(tmp_path / "b.gif", shots, stills=tmp_path / "n")[1].values()] == ["01-top-392x320-00-page.png", "01-top-392x320-01-保存.png"]
+    with pytest.raises(ValueError, match="pysaiyanweboo"):
+        eg.output_names(tmp_path / "b.gif", shots, stills=tmp_path / "n", run_details=("git-commit",))
 
 
 @pytest.mark.browser
 @pytest.mark.parametrize("browser_name", ["chromium", "firefox", "webkit"])
 def test_frame_marks_one_frame_and_takes_no_clicks(tmp_path, browser_name):
-    pytest.importorskip("web_ui")
+    pytest.importorskip("pysaiyanweboo")
     (tmp_path / "page.js").write_text("b.onclick = () => { b.textContent = document.querySelectorAll('[data-btk-frame]').length; };\n"
                                       "addEventListener('click', e => { document.title = e.target.id; });", encoding="utf-8")
     (tmp_path / "index.html").write_text("<meta http-equiv=Content-Security-Policy content=\"default-src 'self'; style-src 'self'\">"   # no inline style
@@ -190,12 +208,12 @@ def test_frame_marks_one_frame_and_takes_no_clicks(tmp_path, browser_name):
 
 
 @pytest.mark.browser
-def test_stills_are_written_and_a_nano_run_needs_no_web_ui(tmp_path, monkeypatch):
+def test_stills_are_written_and_a_nano_run_needs_no_pysaiyanweboo(tmp_path, monkeypatch):
     (tmp_path / "index.html").write_text("<h1 id=t>ok</h1><button id=b>go</button>", encoding="utf-8")
     plan = _plan(tmp_path, [{"label": "🏠 Top", "url": "/index.html", "viewport": "392x320", "steps": [
         {"frame": [{"selector": "#t", "label": "見出し", "spotlight": True}, {"selector": "#b", "shape": "arrow"}]}, {"click": "#b"}]}])
     out = tmp_path / "frame.gif"
-    monkeypatch.setitem(sys.modules, "web_ui", None)                                  # 🪶 PySaiyanWeBoo is not installed
+    monkeypatch.setitem(sys.modules, "pysaiyanweboo", None)                                  # 🪶 PySaiyanWeBoo is not installed
     with pytest.raises(SystemExit, match="2"):                                         # a GIF needs it …
         eg.main([str(out), "--serve", str(tmp_path), "--plan", str(plan)])
     stills = tmp_path / "stills"
@@ -212,7 +230,9 @@ def test_stills_are_written_and_a_nano_run_needs_no_web_ui(tmp_path, monkeypatch
     bundle = json.loads((stills / "evidence-chromium.json").read_text(encoding="utf-8"))
     assert bundle["stage"] == "failed" and "--sha" in bundle["error"] and receipt["stills"]["stage"] == "failed"   # no --sha: not checkable
     sha = "c" * 40
-    assert eg.main([str(out), "--serve", str(tmp_path), "--plan", str(plan), "--stills", str(stills), "--stills-prefix", "p-", "--sha", sha]) == 0
+    with pytest.raises(SystemExit, match="2"):                                         # the stills exist now: refused …
+        eg.main([str(out), "--serve", str(tmp_path), "--plan", str(plan), "--stills", str(stills), "--stills-prefix", "p-", "--sha", sha])
+    assert eg.main([str(out), "--serve", str(tmp_path), "--plan", str(plan), "--stills", str(stills), "--stills-prefix", "p-", "--sha", sha, "--force"]) == 0
     bundle = json.loads((stills / "evidence-chromium.json").read_text(encoding="utf-8"))
     assert bundle["stage"] == "complete" and bundle["project"] == "chromium" and [c["file"] for c in bundle["captures"]] == files
     assert bundle["captures"][0]["width"] == 392 and bundle["captures"][0]["height"] == 320

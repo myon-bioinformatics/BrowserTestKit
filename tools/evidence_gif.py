@@ -3,7 +3,8 @@
 
     uv run --group pages python tools/evidence_gif.py docs/evidence/browser.gif --serve . \\
         --shot "🏠 Top|/index.html|1280x800" --shot "📱 Top|/index.html|392x848"
-    uv run --group pages python tools/evidence_gif.py docs/evidence/browser.gif --serve . --plan shots.json
+    uv run --group pages python tools/evidence_gif.py docs/evidence/browser.gif --serve . --plan shots.json --force
+    uv run --group pages python tools/evidence_gif.py runs/browser.gif --serve . --plan shots.json --git-commit --timestamp   # runs/browser-288cbed-20261113T021500Z.gif
 
 A shot is ``label|url|WIDTHxHEIGHT`` or, in ``--plan`` JSON, ``{"label", "url", "viewport", "steps", "hold", "allow"}``. A step is
 ``{"click": sel}``, ``{"fill": [sel, text]}``, ``{"select": [sel, value]}``, ``{"press": key}``, ``{"scroll": y}``, ``{"wait": ms}``,
@@ -28,7 +29,7 @@ directory instead; ``"allow": ["text"]`` names page errors a fixture raises on p
 
 📦 Where the bytes go: Playwright takes each screenshot (PNG) in any engine (``--browser chromium|firefox|webkit``); a
 screenshot byte-identical to the previous one is not sent again (the hash decides), and each shot's screenshots go to the
-encoder page in one call per 4 MiB. That page is PySaiyanWeBoo's ``web_ui.gif_recorder_document()``: the browser itself decodes,
+encoder page in one call per 4 MiB. That page is PySaiyanWeBoo's ``pysaiyanweboo.gif_recorder_document()``: the browser itself decodes,
 fits, zooms and captions them on a canvas, and ``gif.js`` keeps only changed rectangles, picks one global palette, writes
 delta frames and LZW — the GIF crosses the socket once, pixels never come back. Captions are drawn by the browser in Meiryo
 (Japanese fallbacks), so no font file is bundled.
@@ -43,7 +44,7 @@ Next to the GIF a receipt ``<name>.json`` records every shot's status, page erro
 under ``plan`` — ``--plan <name>.json`` re-records the same GIF (the receipt is the recipe).
 
 Exit codes: 0 every shot loaded without a page error or HTTP error; 1 some shot failed (the GIF is still written, ⛔ in its
-caption, so the failure can be seen); 2 usage. Needs Playwright and PySaiyanWeBoo's ``web_ui`` (this repository's ``pages``
+caption, so the failure can be seen); 2 usage. Needs Playwright and PySaiyanWeBoo (``pysaiyanweboo``) (this repository's ``pages``
 group); no Pillow, no image library.
 """
 from __future__ import annotations
@@ -87,7 +88,7 @@ FRAME_MARK = "data-btk-frame"         # the overlay's attribute: what clear_fram
 ENGINES = ("chromium", "firefox", "webkit")
 BATCH_BYTES = 4 << 20                 # base64 per call to the encoder page: one shot is usually one call
 MIN_EVERY = 20                        # ms: a GIF frame cannot be shorter (2 cs) without browsers stretching it
-WEB_UI_HINT = ("needs PySaiyanWeBoo's web_ui: run with `uv run --group pages` here, or install "
+WEB_UI_HINT = ("needs PySaiyanWeBoo (pysaiyanweboo): run with `uv run --group pages` here, or install "
                "'pysaiyanweboo @ git+https://github.com/myon-bioinformatics/PySaiyanWeBoo@<commit>'")
 
 
@@ -402,10 +403,48 @@ def slug(text: str, limit: int = 32) -> str:
     return re.sub(r"[\W_]+", "-", text).strip("-").lower()[:limit].strip("-") or "x"
 
 
-def still_name(prefix: str, shot: int, label: str, viewport: tuple[int, int], number: int, what: str, suffix: str) -> str:
-    """``<prefix>01-top-1280x800-02-save<suffix>.png``: shot number and label, viewport, the still's number in the shot
-    (00 = the page as loaded) and what is marked, so a name read alone says where it came from."""
-    return f"{prefix}{shot:02d}-{slug(label)}-{viewport[0]}x{viewport[1]}-{number:02d}-{slug(what)}{suffix}.png"
+def still_stem(shot: int, label: str, viewport: tuple[int, int], number: int, what: str) -> str:
+    """``01-top-1280x800-02-save``: shot number and label, viewport, the still's number in the shot (00 = the page as loaded)
+    and what is marked, so a name read alone says where it came from (at most 64 characters, PySaiyanWeBoo's name-part limit)."""
+    return f"{shot:02d}-{slug(label, 24)}-{viewport[0]}x{viewport[1]}-{number:02d}-{slug(what, 16)}"
+
+
+def frame_what(frame: dict) -> str:
+    return " ".join(m.get("label") or m["selector"] for m in frame["marks"])
+
+
+def output_names(out: Path, shots: list[dict], *, stills: Path | None = None, stills_prefix: str = "", stills_suffix: str = "",
+                 run_details: tuple = (), force: bool = False, now=None) -> tuple[Path, dict]:
+    """🏷️ Every name this run writes, decided before the browser starts: ``(gif, {(shot, number): still})``.
+
+    PySaiyanWeBoo's output-name rules, the same as its demo recorder: ``run_details`` (``timestamp`` / ``git-commit``, in the order
+    given) are appended to the GIF's stem and to every still (one time and commit for the whole run), and an existing file is
+    refused unless ``force``. Without PySaiyanWeBoo (🪶 stills only) the names are ``<prefix><stem><suffix>.png`` and run details
+    are refused."""
+    stems = {}
+    for index, shot in enumerate(shots, 1):
+        frames = [frame_what(step["frame"]) for step in shot["steps"] if "frame" in step]
+        for number, what in enumerate(["page", *frames]):
+            stems[(index, number)] = still_stem(index, shot["label"], shot["viewport"], number, what)
+    try:
+        import pysaiyanweboo as pswb
+    except ImportError:
+        pswb = None
+    if pswb is None:
+        if run_details:
+            raise ValueError("--timestamp / --git-commit use PySaiyanWeBoo's naming rules: install pysaiyanweboo (`uv run --group pages`)")
+        paths = {key: stills / f"{stills_prefix}{stem}{stills_suffix}.png" for key, stem in stems.items()} if stills is not None else {}
+        taken = [str(p) for p in paths.values() if p.exists()]
+        if taken and not force:
+            raise FileExistsError("refusing to overwrite " + ", ".join(taken) + " (add --force to replace them)")
+        return out, paths
+    now = now or datetime.datetime.now(datetime.timezone.utc)                # one time for the GIF and every still
+    gif = pswb.gif_targets(out.parent, [out.stem], run_details=run_details, force=force, now=now, ext=out.suffix or ".gif")[out.stem]
+    if stills is None:
+        return gif, {}
+    named = pswb.gif_targets(stills, list(stems.values()), prefix=stills_prefix, suffix=stills_suffix, run_details=run_details,
+                             force=force, now=now, ext=".png")
+    return gif, {key: named[stem] for key, stem in stems.items()}
 
 
 def seal_stills(directory: Path, written: list[dict], engine: str, sha: str | None, *, ok: bool) -> dict:
@@ -444,24 +483,27 @@ def record(out: Path, shots: list[dict], *, serve_dir: Path | None = None, width
            sha: str | None = None, plan: list | None = None, maps: list[tuple[str, Path]] | None = None,
            browser_name: str = "chromium", colors: int = 255, max_bytes: int | None = None, max_frames: int = 300,
            last_hold: int = 2000, stills: Path | None = None, stills_prefix: str = "", stills_suffix: str = "",
-           executable: str = "auto") -> dict:
+           executable: str = "auto", still_paths: dict | None = None) -> dict:
     """Run every shot in ``browser_name``, write ``out`` (GIF) and ``out.with_suffix('.json')`` (receipt); returns the receipt.
 
-    📸 ``stills``: also write the page as loaded and every 🔲 frame of each shot as a PNG there (see still_name), sealed as a
+    📸 ``stills``: also write the page as loaded and every 🔲 frame of each shot as a PNG there (``still_paths`` from output_names; computed
+    here when not given), sealed as a
     capture bundle (seal_stills) that ``btk.py check-capture-evidence`` validates.
-    🪶 Without PySaiyanWeBoo's web_ui (a nano environment) only the stills and the receipt are written, and ``stills`` is required.
+    🪶 Without PySaiyanWeBoo (a nano environment) only the stills and the receipt are written, and ``stills`` is required.
     🧭 ``executable``: ``auto`` launches Playwright's build, or one already on disk when that revision is missing (btk.find_browser);
     ``bundled`` only Playwright's; a path that browser."""
     try:
-        import web_ui
+        import pysaiyanweboo as pswb
     except ImportError as exc:
         if stills is None:
             raise RuntimeError(WEB_UI_HINT + "; without it, --stills DIR records PNG stills only") from exc
-        web_ui = None
+        pswb = None
     from playwright.sync_api import sync_playwright
     if browser_name not in ENGINES:
         raise ValueError(f"--browser must be one of {', '.join(ENGINES)}")
     written: list[dict] = []
+    if stills is not None and still_paths is None:
+        out, still_paths = output_names(out, shots, stills=stills, stills_prefix=stills_prefix, stills_suffix=stills_suffix, force=True)
     results = []
     transfer = {"screenshots": 0, "png_bytes": 0, "identical": 0, "patches": 0, "calls": 0, "sent_bytes": 0, "gif_bytes": 0}
     budget = [max(0, max_frames - static_frames(shots))]               # frames ⏺ steps may still take
@@ -478,9 +520,9 @@ def record(out: Path, shots: list[dict], *, serve_dir: Path | None = None, width
         browser = engine.launch(**({"executable_path": found["path"]} if found["path"] else {}))
         try:
             kernel = None
-            if web_ui is not None:
+            if pswb is not None:
                 kernel = browser.new_context().new_page()                # its own context: no routes, no network
-                kernel.set_content(web_ui.gif_recorder_document())
+                kernel.set_content(pswb.gif_recorder_document())
                 kernel.evaluate("o => { window.rec = new UiGif.Recorder(o); }", {"width": width, "height": height, "caption": CAPTION})
             total = len(shots)
             for index, shot in enumerate(shots, 1):
@@ -497,13 +539,14 @@ def record(out: Path, shots: list[dict], *, serve_dir: Path | None = None, width
                 page.on("console", lambda msg, errs=errors, ext=external: console_error(msg, errs, ext))
                 captures, done = Captures(transfer, last), []
 
-                def keep_still(png: bytes, what: str, shot=index, label=shot["label"], size=(w, h)) -> None:
+                def keep_still(png: bytes, what: str, shot=index) -> None:
                     if stills is None:
                         return
                     stills.mkdir(parents=True, exist_ok=True)
                     number = sum(1 for x in written if x["shot"] == shot)
-                    name = still_name(stills_prefix, shot, label, size, number, what, stills_suffix)
-                    (stills / name).write_bytes(png)
+                    target = still_paths[(shot, number)]
+                    target.write_bytes(png)
+                    name = target.name
                     width, height = _sibling("btk").png_dimensions(png)
                     written.append({"file": name, "shot": shot, "what": what, "bytes": len(png), "sha256": hashlib.sha256(png).hexdigest(),
                                     "width": width, "height": height})
@@ -522,7 +565,7 @@ def record(out: Path, shots: list[dict], *, serve_dir: Path | None = None, width
                             done.append(run_step(page, step))
                             png = captures.full(page, w, done[-1], shot["hold"])
                             if "frame" in step:                        # 📸 a marked view is what a slide wants
-                                keep_still(png, " ".join(m.get("label") or m["selector"] for m in step["frame"]["marks"]))
+                                keep_still(png, frame_what(step["frame"]))
                 except Exception as exc:  # noqa: BLE001 - the failure is the evidence; keep recording the other shots
                     errors.append(f"{type(exc).__name__}: {exc}".splitlines()[0][:300])
                     with contextlib.suppress(Exception):
@@ -559,10 +602,10 @@ def record(out: Path, shots: list[dict], *, serve_dir: Path | None = None, width
         report["capture_s"] = round(captured - started, 1)
         out.write_bytes(data)
         gif = {"gif": out.name, "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest(), "frames": report["frames"]}
-        encoder = {"module": "PySaiyanWeBoo web_ui gif.js", "web_ui": web_ui.installed_commit() or "checkout", **report}
-    else:                                                              # 🪶 no web_ui: the stills are the evidence
+        encoder = {"module": "PySaiyanWeBoo gif.js", "web_ui": pswb.installed_commit() or "checkout", **report}   # "web_ui": the key fleet records read
+    else:                                                              # 🪶 no PySaiyanWeBoo: the stills are the evidence
         gif = {"gif": None, "bytes": 0, "sha256": None, "frames": 0}
-        encoder = {"module": None, "skipped": "PySaiyanWeBoo web_ui is not installed: stills only",
+        encoder = {"module": None, "skipped": "PySaiyanWeBoo is not installed: stills only",
                    "colors": 0, "overBudget": False, "capture_s": round(captured - started, 1)}
     bundle = seal_stills(stills, written, browser_name, sha, ok=all(r["status"] == "pass" for r in results)) if stills is not None else None
     receipt = {"schema": SCHEMA, **gif, "canvas": f"{width}x{height + CAPTION}", "browser": f"{browser_name} {version}",
@@ -595,9 +638,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-frames", type=int, default=300, help="frame cap; ⏺ record steps get what the other frames leave (default 300)")
     parser.add_argument("--hold", type=int, default=1200, help="ms each frame stays (default 1200; a shot's \"hold\" wins)")
     parser.add_argument("--stills", type=Path, metavar="DIR", help="📸 also write the page as loaded and every 🔲 frame as PNG here "
-                        "(the only output when PySaiyanWeBoo's web_ui is not installed)")
+                        "(the only output when PySaiyanWeBoo is not installed)")
     parser.add_argument("--stills-prefix", default="", help="📸 text before every still's name, e.g. a run or a repository")
     parser.add_argument("--stills-suffix", default="", help="📸 text after every still's name, before .png, e.g. -dark")
+    parser.add_argument("--timestamp", action="append_const", const="timestamp", dest="run_details", default=[],
+                        help="🏷️ add when this run started (UTC, -20261113T021500Z) to the GIF's and every still's name, so each run keeps its files")
+    parser.add_argument("--git-commit", action="append_const", const="git-commit", dest="run_details",
+                        help="🏷️ add the current directory's git commit (-288cbed, -288cbed-dirty); run details follow the order given")
+    parser.add_argument("--force", action="store_true", help="🏷️ replace an existing GIF or still (otherwise refused, as PySaiyanWeBoo's recorder does)")
     parser.add_argument("--executable", default="auto", metavar="auto|bundled|PATH",
                         help="🧭 auto (default): Playwright's browser, or one already on disk when its revision is missing; "
                              "bundled: Playwright's only; PATH: that browser")
@@ -615,12 +663,15 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError(f"--serve is not a directory: {args.serve}")
         if not 2 <= args.colors <= 255 or args.max_frames < len(shots) or args.width % 8 or args.height % 8:
             raise ValueError("--colors 2-255, --max-frames at least one per shot, --width/--height multiples of 8")
-    except (ValueError, OSError) as exc:
+        out, still_paths = output_names(args.out, shots, stills=args.stills, stills_prefix=args.stills_prefix, stills_suffix=args.stills_suffix,
+                                        run_details=tuple(dict.fromkeys(args.run_details)), force=args.force)
+    except (ValueError, OSError, argparse.ArgumentTypeError) as exc:
         parser.exit(2, f"⛔ {exc}\n")
     try:
-        receipt = record(args.out, shots, serve_dir=args.serve, width=args.width, height=args.height, sha=args.sha, plan=raw, maps=maps,
+        receipt = record(out, shots, serve_dir=args.serve, width=args.width, height=args.height, sha=args.sha, plan=raw, maps=maps,
                          browser_name=args.browser, colors=args.colors, max_bytes=max_bytes, max_frames=args.max_frames, last_hold=args.last_hold,
-                         stills=args.stills, stills_prefix=args.stills_prefix, stills_suffix=args.stills_suffix, executable=args.executable)
+                         stills=args.stills, stills_prefix=args.stills_prefix, stills_suffix=args.stills_suffix, executable=args.executable,
+                         still_paths=still_paths)
     except RuntimeError as exc:
         parser.exit(2, f"⛔ {exc}\n")
     for shot in receipt["shots"]:
@@ -636,7 +687,7 @@ def main(argv: list[str] | None = None) -> int:
     if receipt["gif"] is None:
         print(f"🪶 {e['skipped']} ✅ {s['pass']} ⛔ {s['fail']}")
         return 1 if s["fail"] else 0
-    print(f"🎞️ {args.out} 🖼️ {receipt['frames']} 📦 {receipt['bytes'] // 1024} KiB 🎨 {e['colors']} ✅ {s['pass']} ⛔ {s['fail']}"
+    print(f"🎞️ {out} 🖼️ {receipt['frames']} 📦 {receipt['bytes'] // 1024} KiB 🎨 {e['colors']} ✅ {s['pass']} ⛔ {s['fail']}"
           + (" ⚠️ over --max-bytes" if e["overBudget"] else ""))
     print(f"🔌 📸 {x['screenshots']} ({x['png_bytes'] // 1024} KiB) ♻️ {x['identical']} ✂️ {x['patches']} 📤 {x['sent_bytes'] // 1024} KiB / {x['calls']} calls 📥 {x['gif_bytes'] // 1024} KiB")
     return 1 if s["fail"] else 0

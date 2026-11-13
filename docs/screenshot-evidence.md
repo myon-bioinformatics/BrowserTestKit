@@ -181,7 +181,7 @@ records a plan of shots (page × viewport × steps: `click`, `fill`, `select`, `
 
 ```
 uv run --project ../BrowserTestKit --group pages --group browser \
-  python ../BrowserTestKit/tools/evidence_gif.py docs/evidence/browser.gif --serve _site --plan docs/evidence/browser.json
+  python ../BrowserTestKit/tools/evidence_gif.py docs/evidence/browser.gif --serve _site --plan docs/evidence/browser.json --force
 ```
 
 🔌 Where the bytes go — Python drives, the browser does the pixel work, nothing is shipped twice:
@@ -194,7 +194,7 @@ page ──📸 PNG──▶ Python ──(identical? ♻️ skip)──▶ enco
 - 📸 Playwright's screenshot is the only image that crosses the socket, once. A byte-identical screenshot
   (a step that changed nothing) is not sent again; ⏺ `record` with `clip` sends only the element's box and the
   encoder lays it on the last full screenshot.
-- 🧱 The encoder page is PySaiyanWeBoo's `web_ui.gif_recorder_document()`, built from Python. The browser decodes,
+- 🧱 The encoder page is PySaiyanWeBoo's `pysaiyanweboo.gif_recorder_document()`, built from Python. The browser decodes,
   fits, zooms and captions on a canvas (Meiryo, Japanese fallbacks; no font file), and `gif.js` adds only what no
   browser offers: a 6-bit bucket histogram while frames arrive, changed rectangles only, one global palette
   (exact when it fits, else median cut + refinement), tight delta frames (transparent where unchanged when that
@@ -210,6 +210,11 @@ page ──📸 PNG──▶ Python ──(identical? ♻️ skip)──▶ enco
 - 📸 `--stills DIR` also writes the page as loaded and every 🔲 frame as a PNG (no caption, for a deck or a doc), named
   `<--stills-prefix>01-top-1280x800-02-save<--stills-suffix>.png`: shot number and label, viewport, the still's number
   in the shot and what is marked. The receipt lists each file with its sha256.
+- 🏷️ Names follow PySaiyanWeBoo's output-name rules (`pysaiyanweboo.gif_targets`, the same as its demo recorder):
+  `--timestamp` / `--git-commit` add when the run started (UTC) and the current directory's commit to the GIF's and
+  every still's name, in the order given, so repeated runs by people or agents keep their own files; without them an
+  existing GIF or still is refused unless `--force` (refreshing a committed `docs/evidence/browser.gif` needs it).
+  Every name is decided before the browser starts. Without PySaiyanWeBoo only plain names are possible.
   🧾 The stills are also sealed as a capture bundle, `evidence-<engine>.json` next to them, in the format
   `btk.py check-capture-evidence` reads (`project` = the engine; `complete` only when every shot passed and `--sha` is a
   full commit, and only after that validator accepted it):

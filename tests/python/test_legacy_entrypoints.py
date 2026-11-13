@@ -5,11 +5,10 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-# check_png, check_evidence, check_capture_evidence, write_capture_evidence and probe_capture_rejections are btk.py
-# commands now (check-png, check-evidence, ...): their files were removed on purpose, so they are not listed here.
+# check_png, check_evidence, check_capture_evidence, write_capture_evidence, probe_capture_rejections, page_inspect
+# and pw_install_plan are btk.py now (check-png, ..., observe, plan): their files were removed on purpose.
 LEGACY = ('app_comparison app_digest btk_events evidence_board html_builder image_diff jsonl_digest '
-          'mirror_check page_inspect page_text platform_adapter platform_probe '
-          'pw_install_plan pytest_btk_events terminal_browser').split()
+          'mirror_check page_text platform_adapter platform_probe pytest_btk_events terminal_browser').split()
 
 
 def test_legacy_modules_remain_distributed():
@@ -21,15 +20,15 @@ def test_legacy_modules_remain_distributed():
 
 
 @pytest.mark.parametrize('runtime', ['python', 'node'])
-def test_legacy_inspection_runs_current_privacy_and_error_contract(tmp_path, runtime):
-    # Node: both names run btk.py through vendor/py_launch.cjs (page_inspect.cjs and btk.cjs are gone).
-    def command(entry):
+def test_inspection_runs_current_privacy_and_error_contract(tmp_path, runtime):
+    # Node runs btk.py through vendor/py_launch.cjs (page_inspect.py/.cjs and btk.cjs are gone).
+    def command():
         if runtime == 'python':
-            return [sys.executable, str(ROOT / 'tools' / (entry + '.py'))]
+            return [sys.executable, str(ROOT / 'tools' / 'btk.py')]
         return ['node', str(ROOT / 'vendor' / 'py_launch.cjs'), '--env-var', 'BTK_PYTHON', '--site',
                 str(ROOT / 'tools' / 'btk.py')]
-    def run(entry, args):
-        return subprocess.run([*command(entry), *args],
+    def run(args):
+        return subprocess.run([*command(), *args],
                               env={**os.environ, 'PYTHON': sys.executable, 'BTK_PYTHON': sys.executable},
                               capture_output=True, text=True, timeout=60)
     snapshot = {'schema': 'btk-page-observe/1', 'elements': [],
@@ -37,17 +36,15 @@ def test_legacy_inspection_runs_current_privacy_and_error_contract(tmp_path, run
     path = tmp_path / 'old.json'
     path.write_text(json.dumps(snapshot))
     args = ['compare', str(path), str(path), '--json']
-    old, new = run('page_inspect', args), run('btk', args)
-    assert old.returncode == new.returncode == 0
-    assert json.loads(old.stdout) == json.loads(new.stdout)
-    assert 'private-value' not in old.stdout + old.stderr
-    assert 'private-fragment' not in old.stdout + old.stderr
-    old, new = run('page_inspect', ['unknown', '--json']), run('btk', ['unknown', '--json'])
-    assert old.returncode == new.returncode == 2
+    done = run(args)
+    assert done.returncode == 0 and json.loads(done.stdout)['left_url'] == 'http://127.0.0.1:8765/a'
+    assert 'private-value' not in done.stdout + done.stderr
+    assert 'private-fragment' not in done.stdout + done.stderr
+    assert run(['unknown', '--json']).returncode == 2
 
 
-def test_legacy_python_api_including_private_helpers():
-    spec = importlib.util.spec_from_file_location('legacy_inspect', ROOT / 'tools/page_inspect.py')
+def test_python_api_including_private_helpers():
+    spec = importlib.util.spec_from_file_location('btk_inspect', ROOT / 'tools/btk.py')
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     tree = {'shadowRoots': [{'shadowRootType': 'open'}, {'shadowRootType': 'closed'},
@@ -73,7 +70,7 @@ def test_installed_legacy_modules_outside_checkout(tmp_path):
     snapshot = tmp_path / 'snapshot.json'
     snapshot.write_text(json.dumps({'schema': 'btk-page-observe/1', 'elements': [],
                                    'url': 'http://127.0.0.1:8765/?q=private-value'}))
-    done = subprocess.run([sys.executable, '-S', '-m', 'page_inspect', 'compare',
+    done = subprocess.run([sys.executable, '-S', '-m', 'btk', 'compare',
                            str(snapshot), str(snapshot), '--json'], cwd=tmp_path,
                           env=env, capture_output=True, text=True, timeout=60)
     assert done.returncode == 0, done.stderr
