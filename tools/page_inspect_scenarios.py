@@ -318,7 +318,7 @@ def run_scenario(args, api):
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else list(argv)
     import argparse
-    parser = argparse.ArgumentParser(prog="page_inspect_scenarios", description="Internal adapter; use page_inspect.py scenario.")
+    parser = argparse.ArgumentParser(prog="page_inspect_scenarios", description="Internal adapter; use btk.py scenario.")
     parser.parse_args(argv)
 
 

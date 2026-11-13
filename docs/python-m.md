@@ -1,6 +1,6 @@
 # Running the scripts with `python -m`
 
-The base tools are stdlib-only at runtime; browser recording and page rendering use their optional dependency groups. `pyproject.toml` installs each one as a top-level module, so after installation it runs from any directory, like `python -m zipfile`, with no clone or file path, or from a checkout as `python -S tools/NAME.py`. The former `scripts/` directory was merged into `tools/`; the installed module names are unchanged, including `page_inspect`, `pw_install_plan`, and `image_diff`. `page_inspect` delegates to the current BTK implementation in both Python and Node; the image-diff backend remains vendored and packaged.
+The base tools are stdlib-only at runtime; browser recording and page rendering use their optional dependency groups. `pyproject.toml` installs each one as a top-level module, so after installation it runs from any directory, like `python -m zipfile`, with no clone or file path, or from a checkout as `python -S tools/NAME.py`. The former `scripts/` directory was merged into `tools/`; the installed module names are unchanged (`image_diff` and the rest), except that `page_inspect` and `pw_install_plan` are now `btk` (`python -m btk observe ...`, `python -m btk plan`) and the evidence validators are `btk` commands too (`python -m btk check-png ...`); the image-diff backend remains vendored and packaged.
 
 ```sh
 # one-off: nothing cloned, uv caches the build
