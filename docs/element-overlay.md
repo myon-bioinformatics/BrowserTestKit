@@ -103,3 +103,6 @@ Output data adheres to schema `btk-element-overlay/1`:
 - Text metadata (`name`, `label`, `text`, `innerText`, `role`, `selector`, `id`)
   is expected to contain strings. Empty names/selectors fall back to the next
   name field or element ID in both twins.
+- `--format svg --shape rect|ellipse|triangle|arrow` (with `--label-field`, `--spotlight`) draws the 🔲 marks
+  `tools/evidence_gif.py` puts on screenshots instead of boxes and dots: both go through `mark_svg()`. (Python
+  only; the Node twin keeps the box overlay.)

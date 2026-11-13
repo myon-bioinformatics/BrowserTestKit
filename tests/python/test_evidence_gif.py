@@ -1,6 +1,7 @@
 """evidence_gif: shots are checked before any browser starts; a recording in each engine is read back by a stdlib parser, the engine itself and Pillow."""
 import importlib.util
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -142,23 +143,25 @@ def test_step_and_budget_checks():
     assert shots[0]["hold"] == 900 and eg.static_frames(shots) == 1 + 1 + 6 + 1
 
 
-def test_frame_step_checks_and_shapes():
-    assert eg.check_step({"frame": "#x"})["frame"] == {"selector": "#x", "shape": "rect", "color": "#e53935", "width": 4, "pad": 8, "keep": False}
+def test_frame_step_checks_marks():
+    mark = {"selector": "#x", "shape": "rect", "color": "#e53935", "width": 4, "pad": 8, "label": None, "number": None, "spotlight": False}
+    assert eg.check_step({"frame": "#x"})["frame"] == {"marks": [mark], "keep": False}
+    two = eg.check_step({"frame": ["#a", {"selector": "#b", "label": "ここ", "spotlight": True, "keep": True, "number": 7}]})["frame"]
+    assert two["keep"] and [m["number"] for m in two["marks"]] == [1, 7] and two["marks"][1]["label"] == "ここ"
     for bad in ({"frame": {"shape": "rect"}}, {"frame": {"selector": "#x", "shape": "star"}}, {"frame": {"selector": "#x", "color": "red"}},
                 {"frame": {"selector": "#x", "color": "#12345g"}}, {"frame": {"selector": "#x", "width": 0}}, {"frame": {"selector": "#x", "keep": "yes"}},
-                {"frame": {"selector": "#x", "fill": "#fff"}}):
+                {"frame": {"selector": "#x", "fill": "#fff"}}, {"frame": {"selector": "#x", "label": "x" * 81}}, {"frame": []}, {"frame": ["#a"] * 9},
+                {"frame": {"selector": "#x", "spotlight": 1}}, {"frame": {"selector": "#x", "number": True}}):
         with pytest.raises(ValueError):
             eg.check_step(bad)
-    box = {"x": 100, "y": 50, "width": 40, "height": 20}
-    draw = lambda **o: eg.frame_svg(box, (392, 848), eg.check_step({"frame": {"selector": "#x", **o}})["frame"])  # noqa: E731
-    rect = draw(color="#1565c0", width=8, pad=0)
-    assert '<rect x="100" y="50" width="40" height="20"' in rect and 'stroke="#1565c0" stroke-width="8"' in rect
-    assert 'data-btk-frame="once"' in rect and "style=" not in rect and 'width="392" height="848"' in rect
-    assert 'data-btk-frame="keep"' in draw(keep=True)
-    assert '<ellipse cx="120" cy="60"' in draw(shape="ellipse") and '<polygon points="120,6 64,78 176,78"' in draw(shape="triangle")
-    assert 'x1="28" y1="60" x2="76" y2="60"' in draw(shape="arrow")                     # room on the left: it comes from there
-    assert 'x1="104" ' in eg.frame_svg({**box, "x": 0}, (392, 848), eg.check_step({"frame": {"selector": "#x", "shape": "arrow", "pad": 0}})["frame"])
+    assert eg.overlay.mark_svg is eg._sibling("element_overlay").mark_svg               # one drawer
     assert eg.static_frames(eg.check_plan([{"url": "/a", "steps": [{"frame": "#a"}, {"click": "#a"}]}])) == 3
+
+
+def test_still_names_say_where_they_came_from():
+    assert eg.still_name("", 1, "🏠 Top", (1280, 800), 0, "page", "") == "01-top-1280x800-00-page.png"
+    assert eg.still_name("run7-", 12, "📱 トップ/画面", (392, 848), 3, "💾 保存ボタン #save", "-dark") == "run7-12-トップ-画面-392x848-03-保存ボタン-save-dark.png"
+    assert eg.slug("🔲🔲") == "x" and len(eg.slug("a" * 80)) == 32
 
 
 @pytest.mark.browser
@@ -184,6 +187,28 @@ def test_frame_marks_one_frame_and_takes_no_clicks(tmp_path, browser_name):
     assert code == 1 and shot["steps"][:3] == ["🔲 #b", "click #b", "🔲 #b"] and len(shot["steps"]) == 10      # only the missing selector failed
     assert len(shot["errors"]) == 1 and "TimeoutError" in shot["errors"][0]
     assert len(gif_blocks(out.read_bytes())["frames"]) >= 4                             # the marked frames differ from their neighbours
+
+
+@pytest.mark.browser
+def test_stills_are_written_and_a_nano_run_needs_no_web_ui(tmp_path, monkeypatch):
+    (tmp_path / "index.html").write_text("<h1 id=t>ok</h1><button id=b>go</button>", encoding="utf-8")
+    plan = _plan(tmp_path, [{"label": "🏠 Top", "url": "/index.html", "viewport": "392x320", "steps": [
+        {"frame": [{"selector": "#t", "label": "見出し", "spotlight": True}, {"selector": "#b", "shape": "arrow"}]}, {"click": "#b"}]}])
+    out = tmp_path / "frame.gif"
+    monkeypatch.setitem(sys.modules, "web_ui", None)                                  # 🪶 PySaiyanWeBoo is not installed
+    with pytest.raises(SystemExit, match="2"):                                         # a GIF needs it …
+        eg.main([str(out), "--serve", str(tmp_path), "--plan", str(plan)])
+    stills = tmp_path / "stills"
+    assert eg.main([str(out), "--serve", str(tmp_path), "--plan", str(plan), "--stills", str(stills), "--stills-prefix", "p-"]) == 0
+    receipt = json.loads(out.with_suffix(".json").read_text(encoding="utf-8"))         # … the stills do not
+    assert not out.exists() and receipt["gif"] is None and "stills only" in receipt["encoder"]["skipped"]
+    files = [f["file"] for f in receipt["stills"]["files"]]
+    assert files == ["p-01-top-392x320-00-page.png", "p-01-top-392x320-01-見出し-b.png"]
+    assert receipt["executable"]["source"] in ("playwright", "revision", "system")
+    for name in files:
+        data = (stills / name).read_bytes()
+        assert data[:8] == b"\x89PNG\r\n\x1a\n" and data[16:24] == (392).to_bytes(4, "big") + (320).to_bytes(4, "big")
+    assert (stills / files[0]).read_bytes() != (stills / files[1]).read_bytes()          # the marks are in the still
 
 
 def _plan(tmp_path, shots):

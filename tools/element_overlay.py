@@ -10,12 +10,17 @@ Stdlib-only; runs under ``python -S``::
     python -S tools/element_overlay.py --file dom.json --format svg --out overlay.svg
     python -S tools/element_overlay.py --file dom.json --find "submit" --format tap
     python -c "import element_overlay; print(element_overlay.build_highlight_css(['#submit-btn']))"
+    python -S tools/element_overlay.py --file dom.json --format svg --shape ellipse --label-field name --spotlight
+
+🔲 Marks for slides and README GIFs: ``mark_svg(marks, viewport)`` draws ``rect`` / ``ellipse`` / ``triangle`` around a box or an
+``arrow`` at it, with an optional callout ``label`` (Meiryo), a number badge and a ``spotlight`` that dims everything else.
+``tools/evidence_gif.py``'s 🔲 frame step and ``--format svg --shape`` here draw with this one function.
 
 Exit codes: 0 OK; 1 assertion failure or no search match; 2 usage or input error.
 """
 from __future__ import annotations
 
-import argparse, json, math, re, sys
+import argparse, html, json, math, re, sys
 from decimal import Decimal, localcontext, ROUND_HALF_UP; from typing import Any, Dict, List, Optional, Union
 
 SCHEMA = "btk-element-overlay/1"
@@ -185,12 +190,117 @@ def build_highlight_css(
     )
 
 
+# ---- 🔲 marks: one drawer for evidence_gif's frame step and the svg overlay ----------------------------------------------
+
+MARK_SHAPES = ("rect", "ellipse", "triangle", "arrow")
+MARK_KEYS = ("shape", "color", "width", "pad", "label", "number", "spotlight")
+MARK_FONT = "Meiryo, 'Hiragino Sans', 'Noto Sans CJK JP', 'Yu Gothic', sans-serif"
+MARK_TEXT = 16                       # px: label and badge text; the label box is 32 high (8 above and below)
+
+
+def check_mark(value: Dict[str, Any]) -> Dict[str, Any]:
+    """Defaults and limits for one mark's look (``box`` and other keys are the caller's): raises ValueError."""
+    mark = {"shape": value.get("shape", "rect"), "color": str(value.get("color", "#e53935")), "width": value.get("width", 4),
+            "pad": value.get("pad", 8), "label": value.get("label"), "number": value.get("number"), "spotlight": value.get("spotlight", False)}
+    colour = mark["color"]
+    if (mark["shape"] not in MARK_SHAPES or not isinstance(mark["width"], int) or not 1 <= mark["width"] <= 32
+            or not isinstance(mark["pad"], int) or not 0 <= mark["pad"] <= 64
+            or len(colour) not in (4, 7) or colour[0] != "#" or any(c not in "0123456789abcdefABCDEF" for c in colour[1:])
+            or type(mark["spotlight"]) is not bool
+            or not (mark["label"] is None or isinstance(mark["label"], str) and 0 < len(mark["label"]) <= 80)
+            or not (mark["number"] is None or type(mark["number"]) is int and 0 <= mark["number"] <= 99)):
+        raise ValueError(f"a mark: shape {' / '.join(MARK_SHAPES)}, color #rgb or #rrggbb, width 1-32, pad 0-64, "
+                         f"label 1-80 characters, number 0-99, spotlight true/false: {value!r}")
+    return mark
+
+
+def _text_width(text: str) -> float:
+    """Estimated width of ``text`` at MARK_TEXT px: a wide (CJK, emoji) character is one em, others about half."""
+    return sum(MARK_TEXT if ord(c) >= 0x2E80 else MARK_TEXT * 0.56 for c in text)
+
+
+def _overlaps(a: tuple, b: tuple) -> bool:
+    return a[0] < b[0] + b[2] and b[0] < a[0] + a[2] and a[1] < b[1] + b[3] and b[1] < a[1] + a[3]
+
+
+def mark_svg(marks: List[Dict[str, Any]], viewport: Union[tuple, list], *, attributes: str = "") -> str:
+    """One viewport-sized SVG with every mark: ``{"box": {x, y, width, height}, **check_mark(...)}``.
+
+    Spotlight marks cut holes in one dimming layer. An arrow comes from the first side with room (left, right, above, else
+    below). A label takes the first free place (beyond an arrow's tail; else right, below, above, left of the padded box)
+    inside the viewport that covers no other mark or label. No ``style`` attribute (a page's ``style-src 'self'`` would
+    refuse it): the caller positions the SVG."""
+    vw, vh = float(viewport[0]), float(viewport[1])
+    num = _svg_number
+    padded = [(m["box"]["x"] - m["pad"], m["box"]["y"] - m["pad"], m["box"]["width"] + 2 * m["pad"], m["box"]["height"] + 2 * m["pad"]) for m in marks]
+    taken = list(padded)
+    layers, holes = [], []
+    for mark, (x, y, w, h) in zip(marks, padded):
+        colour, line = mark["color"], mark["width"]
+        cx, cy = x + w / 2, y + h / 2
+        if mark.get("spotlight"):
+            holes.append(f"M{num(x)} {num(y)}h{num(w)}v{num(h)}h{num(-w)}Z")
+        stroke = f'fill="none" stroke="{colour}" stroke-width="{line}" stroke-linejoin="round"'
+        places = []                                                   # where this mark's label may go, best first
+        if mark["shape"] == "ellipse":                                # the ellipse through the padded box's corners
+            layers.append(f'<ellipse cx="{num(cx)}" cy="{num(cy)}" rx="{num(w / 2 ** .5)}" ry="{num(h / 2 ** .5)}" {stroke}/>')
+        elif mark["shape"] == "triangle":                             # apex one box height above: the box's top edge just fits
+            layers.append(f'<polygon points="{num(cx)},{num(y - h)} {num(x - w / 2)},{num(y + h)} {num(x + w + w / 2)},{num(y + h)}" {stroke}/>')
+        elif mark["shape"] == "arrow":                                # tip on the box's edge, from the side with room
+            head, tail = 4 * line, 64
+            room = {"left": x, "right": vw - x - w, "above": y, "below": vh - y - h}
+            side = next((s for s in ("left", "right", "above") if room[s] >= tail), "below")
+            if side in ("left", "right"):
+                sign, tip = (-1, x) if side == "left" else (1, x + w)
+                end = tip + sign * tail
+                layers.append(f'<line x1="{num(end)}" y1="{num(cy)}" x2="{num(tip + sign * head)}" y2="{num(cy)}" stroke="{colour}" stroke-width="{line}"/>'
+                              f'<polygon points="{num(tip)},{num(cy)} {num(tip + sign * head)},{num(cy - head / 2)} {num(tip + sign * head)},{num(cy + head / 2)}" fill="{colour}"/>')
+                taken.append((min(end, tip), cy - head / 2, tail, head))
+                places.append(lambda lw, lh, end=end, sign=sign: (end - 8 - lw if sign < 0 else end + 8, cy - lh / 2))
+            else:
+                sign, tip = (-1, y) if side == "above" else (1, y + h)
+                end = tip + sign * tail
+                layers.append(f'<line x1="{num(cx)}" y1="{num(end)}" x2="{num(cx)}" y2="{num(tip + sign * head)}" stroke="{colour}" stroke-width="{line}"/>'
+                              f'<polygon points="{num(cx)},{num(tip)} {num(cx - head / 2)},{num(tip + sign * head)} {num(cx + head / 2)},{num(tip + sign * head)}" fill="{colour}"/>')
+                taken.append((cx - head / 2, min(end, tip), head, tail))
+                places.append(lambda lw, lh, end=end, sign=sign: (cx - lw / 2, end - 8 - lh if sign < 0 else end + 8))
+        else:
+            layers.append(f'<rect x="{num(x)}" y="{num(y)}" width="{num(w)}" height="{num(h)}" rx="4" {stroke}/>')
+        text = f'font-family="{MARK_FONT}" font-size="{MARK_TEXT}" font-weight="bold" fill="#fff"'
+        if mark.get("number") is not None:                            # a badge on the padded box's top-left corner
+            bx, by = min(max(x, 16), vw - 16), min(max(y, 16), vh - 16)
+            layers.append(f'<circle cx="{num(bx)}" cy="{num(by)}" r="14" fill="{colour}"/>'
+                          f'<text x="{num(bx)}" y="{num(by + 6)}" text-anchor="middle" {text}>{mark["number"]}</text>')
+        if mark.get("label"):
+            lw, lh = _text_width(mark["label"]) + 16, 32
+            places += [lambda lw, lh: (x + w + 8, cy - lh / 2), lambda lw, lh: (x, y + h + 8),
+                       lambda lw, lh: (x, y - 8 - lh), lambda lw, lh: (x - 8 - lw, cy - lh / 2)]
+            inside = [(lx, ly) for lx, ly in (place(lw, lh) for place in places) if 0 <= lx <= vw - lw and 0 <= ly <= vh - lh]
+            free = [(lx, ly) for lx, ly in inside if not any(_overlaps((lx, ly, lw, lh), other) for other in taken)]
+            lx, ly = (free or inside or [(min(max(x, 0), max(0, vw - lw)), min(y + h + 8, max(0, vh - lh)))])[0]
+            taken.append((lx, ly, lw, lh))
+            layers.append(f'<rect x="{num(lx)}" y="{num(ly)}" width="{num(lw)}" height="{lh}" rx="8" fill="{colour}"/>'
+                          f'<text x="{num(lx + 8)}" y="{num(ly + 22)}" {text}>{html.escape(mark["label"])}</text>')
+    dim = (f'<path d="M0 0H{num(vw)}V{num(vh)}H0Z{"".join(holes)}" fill="#000" fill-opacity=".48" fill-rule="evenodd"/>' if holes else "")
+    return (f'<svg xmlns="http://www.w3.org/2000/svg"{attributes} width="{num(vw)}" height="{num(vh)}" '
+            f'viewBox="0 0 {num(vw)} {num(vh)}">{dim}{"".join(layers)}</svg>')
+
+
 def render_svg_overlay(
     annotation_data: Any,
     options: Optional[Dict[str, Any]] = None
 ) -> str:
     """Render an SVG string with element bounding boxes, center markers, and target index badges."""
     opts = options or {}
+    if opts.get("shape"):                                             # 🔲 the marks evidence_gif draws, one per element
+        data = annotate_elements(annotation_data, opts) if isinstance(annotation_data, (list, dict)) and "schema" not in annotation_data else annotation_data
+        items = data.get("items", []) if isinstance(data, dict) else []
+        view = data.get("viewport") if isinstance(data, dict) and data.get("viewport") else {"width": 800.0, "height": 600.0}
+        look = check_mark({"shape": opts["shape"], "color": opts.get("color", "#e53935"), "spotlight": bool(opts.get("spotlight"))})
+        field = opts.get("label_field")
+        marks = [{**look, "box": item, "number": item["index"] if len(items) > 1 else None,
+                  "label": (str(item.get(field) or "")[:80] or None) if field else None} for item in items]
+        return mark_svg(marks, (float(opts.get("width", view["width"])), float(opts.get("height", view["height"]))))
     data = annotate_elements(annotation_data, opts) if isinstance(annotation_data, (list, dict)) and "schema" not in annotation_data else annotation_data
     items = data.get("items", []) if isinstance(data, dict) else []
 
@@ -302,6 +412,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--assert-min-count", type=int, default=1, help="Assert minimum element count")
     parser.add_argument("--viewport", help="Viewport dimensions WxH (e.g. 1280x720)")
     parser.add_argument("--color", default="#ff0055", help="Color for CSS highlight or SVG overlay")
+    parser.add_argument("--shape", choices=MARK_SHAPES, help="svg: 🔲 marks (evidence_gif's shapes) instead of boxes and dots")
+    parser.add_argument("--label-field", help="svg --shape: callout text from this element field (name, role, selector, ...)")
+    parser.add_argument("--spotlight", action="store_true", help="svg --shape: dim everything outside the marks")
     parser.add_argument("--out", help="Write output to file instead of stdout")
     args = parser.parse_args(argv)
 
@@ -325,6 +438,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         "assert_min_count": args.assert_min_count,
         "viewport": args.viewport,
         "color": args.color,
+        "shape": args.shape,
+        "label_field": args.label_field,
+        "spotlight": args.spotlight,
     }
 
     if args.format == "css":

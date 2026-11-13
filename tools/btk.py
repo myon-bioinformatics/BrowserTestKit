@@ -12,7 +12,7 @@ kit is vendored: nothing else in tools/ is needed for these commands.
 """
 from __future__ import annotations
 
-import argparse, base64, binascii, contextvars, hashlib, io, json, math, os, platform, re, sys, tarfile, time, urllib.parse, urllib.request
+import argparse, base64, binascii, contextlib, contextvars, hashlib, io, json, math, os, platform, re, sys, shutil, tarfile, time, urllib.parse, urllib.request
 from pathlib import Path
 
 # ---- fetch -----------------------------------------------------------------------------
@@ -2027,6 +2027,67 @@ def _close_browser(browser):
     return None
 
 
+# ---- 🧭 a browser already on disk (nano environments: no `playwright install` for a revision bump) ---------------------
+
+PLAYWRIGHT_BUILD = re.compile(r"^(chromium|chromium_headless_shell|chromium_tip_of_tree|firefox|firefox_beta|webkit)-(\d+)$")
+SYSTEM_CHROMIUM = ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "chrome", "msedge",
+                   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
+
+
+def browser_roots() -> list[Path]:
+    """Where Playwright keeps browsers: its own PLAYWRIGHT_BROWSERS_PATH (read, never set here) and the per-OS caches."""
+    roots = []
+    configured = os.environ.get("PLAYWRIGHT_BROWSERS_PATH")
+    if configured and configured != "0":
+        roots.append(Path(configured))
+    home = Path.home()
+    roots += [home / ".cache/ms-playwright", home / "Library/Caches/ms-playwright"]
+    if os.environ.get("LOCALAPPDATA"):
+        roots.append(Path(os.environ["LOCALAPPDATA"]) / "ms-playwright")
+    return list(dict.fromkeys(roots))
+
+
+def find_browser(engine: str, expected: str | None, *, headless: bool = True, roots: list[Path] | None = None,
+                 system: tuple = SYSTEM_CHROMIUM) -> dict:
+    """The executable to launch ``engine`` with when Playwright's own build (``expected``) may be missing.
+
+    ``{"source": "playwright"}``: the expected build exists (for headless chromium, its ``chromium_headless_shell`` of the
+    same revision counts), launch as usual. ``"revision"``: the same build under another revision directory
+    (``-1243`` for an expected ``-1248``), newest first. ``"system"``: an installed Chrome / Chromium / Edge (chromium
+    only: Firefox and WebKit need Playwright's patched builds). ``"missing"``: nothing found. Reads the disk only."""
+    if expected and Path(expected).exists():
+        return {"source": "playwright", "path": None}
+    found, wanted = [], None
+    parts = Path(expected).parts if expected else ()
+    for at in range(len(parts) - 1, -1, -1):                          # the build directory, not some other name-123 above it
+        build = PLAYWRIGHT_BUILD.match(parts[at])
+        if not build:
+            continue
+        name, wanted, rest = build[1], int(build[2]), Path(*parts[at + 1:])
+        layouts = [(name, lambda d, rest=rest: [d / rest])]
+        if engine == "chromium" and headless:                         # what a headless launch really runs
+            layouts.append(("chromium_headless_shell", lambda d: [*d.glob("*/chrome-headless-shell"), *d.glob("*/chrome-headless-shell.exe")]))
+        for root in dict.fromkeys([Path(*parts[:at])] + list(roots if roots is not None else browser_roots())):
+            for rank, (prefix, paths) in enumerate(layouts):          # the shell outranks the full build headless
+                with contextlib.suppress(OSError):
+                    for directory in root.glob(f"{prefix}-*"):
+                        other = directory.name.rpartition("-")[2]
+                        if other.isdigit():
+                            found += [(int(other), rank, str(path)) for path in paths(directory) if path.is_file()]
+        break
+    if any(revision == wanted for revision, _, _ in found):
+        return {"source": "playwright", "path": None}
+    if found:
+        revision, _, path = max(found)
+        return {"source": "revision", "path": path, "revision": revision}
+    if engine == "chromium":
+        for name in system:
+            path = shutil.which(name) or (name if os.path.isabs(name) and os.path.isfile(name) else None)
+            if path:
+                return {"source": "system", "path": path}
+    return {"source": "missing", "path": None}
+
+
 def _playwright():
     try:
         from playwright.sync_api import sync_playwright
@@ -2500,6 +2561,11 @@ def _with_browser(url, browser_name, profile, headed, channel, viewport=None, to
         kwargs = {"headless": not headed}
         if channel:
             kwargs["channel"] = channel
+        else:                                                         # 🧭 a pinned revision that is not installed: use one on disk
+            engine = getattr(playwright, browser_name)
+            found = find_browser(browser_name, engine.executable_path, headless=not headed)
+            if found["path"]:
+                kwargs["executable_path"] = found["path"]
         try:
             browser = getattr(playwright, browser_name).launch(**kwargs)
         except Exception as exc:
