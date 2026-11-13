@@ -245,7 +245,7 @@ page ──📸 PNG──▶ Python ──(identical? ♻️ skip)──▶ enco
   docs/evidence/browser.json` re-records the same GIF.
 
 📊 Re-recording every repository's existing plan with this encoder (same frames): 2635 → 2134 KiB (−19 %), each
-GIF encoded in 0.1–0.3 s inside the browser. `tests/python/test_evidence_gif.py` records in each engine and reads
+GIF encoded in 0.1–0.3 s inside the browser. `tests/python/test_evidence.py` records in each engine and reads
 the GIF back with a stdlib block parser, the engine itself and Pillow where installed; PySaiyanWeBoo checks
 `gif.js` against an independently written decoder (`tests/gif.node.js`) and in every engine (`GifBrowserTests`).
 It is review evidence, not a pixel baseline: GIF bytes depend on the browser build and fonts.

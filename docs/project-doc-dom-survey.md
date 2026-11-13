@@ -64,7 +64,7 @@ Shared compiler direction:
 The observations above describe acquisition at the time, not current defect
 status. PR #54 commit `2d4da483c30907bd7a392b009b73366421ee0c8d` subsequently fixed
 explicit hidden-copy exclusion and preservation of preformatted whitespace.
-`tests/python/test_page_text_live_regressions.py` now checks the saved Alpine
+`tests/python/test_page_text.py` now checks the saved Alpine
 hidden copy and Deno terminal newline against their recorded live text. The
 FFmpeg/Pillow and corrected Tone.js/Remotion checks are described in the
 [media follow-up](media-doc-dom-survey.md#revalidation-after-extraction-fixes-2026-10-09).

@@ -139,7 +139,7 @@ Extracted from intermediate work that did not reach a shared place:
 | PR #182 verification script | TypeScript transpile + vm stub to count tests; `replace` with `$` | `HANDROLLED_SPEC_CENSUS`, `REPLACEMENT_STRING_SPECIALS` |
 
 Dart/Flutter widget tests stay with Flutter; this kit covers the browser side.
-Tests: `tests/python/test_interaction.py` (Chromium/Firefox/WebKit, sync and async)
+Tests: `tests/python/test_platform.py` (Chromium/Firefox/WebKit, sync and async)
 and `tests/node/interaction.spec.ts` (all Node projects including mobile).
 
 The shared `fixtures/inventory-names.json` cases compare Node, Python sync and

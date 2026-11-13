@@ -128,7 +128,7 @@ Stage: assert
 Observed: rotated target, refine() map != exhaustive map (exact=False); Chromium and WebKit happened to pass
 Root cause: a block was settled from its four agreeing corners while a corner of the target poked in between them
 Fix: blocks of 4+ cells next to a differently labelled probe are split (300 random rotated boxes: 62 misses -> 0, about 21% of cells probed)
-Regression guard: tests/python/test_hit_probe.py::test_random_rotated_boxes_match_exhaustive, test_old_corner_rule_misses_a_poking_corner; the browser test compares with an exhaustive map on every engine
+Regression guard: tests/python/test_platform.py::test_random_rotated_boxes_match_exhaustive, test_old_corner_rule_misses_a_poking_corner; the browser test compares with an exhaustive map on every engine
 Portable lesson: sampling is only trustworthy next to a full reference; guard sampled maps with an exhaustive comparison
 
 ID: FRACTIONAL_HIT_COORDINATES
@@ -140,7 +140,7 @@ Stage: interact
 Observed: rotated target, real clicks 8/12 matched elementFromPoint; a 0.5 sub-point offset gave half hits on a plain box in Chromium
 Root cause: the grid origin came from a fractional bounding box, and engines round fractional coordinates differently
 Fix: integer sub-points and an integer grid origin
-Regression guard: tests/python/test_hit_probe_browser.py::test_integer_edges_agree_and_fractional_edges_are_recorded (asserts integers, records fractional results per engine)
+Regression guard: tests/python/test_platform.py::test_integer_edges_agree_and_fractional_edges_are_recorded (asserts integers, records fractional results per engine)
 Portable lesson: never assert on fractional-pixel hit tests across engines
 ```
 

@@ -14,7 +14,7 @@ python -m btk --help
 PYTHONPATH=tools python -S -m btk --help
 ```
 
-Module names are the file names (`btk`, `route_trail`, ...), so install into an environment without other modules of the same names, such as a uv run or a virtualenv. `tests/python/test_python_m.py` runs `python -S -m NAME --help` for every script, and CI installs the repository and runs one module from outside the checkout.
+Module names are the file names (`btk`, `route_trail`, ...), so install into an environment without other modules of the same names, such as a uv run or a virtualenv. `tests/python/test_tooling.py` runs `python -S -m NAME --help` for every script, and CI installs the repository and runs one module from outside the checkout.
 
 ## Standard-library one-liners
 
