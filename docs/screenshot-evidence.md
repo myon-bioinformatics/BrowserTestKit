@@ -205,6 +205,10 @@ page ──📸 PNG──▶ Python ──(identical? ♻️ skip)──▶ enco
 - 📸 `--stills DIR` also writes the page as loaded and every 🔲 frame as a PNG (no caption, for a deck or a doc), named
   `<--stills-prefix>01-top-1280x800-02-save<--stills-suffix>.png`: shot number and label, viewport, the still's number
   in the shot and what is marked. The receipt lists each file with its sha256.
+  🧾 The stills are also sealed as a capture bundle, `evidence-<engine>.json` next to them, in the format
+  `check_capture_evidence.py` reads (`project` = the engine; `complete` only when every shot passed and `--sha` is a
+  full commit, and only after that validator accepted it):
+  `python -S tools/check_capture_evidence.py DIR --pattern 'evidence-*.json' --expect chromium --captures A.png,B.png --sha SHA`.
 - 🪶 Nano environments: without PySaiyanWeBoo's `web_ui` installed, `--stills` still records (stills and receipt, no
   GIF), so a Playwright-only environment needs no git dependency. 🧭 `--executable auto` (default) launches
   Playwright's own build, or — when that revision is not installed — the newest build of the same browser already on

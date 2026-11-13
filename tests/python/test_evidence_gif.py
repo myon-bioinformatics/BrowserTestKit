@@ -209,6 +209,17 @@ def test_stills_are_written_and_a_nano_run_needs_no_web_ui(tmp_path, monkeypatch
         data = (stills / name).read_bytes()
         assert data[:8] == b"\x89PNG\r\n\x1a\n" and data[16:24] == (392).to_bytes(4, "big") + (320).to_bytes(4, "big")
     assert (stills / files[0]).read_bytes() != (stills / files[1]).read_bytes()          # the marks are in the still
+    bundle = json.loads((stills / "evidence-chromium.json").read_text(encoding="utf-8"))
+    assert bundle["stage"] == "failed" and "--sha" in bundle["error"] and receipt["stills"]["stage"] == "failed"   # no --sha: not checkable
+    sha = "c" * 40
+    assert eg.main([str(out), "--serve", str(tmp_path), "--plan", str(plan), "--stills", str(stills), "--stills-prefix", "p-", "--sha", sha]) == 0
+    bundle = json.loads((stills / "evidence-chromium.json").read_text(encoding="utf-8"))
+    assert bundle["stage"] == "complete" and bundle["project"] == "chromium" and [c["file"] for c in bundle["captures"]] == files
+    assert bundle["captures"][0]["width"] == 392 and bundle["captures"][0]["height"] == 320
+    checker = eg._sibling("check_capture_evidence")                                    # the kit's own validator accepts the stills
+    assert checker.main([str(stills), "--pattern", "evidence-*.json", "--expect", "chromium", "--captures", ",".join(files), "--sha", sha]) == 0
+    (stills / files[1]).write_bytes((stills / files[0]).read_bytes())                   # a swapped picture is caught
+    assert checker.main([str(stills), "--pattern", "evidence-*.json", "--expect", "chromium", "--captures", ",".join(files), "--sha", sha]) == 1
 
 
 def _plan(tmp_path, shots):

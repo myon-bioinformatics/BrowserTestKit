@@ -408,6 +408,33 @@ def still_name(prefix: str, shot: int, label: str, viewport: tuple[int, int], nu
     return f"{prefix}{shot:02d}-{slug(label)}-{viewport[0]}x{viewport[1]}-{number:02d}-{slug(what)}{suffix}.png"
 
 
+def seal_stills(directory: Path, written: list[dict], engine: str, sha: str | None, *, ok: bool) -> dict:
+    """📸 The stills as a capture bundle ``check_capture_evidence.py`` reads: ``evidence-<engine>.json`` next to them, ``project`` = the
+    engine, ``stage`` complete only when every shot passed and ``sha`` (``--sha``) is a full commit; then checked here by that validator.
+
+    ``python -S tools/check_capture_evidence.py DIR --pattern 'evidence-*.json' --expect chromium --captures A.png,B.png --sha SHA``"""
+    validator = _sibling("check_capture_evidence")
+    name = f"evidence-{engine}.json"
+    target = directory / name
+    target.unlink(missing_ok=True)                                     # an old complete receipt must not cover this run
+    directory.mkdir(parents=True, exist_ok=True)
+    captures = [{key: still[key] for key in ("file", "bytes", "sha256", "width", "height")} for still in written]
+    full = isinstance(sha, str) and re.fullmatch(r"[0-9a-f]{40}", sha) is not None
+    receipt = {"stage": "complete" if ok and full and captures else "failed", "project": engine, "sha": sha,
+               "generator": "BrowserTestKit evidence_gif --stills", "captures": captures}
+    if not full:
+        receipt["error"] = "--sha is not a full lowercase commit: the stills are not a checkable bundle"
+    elif not ok:
+        receipt["error"] = "a shot failed: failed bundles cannot cover success"
+    target.write_text(json.dumps(receipt, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    if receipt["stage"] == "complete":
+        passed, _, problems = validator.check(directory, name, [engine], [c["file"] for c in captures], sha)
+        if not passed:                                                 # never leave a complete receipt the validator rejects
+            receipt.update(stage="failed", error="; ".join(problems))
+            target.write_text(json.dumps(receipt, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return {"receipt": name, "stage": receipt["stage"], **({"error": receipt["error"]} if "error" in receipt else {})}
+
+
 def static_frames(shots: list[dict]) -> int:
     """Frames every shot needs whatever happens: the page, each step, each zoom's steps (⏺ frames come out of the rest)."""
     return sum(1 + sum(next(iter(s.values()))["steps"] if "zoom" in s else 1 for s in shot["steps"]) for shot in shots)
@@ -420,7 +447,8 @@ def record(out: Path, shots: list[dict], *, serve_dir: Path | None = None, width
            executable: str = "auto") -> dict:
     """Run every shot in ``browser_name``, write ``out`` (GIF) and ``out.with_suffix('.json')`` (receipt); returns the receipt.
 
-    📸 ``stills``: also write the page as loaded and every 🔲 frame of each shot as a PNG there (see still_name).
+    📸 ``stills``: also write the page as loaded and every 🔲 frame of each shot as a PNG there (see still_name), sealed as a
+    capture bundle (seal_stills) that check_capture_evidence.py validates.
     🪶 Without PySaiyanWeBoo's web_ui (a nano environment) only the stills and the receipt are written, and ``stills`` is required.
     🧭 ``executable``: ``auto`` launches Playwright's build, or one already on disk when that revision is missing (btk.find_browser);
     ``bundled`` only Playwright's; a path that browser."""
@@ -476,7 +504,9 @@ def record(out: Path, shots: list[dict], *, serve_dir: Path | None = None, width
                     number = sum(1 for x in written if x["shot"] == shot)
                     name = still_name(stills_prefix, shot, label, size, number, what, stills_suffix)
                     (stills / name).write_bytes(png)
-                    written.append({"file": name, "shot": shot, "what": what, "bytes": len(png), "sha256": hashlib.sha256(png).hexdigest()})
+                    width, height = _sibling("check_capture_evidence")._png.dimensions(png)
+                    written.append({"file": name, "shot": shot, "what": what, "bytes": len(png), "sha256": hashlib.sha256(png).hexdigest(),
+                                    "width": width, "height": height})
                 try:
                     response = page.goto(resolve(shot["url"], origin), wait_until="load")
                     if response is not None and response.status >= 400:
@@ -534,9 +564,10 @@ def record(out: Path, shots: list[dict], *, serve_dir: Path | None = None, width
         gif = {"gif": None, "bytes": 0, "sha256": None, "frames": 0}
         encoder = {"module": None, "skipped": "PySaiyanWeBoo web_ui is not installed: stills only",
                    "colors": 0, "overBudget": False, "capture_s": round(captured - started, 1)}
+    bundle = seal_stills(stills, written, browser_name, sha, ok=all(r["status"] == "pass" for r in results)) if stills is not None else None
     receipt = {"schema": SCHEMA, **gif, "canvas": f"{width}x{height + CAPTION}", "browser": f"{browser_name} {version}",
                "executable": found, "recorded": datetime.date.today().isoformat(), "commit": sha,
-               "stills": {"dir": str(stills) if stills is not None else None, "files": written},
+               "stills": {"dir": str(stills) if stills is not None else None, "files": written, **(bundle or {})},
                "encoder": encoder,
                "limits": {"colors": colors, "max_bytes": max_bytes, "max_frames": max_frames, "last_hold_ms": last_hold},
                "transfer": transfer, "mapped": [prefix for prefix, _ in maps or []],
@@ -597,7 +628,9 @@ def main(argv: list[str] | None = None) -> int:
               + (f" 🌐 {len(shot['external'])}" if shot["external"] else "") + "".join(f"\n   ⚠️ {e}" for e in shot["errors"]))
     s, e, x = receipt["summary"], receipt["encoder"], receipt["transfer"]
     if receipt["stills"]["files"]:
-        print(f"📸 {receipt['stills']['dir']} × {len(receipt['stills']['files'])}")
+        bundle = receipt["stills"]
+        print(f"📸 {bundle['dir']} × {len(bundle['files'])} 🧾 {bundle['receipt']} {'✅' if bundle['stage'] == 'complete' else '⚠️'} {bundle['stage']}"
+              + (f" ({bundle['error']})" if "error" in bundle else ""))
     if receipt["executable"]["path"]:
         print(f"🧭 {receipt['executable']['source']} {receipt['executable']['path']}")
     if receipt["gif"] is None:
