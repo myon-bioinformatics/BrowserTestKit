@@ -50,8 +50,8 @@ _PAGE_CSS = ".ui-table th,.ui-table td{text-align:center}.ui-table td img{displa
 
 
 def _page(pages, envs, cells, tiles, encode, tile, run_url):
-    """The digest page comes from PySaiyanWeBoo's web_ui (``pages`` dependency group); only the cells are built here."""
-    import web_ui  # PySaiyanWeBoo, pinned in pyproject's pages group
+    """The digest page comes from PySaiyanWeBoo (pysaiyanweboo) (``pages`` dependency group); only the cells are built here."""
+    import pysaiyanweboo as ui  # PySaiyanWeBoo, pinned in pyproject's pages group
 
     rows = []
     for page in pages:
@@ -78,9 +78,9 @@ def _page(pages, envs, cells, tiles, encode, tile, run_url):
     body = (f'<main class="ui-page"><h1 class="ui-title">Published app digest</h1>'
             f'<p class="ui-muted">Thumbnails {tile[0]}x{tile[1]} px · builds {html.escape(", ".join(builds) or "unknown")}{link}. '
             'Mobile profiles are emulation; thumbnails are for orientation, not pixel review.</p>'
-            + web_ui.table(['', *envs], rows, trusted_html=True) + '</main>')
-    return web_ui.render_document(trusted_html=body, title='Published app digest',
-                                  css=web_ui.core_css() + _PAGE_CSS) + '\n'
+            + ui.table(['', *envs], rows, trusted_html=True) + '</main>')
+    return ui.render_document(trusted_html=body, title='Published app digest',
+                                  css=ui.core_css() + _PAGE_CSS) + '\n'
 
 
 def summary_markdown(pages, envs, cells, run_url=None):

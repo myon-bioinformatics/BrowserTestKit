@@ -198,17 +198,18 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: myon-bioinformatics/PySaiyanWeBoo
-          ref: 3f02f3cf1f8a53854d220a049601e413d5babff1
+          ref: 635f2f265ea64d41326772b6b55011d7ad82037c
           path: .web-ui
           persist-credentials: false
           sparse-checkout: |
+            /pysaiyanweboo.py
             /web_ui.py
             /tools/
           sparse-checkout-cone-mode: false
       - name: Page viewer (one section per page, opened by emoji)
         if: always() && hashFiles('app-matrix/screenshots/report.json') != ''
         run: |
-          python -S .web-ui/web_ui.py --example flutter-pages > .web-ui/flutter-pages.json
+          python -S .web-ui/pysaiyanweboo.py --example flutter-pages > .web-ui/flutter-pages.json
           python -S .web-ui/tools/capture_matrix.py --pages .web-ui/flutter-pages.json \
             --report app-matrix/screenshots/report.json --dataset app-matrix/dataset.json \
             > app-matrix/screenshots/viewer.html

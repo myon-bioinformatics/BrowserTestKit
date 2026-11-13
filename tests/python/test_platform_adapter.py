@@ -189,12 +189,13 @@ def test_report_adds_the_web_ui_viewer_on_top_of_the_ironmate_comparison():
     import re
     apps = (ROOT / '.github/workflows/platform-apps.yml').read_text()
     pin = re.search(r'repository: myon-bioinformatics/PySaiyanWeBoo\n\s+ref: ([0-9a-f]+)', apps)
-    assert pin and pin.group(1) == '3f02f3cf1f8a53854d220a049601e413d5babff1'
+    assert pin and pin.group(1) == '635f2f265ea64d41326772b6b55011d7ad82037c'
     assert 'ref: e77d2a3f7b66f37c899832b261450b2bcd29f3dc' in apps
     assert apps.count('repository: myon-bioinformatics/Ironmate') == 1  # one comparison, not two
     assert '--report app-matrix/screenshots/report.json --dataset app-matrix/dataset.json' in apps and '--embed-css' not in apps
-    # web-ui keeps its page table and CSS in web_ui.py (no examples/ or css/) and its helpers in tools/.
-    assert '.web-ui/web_ui.py --example flutter-pages' in apps and '.web-ui/tools/capture_matrix.py' in apps
+    # web-ui keeps its page table and CSS in pysaiyanweboo.py (no examples/ or css/) and its helpers in tools/.
+    assert '.web-ui/pysaiyanweboo.py --example flutter-pages' in apps and '.web-ui/tools/capture_matrix.py' in apps
+    assert '/pysaiyanweboo.py\n            /web_ui.py\n' in apps  # tools/ at this pin still import web_ui (the forwarding name)
     assert "hashFiles('app-matrix/screenshots/report.json')" in apps and 'screenshots/viewer.html' in apps
     # The viewer joins on adapter ids: web-ui's page table must name exactly these adapters.
     assert {p.stem for p in (ROOT / 'adapters').glob('flutter-*.json')} == {

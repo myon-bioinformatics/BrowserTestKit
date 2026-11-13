@@ -1,11 +1,9 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.12'",
     "python_full_version < '3.12'",
-]
-supported-markers = [
 ]
 
 [[package]]
@@ -32,11 +30,6 @@ pages = [
     { name = "pysaiyanweboo" },
 ]
 
-[package.group-requires-python]
-browser = ">=3.11"
-browser-test = ">=3.11,>=3.11"
-dev = ">=3.11"
-
 [package.metadata]
 
 [package.metadata.requires-dev]
@@ -48,11 +41,11 @@ browser-test = [
 ]
 dev = [
     { name = "pip", marker = "python_full_version >= '3.11'", specifier = ">=26.2" },
-    { name = "pysaiyanweboo", marker = "python_full_version >= '3.11'", git = "https://github.com/myon-bioinformatics/PySaiyanWeBoo?rev=f624d9364017b7e2da7f797817dfba2a8d9adb14" },
+    { name = "pysaiyanweboo", marker = "python_full_version >= '3.11'", git = "https://github.com/myon-bioinformatics/PySaiyanWeBoo?rev=635f2f265ea64d41326772b6b55011d7ad82037c" },
     { name = "pytest", marker = "python_full_version >= '3.11'", specifier = ">=9.0.3" },
     { name = "pyyaml", marker = "python_full_version >= '3.11'", specifier = ">=6.0.3" },
 ]
-pages = [{ name = "pysaiyanweboo", git = "https://github.com/myon-bioinformatics/PySaiyanWeBoo?rev=f624d9364017b7e2da7f797817dfba2a8d9adb14" }]
+pages = [{ name = "pysaiyanweboo", git = "https://github.com/myon-bioinformatics/PySaiyanWeBoo?rev=635f2f265ea64d41326772b6b55011d7ad82037c" }]
 
 [[package]]
 name = "colorama"
@@ -238,7 +231,7 @@ wheels = [
 [[package]]
 name = "pysaiyanweboo"
 version = "0.1.0"
-source = { git = "https://github.com/myon-bioinformatics/PySaiyanWeBoo?rev=f624d9364017b7e2da7f797817dfba2a8d9adb14#f624d9364017b7e2da7f797817dfba2a8d9adb14" }
+source = { git = "https://github.com/myon-bioinformatics/PySaiyanWeBoo?rev=635f2f265ea64d41326772b6b55011d7ad82037c#635f2f265ea64d41326772b6b55011d7ad82037c" }
 
 [[package]]
 name = "pytest"

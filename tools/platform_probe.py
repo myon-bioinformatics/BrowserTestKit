@@ -419,13 +419,13 @@ show();
 
 
 def render(records: list[dict]) -> str:
-    """One self-contained review page from PySaiyanWeBoo's web_ui (core CSS + the matrix script); needs the
+    """One self-contained review page from PySaiyanWeBoo (pysaiyanweboo) (core CSS + the matrix script); needs the
     ``pages`` dependency group (``uv run --group pages``), unlike collect/merge/summary which stay stdlib."""
-    import web_ui  # PySaiyanWeBoo, pinned in pyproject's pages group
+    import pysaiyanweboo as ui  # PySaiyanWeBoo, pinned in pyproject's pages group
 
     data = json.dumps({"schema": DATASET_SCHEMA, "records": records}, ensure_ascii=False).replace("<", "\\u003c")
-    body = _PAGE_BODY.replace("__DATA__", data) + web_ui.classic_script(_PAGE_JS)
-    return web_ui.render_document(trusted_html=body, title="Platform matrix", css=web_ui.core_css() + _PAGE_CSS)
+    body = _PAGE_BODY.replace("__DATA__", data) + ui.classic_script(_PAGE_JS)
+    return ui.render_document(trusted_html=body, title="Platform matrix", css=ui.core_css() + _PAGE_CSS)
 
 
 def main(argv=None) -> int:
