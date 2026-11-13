@@ -13,6 +13,8 @@ A shot is ``label|url|WIDTHxHEIGHT`` or, in ``--plan`` JSON, ``{"label", "url", 
   — one frame with the element marked by a coloured shape (``rect`` / ``ellipse`` / ``triangle`` around it, ``arrow``
   pointing at it; the same shape names as Ironmate's layers), so the viewer sees where the next step lands. The mark is
   an overlay that takes no clicks; it goes when the next step starts, or with ``keep`` stays until the next 🔲 / the shot's end.
+  A mark also takes ``label`` (a callout), ``number`` (a badge) and ``spotlight`` (dim the rest); a list draws up to 8 marks at
+  once, numbered. element_overlay.mark_svg() draws them (the same marks as ``element_overlay.py --format svg --shape``).
 
 * ⏺ ``{"record": {"every": 200, "for": 2000, "clip": sel}}`` — frames every ``every`` ms for ``for`` ms (an animation, a
   transition); delays are the measured ones. With ``clip`` only that element's box is captured and laid on the last full
@@ -53,17 +55,34 @@ import datetime
 import functools
 import hashlib
 import http.server
+import importlib.util
 import json
 import mimetypes
 from pathlib import Path
+import re
 import sys
 import threading
 import time
 
 CAPTION = 32
+TOOLS = Path(__file__).resolve().parent
+
+
+def _sibling(name: str):
+    """A stdlib module next to this file (element_overlay, btk), loaded by path so the tool runs from anywhere."""
+    if name in sys.modules:
+        return sys.modules[name]
+    spec = importlib.util.spec_from_file_location(name, TOOLS / f"{name}.py")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    assert spec.loader
+    spec.loader.exec_module(module)
+    return module
+
+
+overlay = _sibling("element_overlay")       # 🔲 marks: the same drawer as element_overlay --format svg --shape
 SCHEMA = "btk-evidence-gif/2"
 STEP_KEYS = ("click", "fill", "select", "press", "scroll", "wait", "eval", "record", "zoom", "frame")
-FRAME_SHAPES = ("rect", "ellipse", "triangle", "arrow")
 FRAME_MARK = "data-btk-frame"         # the overlay's attribute: what clear_frame removes
 ENGINES = ("chromium", "firefox", "webkit")
 BATCH_BYTES = 4 << 20                 # base64 per call to the encoder page: one shot is usually one call
@@ -124,39 +143,22 @@ def check_step(step) -> dict:
             raise ValueError(f"zoom: 1-30 steps, ms <= 10000, hold <= 60000, scale 1-8: {step!r}")
         return {"zoom": zoom}
     if kind == "frame":
-        value = {"selector": value} if isinstance(value, str) else value
-        if not isinstance(value, dict) or not isinstance(value.get("selector"), str) or set(value) - {"selector", "shape", "color", "width", "pad", "keep"}:
-            raise ValueError(f"frame takes a selector (and shape, color, width, pad, keep): {step!r}")
-        frame = {"selector": value["selector"], "shape": value.get("shape", "rect"), "color": str(value.get("color", "#e53935")),
-                 "width": int(value.get("width", 4)), "pad": int(value.get("pad", 8)), "keep": value.get("keep", False)}
-        colour = frame["color"]
-        if (frame["shape"] not in FRAME_SHAPES or frame["keep"] not in (True, False) or not 1 <= frame["width"] <= 32 or not 0 <= frame["pad"] <= 64
-                or len(colour) not in (4, 7) or colour[0] != "#" or any(c not in "0123456789abcdefABCDEF" for c in colour[1:])):
-            raise ValueError(f"frame: shape {' / '.join(FRAME_SHAPES)}, color #rgb or #rrggbb, width 1-32, pad 0-64, keep true/false: {step!r}")
-        return {"frame": frame}
+        items = value if isinstance(value, list) else [value]
+        if not 1 <= len(items) <= 8:
+            raise ValueError(f"frame takes 1-8 marks: {step!r}")
+        marks = []
+        for item in items:
+            item = {"selector": item} if isinstance(item, str) else item
+            if not isinstance(item, dict) or not isinstance(item.get("selector"), str) or set(item) - {"selector", "keep", *overlay.MARK_KEYS}:
+                raise ValueError(f"a frame mark takes a selector (and keep, {', '.join(overlay.MARK_KEYS)}): {step!r}")
+            if type(item.get("keep", False)) is not bool:
+                raise ValueError(f"frame: keep true/false: {step!r}")
+            marks.append({"selector": item["selector"], **overlay.check_mark(item), "keep": item.get("keep", False)})
+        if len(marks) > 1:                                             # several marks: ① ② … unless a number is given
+            for index, mark in enumerate(marks, 1):
+                mark["number"] = index if mark["number"] is None else mark["number"]
+        return {"frame": {"marks": marks, "keep": any(m.pop("keep") for m in marks)}}
     return step
-
-
-def frame_svg(box: dict, viewport: tuple[int, int], frame: dict) -> str:
-    """The 🔲 overlay: one viewport-sized SVG with ``frame["shape"]`` drawn around (``arrow``: pointing at) the padded ``box``.
-    It carries no ``style`` attribute (a page's ``style-src 'self'`` would refuse it): draw_frame places it through the CSSOM."""
-    pad, colour, line = frame["pad"], frame["color"], frame["width"]
-    x, y, w, h = box["x"] - pad, box["y"] - pad, box["width"] + 2 * pad, box["height"] + 2 * pad
-    cx, cy = x + w / 2, y + h / 2
-    stroke = f'fill="none" stroke="{colour}" stroke-width="{line}" stroke-linejoin="round"'
-    if frame["shape"] == "ellipse":                                   # the ellipse through the padded box's corners
-        body = f'<ellipse cx="{cx:g}" cy="{cy:g}" rx="{w / 2 ** .5:g}" ry="{h / 2 ** .5:g}" {stroke}/>'
-    elif frame["shape"] == "triangle":                                # apex one box height above: the box's top edge just fits
-        body = f'<polygon points="{cx:g},{y - h:g} {x - w / 2:g},{y + h:g} {x + w + w / 2:g},{y + h:g}" {stroke}/>'
-    elif frame["shape"] == "arrow":                                   # from the side with room, tip on the box's edge
-        head, tail = 4 * line, 64
-        side = -1 if x >= tail else 1                                 # -1: comes from the left
-        tip = x if side < 0 else x + w
-        body = (f'<line x1="{tip + side * tail:g}" y1="{cy:g}" x2="{tip + side * head:g}" y2="{cy:g}" stroke="{colour}" stroke-width="{line}"/>'
-                f'<polygon points="{tip:g},{cy:g} {tip + side * head:g},{cy - head / 2:g} {tip + side * head:g},{cy + head / 2:g}" fill="{colour}"/>')
-    else:
-        body = f'<rect x="{x:g}" y="{y:g}" width="{w:g}" height="{h:g}" rx="4" {stroke}/>'
-    return (f'<svg xmlns="http://www.w3.org/2000/svg" {FRAME_MARK}="{"keep" if frame["keep"] else "once"}" width="{viewport[0]}" height="{viewport[1]}">{body}</svg>')
 
 
 def clear_frame(page, *, kept: bool = False) -> None:
@@ -165,19 +167,21 @@ def clear_frame(page, *, kept: bool = False) -> None:
 
 
 def draw_frame(page, frame: dict) -> str:
-    """Mark the element (scrolled into view) with the overlay; returns the step's note."""
-    target = page.locator(frame["selector"]).first
-    target.scroll_into_view_if_needed(timeout=5000)
-    box = target.bounding_box()
-    if not box:
-        raise ValueError(f"frame: {frame['selector']} has no box (hidden?)")
+    """Mark the elements (the first scrolled into view) with element_overlay's marks; returns the step's note."""
+    page.locator(frame["marks"][0]["selector"]).first.scroll_into_view_if_needed(timeout=5000)
+    marks = []
+    for mark in frame["marks"]:
+        box = page.locator(mark["selector"]).first.bounding_box()
+        if not box:
+            raise ValueError(f"frame: {mark['selector']} has no box (hidden?)")
+        marks.append({**mark, "box": box})
     clear_frame(page, kept=True)
     size = page.evaluate("() => [document.documentElement.clientWidth, document.documentElement.clientHeight]")
+    svg = overlay.mark_svg(marks, size, attributes=f' {FRAME_MARK}="{"keep" if frame["keep"] else "once"}"')
     page.evaluate("""svg => { document.documentElement.insertAdjacentHTML('beforeend', svg);
         Object.assign(document.documentElement.lastElementChild.style, { position: 'fixed', left: '0', top: '0', zIndex: '2147483647',
-                                                                         pointerEvents: 'none', overflow: 'visible' }); }""",
-                  frame_svg(box, (size[0], size[1]), frame))
-    return f"🔲 {frame['selector']}"
+                                                                         pointerEvents: 'none', overflow: 'visible' }); }""", svg)
+    return "🔲 " + " ".join(m.get("label") or m["selector"] for m in frame["marks"])
 
 
 def parse_bytes(text: str | int | None) -> int | None:
@@ -307,7 +311,7 @@ class Captures:
         self.transfer = transfer
         self.last = last                      # [hash of the last full screenshot sent], shared across shots
 
-    def full(self, page, width: int, note: str, delay: int, group: int = 0, **extra) -> None:
+    def full(self, page, width: int, note: str, delay: int, group: int = 0, **extra) -> bytes:
         png = page.screenshot(type="png")
         self.transfer["screenshots"] += 1
         self.transfer["png_bytes"] += len(png)
@@ -319,6 +323,7 @@ class Captures:
             item["png"] = png
             self.last[0] = digest
         self.items.append(item)
+        return png
 
     def patch(self, page, box: dict, note: str, delay: int, group: int) -> None:
         png = page.screenshot(type="png", clip=box)
@@ -392,6 +397,44 @@ def send(kernel, items: list[dict], transfer: dict) -> None:
         transfer["sent_bytes"] += size
 
 
+def slug(text: str, limit: int = 32) -> str:
+    """A file-name part that still says what it is: letters and digits of any script, the rest (emoji, marks, /) as one dash."""
+    return re.sub(r"[\W_]+", "-", text).strip("-").lower()[:limit].strip("-") or "x"
+
+
+def still_name(prefix: str, shot: int, label: str, viewport: tuple[int, int], number: int, what: str, suffix: str) -> str:
+    """``<prefix>01-top-1280x800-02-save<suffix>.png``: shot number and label, viewport, the still's number in the shot
+    (00 = the page as loaded) and what is marked, so a name read alone says where it came from."""
+    return f"{prefix}{shot:02d}-{slug(label)}-{viewport[0]}x{viewport[1]}-{number:02d}-{slug(what)}{suffix}.png"
+
+
+def seal_stills(directory: Path, written: list[dict], engine: str, sha: str | None, *, ok: bool) -> dict:
+    """📸 The stills as a capture bundle ``btk.py check-capture-evidence`` reads: ``evidence-<engine>.json`` next to them, ``project`` = the
+    engine, ``stage`` complete only when every shot passed and ``sha`` (``--sha``) is a full commit; then checked here by that validator.
+
+    ``python -S tools/btk.py check-capture-evidence DIR --pattern 'evidence-*.json' --expect chromium --captures A.png,B.png --sha SHA``"""
+    kit = _sibling("btk")
+    name = f"evidence-{engine}.json"
+    target = directory / name
+    target.unlink(missing_ok=True)                                     # an old complete receipt must not cover this run
+    directory.mkdir(parents=True, exist_ok=True)
+    captures = [{key: still[key] for key in ("file", "bytes", "sha256", "width", "height")} for still in written]
+    full = isinstance(sha, str) and re.fullmatch(r"[0-9a-f]{40}", sha) is not None
+    receipt = {"stage": "complete" if ok and full and captures else "failed", "project": engine, "sha": sha,
+               "generator": "BrowserTestKit evidence_gif --stills", "captures": captures}
+    if not full:
+        receipt["error"] = "--sha is not a full lowercase commit: the stills are not a checkable bundle"
+    elif not ok:
+        receipt["error"] = "a shot failed: failed bundles cannot cover success"
+    target.write_text(json.dumps(receipt, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    if receipt["stage"] == "complete":
+        passed, _, problems = kit.check_capture_evidence(directory, name, [engine], [c["file"] for c in captures], sha)
+        if not passed:                                                 # never leave a complete receipt the validator rejects
+            receipt.update(stage="failed", error="; ".join(problems))
+            target.write_text(json.dumps(receipt, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return {"receipt": name, "stage": receipt["stage"], **({"error": receipt["error"]} if "error" in receipt else {})}
+
+
 def static_frames(shots: list[dict]) -> int:
     """Frames every shot needs whatever happens: the page, each step, each zoom's steps (⏺ frames come out of the rest)."""
     return sum(1 + sum(next(iter(s.values()))["steps"] if "zoom" in s else 1 for s in shot["steps"]) for shot in shots)
@@ -400,26 +443,45 @@ def static_frames(shots: list[dict]) -> int:
 def record(out: Path, shots: list[dict], *, serve_dir: Path | None = None, width: int = 720, height: int = 480,
            sha: str | None = None, plan: list | None = None, maps: list[tuple[str, Path]] | None = None,
            browser_name: str = "chromium", colors: int = 255, max_bytes: int | None = None, max_frames: int = 300,
-           last_hold: int = 2000) -> dict:
-    """Run every shot in ``browser_name``, write ``out`` (GIF) and ``out.with_suffix('.json')`` (receipt); returns the receipt."""
+           last_hold: int = 2000, stills: Path | None = None, stills_prefix: str = "", stills_suffix: str = "",
+           executable: str = "auto") -> dict:
+    """Run every shot in ``browser_name``, write ``out`` (GIF) and ``out.with_suffix('.json')`` (receipt); returns the receipt.
+
+    📸 ``stills``: also write the page as loaded and every 🔲 frame of each shot as a PNG there (see still_name), sealed as a
+    capture bundle (seal_stills) that ``btk.py check-capture-evidence`` validates.
+    🪶 Without PySaiyanWeBoo's web_ui (a nano environment) only the stills and the receipt are written, and ``stills`` is required.
+    🧭 ``executable``: ``auto`` launches Playwright's build, or one already on disk when that revision is missing (btk.find_browser);
+    ``bundled`` only Playwright's; a path that browser."""
     try:
         import web_ui
     except ImportError as exc:
-        raise RuntimeError(WEB_UI_HINT) from exc
+        if stills is None:
+            raise RuntimeError(WEB_UI_HINT + "; without it, --stills DIR records PNG stills only") from exc
+        web_ui = None
     from playwright.sync_api import sync_playwright
     if browser_name not in ENGINES:
         raise ValueError(f"--browser must be one of {', '.join(ENGINES)}")
+    written: list[dict] = []
     results = []
     transfer = {"screenshots": 0, "png_bytes": 0, "identical": 0, "patches": 0, "calls": 0, "sent_bytes": 0, "gif_bytes": 0}
     budget = [max(0, max_frames - static_frames(shots))]               # frames ⏺ steps may still take
     last = [b""]
     started = time.monotonic()
     with serve(serve_dir) as origin, sync_playwright() as pw:
-        browser = getattr(pw, browser_name).launch()
+        engine = getattr(pw, browser_name)
+        if executable == "auto":
+            found = _sibling("btk").find_browser(browser_name, engine.executable_path)
+        elif executable == "bundled":
+            found = {"source": "playwright", "path": None}
+        else:
+            found = {"source": "given", "path": str(Path(executable))}
+        browser = engine.launch(**({"executable_path": found["path"]} if found["path"] else {}))
         try:
-            kernel = browser.new_context().new_page()                    # its own context: no routes, no network
-            kernel.set_content(web_ui.gif_recorder_document())
-            kernel.evaluate("o => { window.rec = new UiGif.Recorder(o); }", {"width": width, "height": height, "caption": CAPTION})
+            kernel = None
+            if web_ui is not None:
+                kernel = browser.new_context().new_page()                # its own context: no routes, no network
+                kernel.set_content(web_ui.gif_recorder_document())
+                kernel.evaluate("o => { window.rec = new UiGif.Recorder(o); }", {"width": width, "height": height, "caption": CAPTION})
             total = len(shots)
             for index, shot in enumerate(shots, 1):
                 w, h = shot["viewport"]
@@ -434,20 +496,33 @@ def record(out: Path, shots: list[dict], *, serve_dir: Path | None = None, width
                 page.on("pageerror", lambda exc, errs=errors: errs.append(f"pageerror: {exc}"[:300]))
                 page.on("console", lambda msg, errs=errors, ext=external: console_error(msg, errs, ext))
                 captures, done = Captures(transfer, last), []
+
+                def keep_still(png: bytes, what: str, shot=index, label=shot["label"], size=(w, h)) -> None:
+                    if stills is None:
+                        return
+                    stills.mkdir(parents=True, exist_ok=True)
+                    number = sum(1 for x in written if x["shot"] == shot)
+                    name = still_name(stills_prefix, shot, label, size, number, what, stills_suffix)
+                    (stills / name).write_bytes(png)
+                    width, height = _sibling("btk").png_dimensions(png)
+                    written.append({"file": name, "shot": shot, "what": what, "bytes": len(png), "sha256": hashlib.sha256(png).hexdigest(),
+                                    "width": width, "height": height})
                 try:
                     response = page.goto(resolve(shot["url"], origin), wait_until="load")
                     if response is not None and response.status >= 400:
                         errors.append(f"http {response.status}")
                     page.wait_for_timeout(600)
                     generator = page_generator(page)
-                    captures.full(page, w, "", shot["hold"])
+                    keep_still(captures.full(page, w, "", shot["hold"]), "page")
                     for group, step in enumerate(shot["steps"], 1):
                         clear_frame(page)                              # a 🔲 mark shows on its own frame only (unless keep)
                         if "record" in step or "zoom" in step:
                             done.append(capture_step(page, step, captures, w, shot["hold"], budget, group + 1000 * index))
                         else:
                             done.append(run_step(page, step))
-                            captures.full(page, w, done[-1], shot["hold"])
+                            png = captures.full(page, w, done[-1], shot["hold"])
+                            if "frame" in step:                        # 📸 a marked view is what a slide wants
+                                keep_still(png, " ".join(m.get("label") or m["selector"] for m in step["frame"]["marks"]))
                 except Exception as exc:  # noqa: BLE001 - the failure is the evidence; keep recording the other shots
                     errors.append(f"{type(exc).__name__}: {exc}".splitlines()[0][:300])
                     with contextlib.suppress(Exception):
@@ -462,28 +537,38 @@ def record(out: Path, shots: list[dict], *, serve_dir: Path | None = None, width
                         item["ok"] = ok
                     if index == total and captures.items:
                         captures.items[-1]["delay"] = max(captures.items[-1]["delay"], last_hold)
-                    if captures.items:
+                    if captures.items and kernel is not None:
                         send(kernel, captures.items, transfer)
                     context.close()
                 results.append({"label": shot["label"], "url": shot["url"], "viewport": f"{w}x{h}", "steps": done,
                                 "status": "pass" if ok else "fail", "errors": errors, "allowed": allowed,
                                 "external": sorted(set(external)), "generator": generator})
             captured = time.monotonic()
-            encoded = kernel.evaluate("o => rec.encodeBase64(o)", {"colors": colors, "maxBytes": max_bytes or 0,
-                                                                     "comment": f"BrowserTestKit evidence_gif {sha or ''}".strip()})
+            encoded = None
+            if kernel is not None:
+                encoded = kernel.evaluate("o => rec.encodeBase64(o)", {"colors": colors, "maxBytes": max_bytes or 0,
+                                                                         "comment": f"BrowserTestKit evidence_gif {sha or ''}".strip()})
             version = browser.version
         finally:
             browser.close()
-    data = base64.b64decode(encoded["gif"])
-    transfer["gif_bytes"] = len(data)
-    report = encoded["report"]
-    report["capture_s"] = round(captured - started, 1)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_bytes(data)
-    receipt = {"schema": SCHEMA, "gif": out.name, "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest(),
-               "frames": report["frames"], "canvas": f"{width}x{height + CAPTION}", "browser": f"{browser_name} {version}",
-               "recorded": datetime.date.today().isoformat(), "commit": sha,
-               "encoder": {"module": "PySaiyanWeBoo web_ui gif.js", "web_ui": web_ui.installed_commit() or "checkout", **report},
+    if encoded is not None:
+        data = base64.b64decode(encoded["gif"])
+        transfer["gif_bytes"] = len(data)
+        report = encoded["report"]
+        report["capture_s"] = round(captured - started, 1)
+        out.write_bytes(data)
+        gif = {"gif": out.name, "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest(), "frames": report["frames"]}
+        encoder = {"module": "PySaiyanWeBoo web_ui gif.js", "web_ui": web_ui.installed_commit() or "checkout", **report}
+    else:                                                              # 🪶 no web_ui: the stills are the evidence
+        gif = {"gif": None, "bytes": 0, "sha256": None, "frames": 0}
+        encoder = {"module": None, "skipped": "PySaiyanWeBoo web_ui is not installed: stills only",
+                   "colors": 0, "overBudget": False, "capture_s": round(captured - started, 1)}
+    bundle = seal_stills(stills, written, browser_name, sha, ok=all(r["status"] == "pass" for r in results)) if stills is not None else None
+    receipt = {"schema": SCHEMA, **gif, "canvas": f"{width}x{height + CAPTION}", "browser": f"{browser_name} {version}",
+               "executable": found, "recorded": datetime.date.today().isoformat(), "commit": sha,
+               "stills": {"dir": str(stills) if stills is not None else None, "files": written, **(bundle or {})},
+               "encoder": encoder,
                "limits": {"colors": colors, "max_bytes": max_bytes, "max_frames": max_frames, "last_hold_ms": last_hold},
                "transfer": transfer, "mapped": [prefix for prefix, _ in maps or []],
                "summary": {"pass": sum(r["status"] == "pass" for r in results), "fail": sum(r["status"] == "fail" for r in results)},
@@ -509,6 +594,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-bytes", help="GIF size budget such as 800K or 2M: fewer colours, then fewer ⏺ frames")
     parser.add_argument("--max-frames", type=int, default=300, help="frame cap; ⏺ record steps get what the other frames leave (default 300)")
     parser.add_argument("--hold", type=int, default=1200, help="ms each frame stays (default 1200; a shot's \"hold\" wins)")
+    parser.add_argument("--stills", type=Path, metavar="DIR", help="📸 also write the page as loaded and every 🔲 frame as PNG here "
+                        "(the only output when PySaiyanWeBoo's web_ui is not installed)")
+    parser.add_argument("--stills-prefix", default="", help="📸 text before every still's name, e.g. a run or a repository")
+    parser.add_argument("--stills-suffix", default="", help="📸 text after every still's name, before .png, e.g. -dark")
+    parser.add_argument("--executable", default="auto", metavar="auto|bundled|PATH",
+                        help="🧭 auto (default): Playwright's browser, or one already on disk when its revision is missing; "
+                             "bundled: Playwright's only; PATH: that browser")
     parser.add_argument("--last-hold", type=int, default=2000, help="ms the last frame stays before the loop restarts (default 2000)")
     args = parser.parse_args(argv)
     try:
@@ -527,13 +619,23 @@ def main(argv: list[str] | None = None) -> int:
         parser.exit(2, f"⛔ {exc}\n")
     try:
         receipt = record(args.out, shots, serve_dir=args.serve, width=args.width, height=args.height, sha=args.sha, plan=raw, maps=maps,
-                         browser_name=args.browser, colors=args.colors, max_bytes=max_bytes, max_frames=args.max_frames, last_hold=args.last_hold)
+                         browser_name=args.browser, colors=args.colors, max_bytes=max_bytes, max_frames=args.max_frames, last_hold=args.last_hold,
+                         stills=args.stills, stills_prefix=args.stills_prefix, stills_suffix=args.stills_suffix, executable=args.executable)
     except RuntimeError as exc:
         parser.exit(2, f"⛔ {exc}\n")
     for shot in receipt["shots"]:
         print(f"{'✅' if shot['status'] == 'pass' else '⛔'} {shot['label']} {shot['viewport']}"
               + (f" 🌐 {len(shot['external'])}" if shot["external"] else "") + "".join(f"\n   ⚠️ {e}" for e in shot["errors"]))
     s, e, x = receipt["summary"], receipt["encoder"], receipt["transfer"]
+    if receipt["stills"]["files"]:
+        bundle = receipt["stills"]
+        print(f"📸 {bundle['dir']} × {len(bundle['files'])} 🧾 {bundle['receipt']} {'✅' if bundle['stage'] == 'complete' else '⚠️'} {bundle['stage']}"
+              + (f" ({bundle['error']})" if "error" in bundle else ""))
+    if receipt["executable"]["path"]:
+        print(f"🧭 {receipt['executable']['source']} {receipt['executable']['path']}")
+    if receipt["gif"] is None:
+        print(f"🪶 {e['skipped']} ✅ {s['pass']} ⛔ {s['fail']}")
+        return 1 if s["fail"] else 0
     print(f"🎞️ {args.out} 🖼️ {receipt['frames']} 📦 {receipt['bytes'] // 1024} KiB 🎨 {e['colors']} ✅ {s['pass']} ⛔ {s['fail']}"
           + (" ⚠️ over --max-bytes" if e["overBudget"] else ""))
     print(f"🔌 📸 {x['screenshots']} ({x['png_bytes'] // 1024} KiB) ♻️ {x['identical']} ✂️ {x['patches']} 📤 {x['sent_bytes'] // 1024} KiB / {x['calls']} calls 📥 {x['gif_bytes'] // 1024} KiB")

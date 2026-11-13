@@ -9,9 +9,14 @@ and framework scroll adapters in the owning application.
 
 ## Existing implementation and limits
 
-- `tools/check_png.py`: stdlib-only PNG signature, IHDR dimensions and terminal
+📦 These validators are commands of the one stdlib file `tools/btk.py` (until 2026-11 they were separate files:
+`check_png.py`, `check_evidence.py`, `check_capture_evidence.py`, `write_capture_evidence.py`,
+`probe_capture_rejections.py`). Arguments and exit codes are unchanged: a pinned consumer moving its pin replaces
+`tools/check_capture_evidence.py ARGS` with `tools/btk.py check-capture-evidence ARGS`, and so on.
+
+- `btk.py check-png`: stdlib-only PNG signature, IHDR dimensions and terminal
   IEND checks. This is a structural check, not a full image decoder or visual review.
-- `tools/check_evidence.py`: requires exact project identities with at least one
+- `btk.py check-evidence`: requires exact project identities with at least one
   `stage: "complete"` receipt and validates every complete PNG record, including
   retries. Optional recorded dimensions must match the PNG.
 - `tests/node/smoke.spec.ts`, `tests/python/test_smoke.py` and
@@ -20,7 +25,7 @@ and framework scroll adapters in the owning application.
   Its stage/status vocabulary is separate from the screenshot receipt's
   `stage: "complete"`; do not interchange those formats.
 
-`tools/check_capture_evidence.py` separately handles multi-image `captures[]`
+`btk.py check-capture-evidence` separately handles multi-image `captures[]`
 receipts. It requires a complete named capture set per project, validates every
 complete retry, checks checkout SHA, PNG byte counts/hashes and optional dimensions,
 and can compare canonical timestamps and run identity. The single-image validator
@@ -58,7 +63,7 @@ application assertions and visual review remain necessary.
 Use the existing single-capture validator where its receipt fits:
 
 ```sh
-python -S tools/check_evidence.py test-results \
+python -S tools/btk.py check-evidence test-results \
   --pattern '**/evidence.json' \
   --expect chromium,firefox,webkit,mobile-webkit
 ```
@@ -69,7 +74,7 @@ installation, Playwright config and expected identities in parity.
 For multi-capture receipts such as Flutter's Home/Build diagnostics format:
 
 ```sh
-python -S tools/check_capture_evidence.py test-results \
+python -S tools/btk.py check-capture-evidence test-results \
   --expect chromium,firefox,webkit,mobile-webkit \
   --captures home.png,build-diagnostics.png \
   --sha "$TESTED_SHA" --canonical build/metadata.json
@@ -100,7 +105,7 @@ validation, and 2 for invalid CLI arguments. Output is capped at 20 notes/errors
 | Concern | Rule |
 | --- | --- |
 | Project and scenario | Check each required identity, not only a total file count. |
-| Multiple captures | Declare required scenario file names and validate every image with `check_capture_evidence.py`, or use separate single-image receipts. |
+| Multiple captures | Declare required scenario file names and validate every image with `btk.py check-capture-evidence`, or use separate single-image receipts. |
 | Retry/run attempt | Keep attempt identity and output directories distinct. Extra retry artifacts must not cause a false count failure, and old runs must not satisfy current-run coverage. |
 | Provenance | Record reviewed SHA and tested SHA explicitly; validate source-derived values against the build actually exercised. |
 | Image integrity | Check file presence, PNG structure and positive dimensions. When a receipt records size/hash, recompute them from the saved bytes. |
@@ -152,16 +157,16 @@ consume this guide or the same receipt schema.
 
 ## Sealing existing CLI capture lanes
 
-`write_capture_evidence.py` adapts existing PNG capture jobs to multi-image receipts.
+`btk.py write-capture-evidence` adapts existing PNG capture jobs to multi-image receipts.
 Pass an explicit project/bundle identity, required filenames, tested SHA, run ID,
 attempt and `--stage complete|failed|skipped`. Clear success images/receipts before
 capture and call the writer after application assertions/capture outcome is known.
-Only complete bundles pass `check_capture_evidence.py`; failed/skipped receipts are
+Only complete bundles pass `btk.py check-capture-evidence`; failed/skipped receipts are
 preserved but never cover required success. The writer checks all required inputs,
 records byte/hash/dimensions, and saves a failed receipt on invalid/missing input.
 It cannot prove fresh capture or visible semantics merely by hashing a PNG.
 
-`probe_capture_rejections.py` first validates an actual CI bundle, then mutates
+`btk.py probe-capture-rejections` first validates an actual CI bundle, then mutates
 isolated temporary copies (missing image, wrong hash, stale run ID, failed receipt)
 and requires each to fail the same validator. It never modifies the actual evidence.
 Use the same expect/captures/SHA/run/attempt and receipt pattern as the real lane.
@@ -198,6 +203,23 @@ page ──📸 PNG──▶ Python ──(identical? ♻️ skip)──▶ enco
   `arrow` pointing at it (Ironmate's shape names), `color` `#rgb`/`#rrggbb`, `width`, `pad` — so the viewer sees
   where the next step lands. The mark is an overlay that takes no clicks and is removed before the next step acts;
   `"keep": true` leaves it until the next 🔲 or the end of the shot.
+  For slides and walkthroughs a mark also takes a callout `label` (Meiryo, placed where it covers no other mark), a
+  `number` badge and `"spotlight": true` (everything else dimmed); a list of up to 8 marks draws them together,
+  numbered ① ② … . The drawing is `element_overlay.mark_svg()` — the same marks `element_overlay.py --format svg
+  --shape` writes from a DOM capture.
+- 📸 `--stills DIR` also writes the page as loaded and every 🔲 frame as a PNG (no caption, for a deck or a doc), named
+  `<--stills-prefix>01-top-1280x800-02-save<--stills-suffix>.png`: shot number and label, viewport, the still's number
+  in the shot and what is marked. The receipt lists each file with its sha256.
+  🧾 The stills are also sealed as a capture bundle, `evidence-<engine>.json` next to them, in the format
+  `btk.py check-capture-evidence` reads (`project` = the engine; `complete` only when every shot passed and `--sha` is a
+  full commit, and only after that validator accepted it):
+  `python -S tools/btk.py check-capture-evidence DIR --pattern 'evidence-*.json' --expect chromium --captures A.png,B.png --sha SHA`.
+- 🪶 Nano environments: without PySaiyanWeBoo's `web_ui` installed, `--stills` still records (stills and receipt, no
+  GIF), so a Playwright-only environment needs no git dependency. 🧭 `--executable auto` (default) launches
+  Playwright's own build, or — when that revision is not installed — the newest build of the same browser already on
+  disk (`PLAYWRIGHT_BROWSERS_PATH`, the per-OS caches), or an installed Chrome / Chromium / Edge for chromium; the
+  receipt's `executable` says which. `bundled` forbids the fallback; a path forces one browser. The finder is
+  `btk.find_browser()`, which `btk observe` / `act` use too.
 - 🔍 `zoom` eases onto an element (outlined) in `steps` frames over `ms` and holds — all drawn from one capture.
 - ⏺ `record` captures every `every` ms for `for` ms (delays are the measured ones), for animations and transitions.
 - 🎚️ Limits: `--colors` (≤ 255), `--max-bytes 800K` (fewer colours, then fewer ⏺ frames, until it fits; over

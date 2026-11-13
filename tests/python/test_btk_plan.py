@@ -105,3 +105,39 @@ def test_install_deps_is_not_a_browser_install():
     assert pip.INSTALL.search("npx playwright install-deps chromium firefox webkit") is None
     match = pip.INSTALL.search("npx playwright install --only-shell chromium")
     assert match is not None and match.group(1).split() == ["--only-shell", "chromium"]
+
+
+def test_find_browser_uses_a_build_already_on_disk(tmp_path):
+    def build(*parts):
+        path = tmp_path.joinpath(*parts)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("", encoding="utf-8")
+        return str(path)
+    expected = str(tmp_path / "chromium-1248" / "chrome-linux64" / "chrome")
+    assert pip.find_browser("chromium", expected, roots=[], system=())["source"] == "missing"
+    older = build("chromium-1200", "chrome-linux64", "chrome")
+    assert pip.find_browser("chromium", expected, roots=[], system=()) == {"source": "revision", "path": older, "revision": 1200}
+    shell = build("chromium_headless_shell-1243", "chrome-headless-shell-linux64", "chrome-headless-shell")
+    assert pip.find_browser("chromium", expected, roots=[], system=())["path"] == shell                # newest; headless runs the shell
+    assert pip.find_browser("chromium", expected, headless=False, roots=[], system=())["path"] == older
+    build("chromium_headless_shell-1248", "chrome-headless-shell-linux64", "chrome-headless-shell")
+    assert pip.find_browser("chromium", expected, roots=[], system=())["source"] == "playwright"       # --only-shell installs count
+    assert pip.find_browser("chromium", older, roots=[], system=())["source"] == "playwright"
+    elsewhere = tmp_path / "cache"
+    other = build("cache", "firefox-1500", "firefox", "firefox")
+    assert pip.find_browser("firefox", str(tmp_path / "firefox-1510" / "firefox" / "firefox"), roots=[elsewhere], system=())["path"] == other
+    assert pip.find_browser("webkit", None, roots=[], system=(older,))["source"] == "missing"          # no system WebKit
+    assert pip.find_browser("chromium", None, roots=[], system=(older,)) == {"source": "system", "path": older}
+
+
+def test_find_browser_same_revision_in_other_cache_needs_explicit_path(tmp_path):
+    for engine, folder, executable in (
+        ("firefox", "firefox-1500", "firefox/firefox"),
+        ("chromium", "chromium_headless_shell-1500", "chrome-headless-shell-linux64/chrome-headless-shell"),
+    ):
+        expected = tmp_path / "configured" / f"{engine}-1500" / ("firefox/firefox" if engine == "firefox" else "chrome-linux64/chrome")
+        other = tmp_path / "other" / folder / executable
+        other.parent.mkdir(parents=True, exist_ok=True)
+        other.touch()
+        assert pip.find_browser(engine, str(expected), roots=[tmp_path / "other"], system=()) == {
+            "source": "revision", "path": str(other), "revision": 1500}

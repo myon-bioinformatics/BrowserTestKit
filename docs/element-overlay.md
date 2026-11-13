@@ -1,6 +1,6 @@
 # Element Annotation Overlay, Highlight CSS, and TAP Assertions
 
-`tools/element_overlay.py` (Python stdlib-only) and `tools/element_overlay.mjs` (Node ES module twin) provide target coordinate calculation, annotation overlay rendering, DOM highlight CSS generation, and Poku-style zero-dependency TAP element assertions.
+`tools/element_overlay.py` (Python stdlib-only; Node calls it through `vendor/py_launch.cjs`) provides target coordinate calculation, annotation overlay rendering, DOM highlight CSS generation, and Poku-style zero-dependency TAP element assertions.
 
 It absorbs key capabilities from:
 - **SeleniumBase & Midscene**: DOM element highlight CSS rules (`build_highlight_css`) for pre-screenshot visual indication.
@@ -33,25 +33,23 @@ python -m element_overlay --file elements.json --format tap
 python -c "import element_overlay; print(element_overlay.build_highlight_css(['#submit-btn', '.btn-primary']))"
 ```
 
-## Node ES Module Usage (`tools/element_overlay.mjs`)
+## From Node
 
-```js
-import { annotateElements, buildHighlightCss, renderSvgOverlay, assertElements } from './tools/element_overlay.mjs';
+There is one implementation, the Python file: Node runs it through the kit's launcher (the Node twin
+`element_overlay.mjs` was removed so the marks and boxes are drawn in one place).
 
-const annotation = annotateElements(elements, { viewport: { width: 1280, height: 720 } });
-const highlightCss = buildHighlightCss(['#btn-1', '#btn-2'], '#00ff00');
-const svg = renderSvgOverlay(elements, { width: 800, height: 600 });
-const tapResult = assertElements(elements, { min_count: 1, assert_role: 'button' });
+```sh
+node vendor/py_launch.cjs --env-var BTK_PYTHON --site tools/element_overlay.py --file elements.json --format svg --shape rect
 ```
 
 ## Evidence Schema (`btk-element-overlay/1`)
 
-Both twins accept finite numeric coordinates, excluding booleans. Elements with
+The overlay accepts finite numeric coordinates, excluding booleans. Elements with
 missing or invalid coordinates, non-positive dimensions, or overflowing bounds
 are skipped; invalid viewport dimensions are ignored. An explicitly supplied
 coordinate takes precedence over its alias even when invalid.
 
-Coordinates and centers use the same binary64 operations in both languages:
+Coordinates and centers use binary64 operations:
 `floor(value * 100 + 0.5) / 100`, with half ties toward positive infinity
 (`0.125` → `0.13`, `-0.125` → `-0.12`). Values with magnitude at least `2**52`
 are already integral and bypass scaling. This is a binary floating-point rule,
@@ -102,4 +100,6 @@ Output data adheres to schema `btk-element-overlay/1`:
   truncating geometry to six significant digits. Negative zero renders as `0`.
 - Text metadata (`name`, `label`, `text`, `innerText`, `role`, `selector`, `id`)
   is expected to contain strings. Empty names/selectors fall back to the next
-  name field or element ID in both twins.
+  name field or element ID.
+- `--format svg --shape rect|ellipse|triangle|arrow` (with `--label-field`, `--spotlight`) draws the 🔲 marks
+  `tools/evidence_gif.py` puts on screenshots instead of boxes and dots: both go through `mark_svg()`.

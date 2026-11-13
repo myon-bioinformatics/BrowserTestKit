@@ -53,12 +53,12 @@ uv run --group pages python tools/platform_probe.py render /tmp/rec --out test-r
 uv run --group pages --group browser python tools/evidence_gif.py docs/evidence/browser.gif --serve . --plan docs/evidence/browser.json
 ```
 
-`tools/evidence_gif.py` is the shared recorder the other repositories use for their README GIFs: page × viewport × steps (⏺ `record` bursts, 🔍 `zoom` from one capture, 🔲 `frame` marks in a colour and shape), captioned in Meiryo, in Chromium, Firefox or WebKit. Only screenshots cross the socket (identical ones skipped, ⏺ `clip` sends just the element); PySaiyanWeBoo's `gif.js` does palette, delta frames and LZW in the browser — no Pillow — under `--colors` / `--max-bytes` / `--max-frames`. Network refused and listed (`external`), pinned CDN assets answered locally with `--map PREFIX=DIR`. See [docs/screenshot-evidence.md](docs/screenshot-evidence.md#readme-gif-evidence-toolsevidence_gifpy).
+`tools/evidence_gif.py` is the shared recorder the other repositories use for their README GIFs: page × viewport × steps (⏺ `record` bursts, 🔍 `zoom` from one capture, 🔲 `frame` marks in a colour and shape, with callouts, numbers and a spotlight; 📸 `--stills` PNGs for slides), captioned in Meiryo, in Chromium, Firefox or WebKit. Only screenshots cross the socket (identical ones skipped, ⏺ `clip` sends just the element); PySaiyanWeBoo's `gif.js` does palette, delta frames and LZW in the browser — no Pillow — under `--colors` / `--max-bytes` / `--max-frames`. Network refused and listed (`external`), pinned CDN assets answered locally with `--map PREFIX=DIR`. See [docs/screenshot-evidence.md](docs/screenshot-evidence.md#readme-gif-evidence-toolsevidence_gifpy).
 
 ## Python support
 
 - Stdlib-only modules and the base package: **Python 3.11+**, with no runtime dependencies.
-  Run a source script with `python -S tools/check_png.py --help`, or install the
+  Run a source script with `python -S tools/btk.py check-png --help`, or install the
   base package with `uv venv && uv pip install .` (an active virtual environment is required) and use `python -m btk --help`. Every tool lives
   under `tools/` (the former `scripts/` copies were merged into it); installed modules keep their names.
 - Image diff (`tools/image_diff.py` / `python -m image_diff`): **Python 3.11+**, using the vendored stdlib-only `pillow_min.py` backend. See [image comparison](docs/image-diff.md).
@@ -213,7 +213,7 @@ uv run --group pages python tools/platform_probe.py render platform-results --ou
 - Adopted third-party JS (`js-adopt`, see the parent's `js_adopt.py`) is checked here too: the fixture loads every file in `js.lock.json` with its SRI, and an environment passes only if DOMPurify sanitizes, seedrandom returns the same first value as every other engine, and a tag with a deliberately wrong `integrity` is refused. `collect` serves the fixture over a local HTTP server because SRI with `crossorigin` does not apply to `file://` pages.
 - Only `collect` needs Playwright. Exit codes: 0 OK; 1 an environment failed; 2 input error.
 
-### Element annotation overlay, DOM highlight CSS, and TAP assertions (`tools/element_overlay.py` / `tools/element_overlay.mjs`)
+### Element annotation overlay, DOM highlight CSS, and TAP assertions (`tools/element_overlay.py`)
 
 Target coordinate calculation, SVG annotation overlays, DOM element highlight CSS, and Poku-style TAP element assertions: [element overlay](docs/element-overlay.md) (`tools/element_overlay.py` / `tools/element_overlay.mjs`). Absorbs patterns from SeleniumBase, Callstack agent-device, Midscene, Poku, and PuppetSharp.
 
