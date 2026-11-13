@@ -5,11 +5,11 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-LEGACY = ('app_comparison app_digest btk_events check_capture_evidence '
-          'check_evidence check_png evidence_board html_builder image_diff jsonl_digest '
-          'mirror_check page_inspect page_text platform_adapter platform_probe probe_capture_rejections '
-          'pw_install_plan pytest_btk_events '
-          'terminal_browser write_capture_evidence').split()
+# check_png, check_evidence, check_capture_evidence, write_capture_evidence and probe_capture_rejections are btk.py
+# commands now (check-png, check-evidence, ...): their files were removed on purpose, so they are not listed here.
+LEGACY = ('app_comparison app_digest btk_events evidence_board html_builder image_diff jsonl_digest '
+          'mirror_check page_inspect page_text platform_adapter platform_probe '
+          'pw_install_plan pytest_btk_events terminal_browser').split()
 
 
 def test_legacy_modules_remain_distributed():

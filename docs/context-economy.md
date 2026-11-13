@@ -4,7 +4,7 @@ An agent session re-reads its whole conversation on every turn, and every tool r
 
 ## 1. Digest, don't dump
 - Write the complete data to a file and keep only its path in the conversation.
-- Report counts and the exceptions instead of the whole list: `check_evidence.py` prints one `ok` line per project and names only what is missing (#12).
+- Report counts and the exceptions instead of the whole list: `btk.py check-evidence` prints one `ok` line per project and names only what is missing (#12).
 
 ## 2. Bounded by default, visibly truncated
 - Every tool gets a cap (`--max-lines`, `--max-files`, `--max-chars`, `--limit`), and truncation is announced (`[... truncated: showing 120 of 431 lines]`), never silent (`UNBOUNDED_TOOL_OUTPUT`).

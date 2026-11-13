@@ -216,10 +216,10 @@ def test_stills_are_written_and_a_nano_run_needs_no_web_ui(tmp_path, monkeypatch
     bundle = json.loads((stills / "evidence-chromium.json").read_text(encoding="utf-8"))
     assert bundle["stage"] == "complete" and bundle["project"] == "chromium" and [c["file"] for c in bundle["captures"]] == files
     assert bundle["captures"][0]["width"] == 392 and bundle["captures"][0]["height"] == 320
-    checker = eg._sibling("check_capture_evidence")                                    # the kit's own validator accepts the stills
-    assert checker.main([str(stills), "--pattern", "evidence-*.json", "--expect", "chromium", "--captures", ",".join(files), "--sha", sha]) == 0
+    check = ["check-capture-evidence", str(stills), "--pattern", "evidence-*.json", "--expect", "chromium", "--captures", ",".join(files), "--sha", sha]
+    assert eg._sibling("btk").main(check) == 0                                         # the kit's own validator accepts the stills
     (stills / files[1]).write_bytes((stills / files[0]).read_bytes())                   # a swapped picture is caught
-    assert checker.main([str(stills), "--pattern", "evidence-*.json", "--expect", "chromium", "--captures", ",".join(files), "--sha", sha]) == 1
+    assert eg._sibling("btk").main(check) == 1
 
 
 def _plan(tmp_path, shots):

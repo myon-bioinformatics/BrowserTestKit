@@ -6,13 +6,15 @@ Commands:
   plan      recommend the lightest ``playwright install`` for each workflow job of a checkout
   observe, act, locate, count, describe, compare, operations
             loopback page inspection (see ``btk.py observe --help``)
+  check-png, check-evidence, check-capture-evidence, write-capture-evidence, probe-capture-rejections
+            📸 screenshot PNGs and their receipts (were tools/check_png.py and friends)
 
 Stdlib only. Run as ``python -S tools/btk.py <command> ...``. This one file is the unit to copy when the
 kit is vendored: nothing else in tools/ is needed for these commands.
 """
 from __future__ import annotations
 
-import argparse, base64, binascii, contextlib, contextvars, hashlib, io, json, math, os, platform, re, sys, shutil, tarfile, time, urllib.parse, urllib.request
+import argparse, base64, binascii, contextlib, contextvars, hashlib, io, json, math, os, platform, re, shutil, struct, sys, tarfile, tempfile, time, urllib.parse, urllib.request
 from pathlib import Path
 
 # ---- fetch -----------------------------------------------------------------------------
@@ -3884,12 +3886,371 @@ def page_main(argv: list[str] | None = None) -> int:
     return emit(payload, text, code, args)
 
 
+# ---- 📸 evidence: screenshot PNGs and their receipts -------------------------------------------------------------
+# check-png, check-evidence (one PNG per project), check-capture-evidence / write-capture-evidence (multi-capture receipts)
+# and probe-capture-rejections. These were tools/check_png.py, check_evidence.py, check_capture_evidence.py,
+# write_capture_evidence.py and probe_capture_rejections.py; the commands keep their arguments and exit codes.
+
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+
+
+def png_dimensions(data: bytes) -> tuple[int, int]:
+    """(width, height) from the PNG signature and IHDR; the file must end with IEND. No pixel decoding."""
+    if len(data) < 33 or data[:8] != PNG_SIGNATURE:
+        raise ValueError("not a valid PNG header")
+    length = struct.unpack(">I", data[8:12])[0]
+    if length != 13 or data[12:16] != b"IHDR":
+        raise ValueError("not a valid PNG IHDR")
+    width, height = struct.unpack(">II", data[16:24])
+    if b"IEND" not in data[-16:]:
+        raise ValueError("PNG has no terminal IEND")
+    return width, height
+
+
+def check_png_cli(argv=None) -> int:
+    argv = sys.argv[1:] if argv is None else list(argv)
+    if len(argv) < 1:
+        print("usage: btk.py check-png FILE [...]", file=sys.stderr)
+        return 2
+    if argv[0] in {"-h", "--help"}:
+        print("usage: btk.py check-png FILE [...]\nValidate PNG signature, IHDR, and IEND; print dimensions.")
+        return 0
+    for raw in argv:
+        path = Path(raw)
+        data = path.read_bytes()
+        width, height = png_dimensions(data)
+        if width < 1 or height < 1:
+            raise ValueError(f"{path}: invalid dimensions")
+        print(f"{path}: png {width}x{height} {len(data)} bytes")
+    return 0
+
+
+def check_evidence(directory: Path, pattern: str, expected: list[str]) -> tuple[list[str], list[str], list[str]]:
+    """Validate screenshot evidence by project identity, not by file count.
+    
+    Each successful test attempt writes a metadata JSON file next to its PNG::
+    
+        {"runtime": "node", "project": "mobile-webkit", "stage": "complete", "artifact": "evidence.png"}
+    
+    ``artifact`` is a file name relative to the metadata file. This reads
+    every metadata file under DIR that matches ``--pattern`` and fails unless each
+    ``--expect`` project (exact name) has at least one ``complete`` record whose
+    artifact is a valid PNG. Every ``complete`` record found is validated,
+    including retry attempts (``SUCCESS_COUNT_VS_RETRY_ARTIFACTS``). A missing
+    project is named even when the evidence of other projects exists. When the
+    metadata records ``width``/``height``, they must match the PNG header.
+    
+    Stdlib only; runs under ``python -S``.
+    
+    Exit codes: 0 = every expected project has valid evidence; 1 = missing or
+    invalid evidence; 2 = usage error.
+
+    Returns ``(ok, notes, problems)`` lines; the evidence is valid when ``problems`` is empty."""
+    ok: list[str] = []
+    notes: list[str] = []
+    problems: list[str] = []
+    counts: dict[str, int] = {}
+    if not directory.is_dir():
+        problems.append(f"{directory}: no such directory")
+    for meta in sorted(directory.glob(pattern)) if directory.is_dir() else []:
+        if not meta.is_file():
+            continue
+        try:
+            data = json.loads(meta.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            problems.append(f"{meta}: unreadable metadata: {exc}")
+            continue
+        project = data.get("project") if isinstance(data, dict) else None
+        if not isinstance(project, str) or not project:
+            problems.append(f'{meta}: metadata has no "project"')
+            continue
+        if data.get("stage") != "complete":
+            notes.append(f"{meta}: {project} attempt ended at stage {data.get('stage')!r}; not counted")
+            continue
+        artifact = data.get("artifact")
+        if not isinstance(artifact, str) or not artifact:
+            problems.append(f'{meta}: complete record for {project} has no "artifact"')
+            continue
+        png = meta.parent / artifact
+        try:
+            width, height = png_dimensions(png.read_bytes())
+        except (OSError, ValueError) as exc:
+            problems.append(f"{meta}: artifact {png} for {project}: {exc}")
+            continue
+        if width < 1 or height < 1:
+            problems.append(f"{png}: invalid dimensions {width}x{height}")
+            continue
+        recorded = (data.get("width"), data.get("height"))
+        if recorded != (None, None) and recorded != (width, height):
+            problems.append(f"{png}: metadata says {recorded[0]}x{recorded[1]}, PNG header says {width}x{height}")
+            continue
+        counts[project] = counts.get(project, 0) + 1
+        ok.append(f"ok {project}: {png} png {width}x{height}")
+    missing = [project for project in expected if project not in counts]
+    if missing:
+        problems.append(f"missing complete evidence for project(s): {', '.join(missing)}")
+    unexpected = sorted(set(counts) - set(expected))
+    if unexpected:
+        notes.append(f"evidence for project(s) not in --expect: {', '.join(unexpected)}")
+    return ok, notes, problems
+
+
+def check_evidence_cli(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="btk.py check-evidence", description="Validate screenshot evidence by exact project identity.")
+    parser.add_argument("directory", type=Path, help="directory that holds the evidence")
+    parser.add_argument("--pattern", default="**/evidence.json", help="metadata glob under DIR (default: %(default)s)")
+    parser.add_argument("--expect", required=True, help="comma-separated project names that must have evidence")
+    args = parser.parse_args(argv)
+    expected = [name.strip() for name in args.expect.split(",") if name.strip()]
+    if not expected:
+        parser.error("--expect needs at least one project name")
+    ok, notes, problems = check_evidence(args.directory, args.pattern, expected)
+    for line in ok:
+        print(line)
+    for line in notes:
+        print(f"note: {line}", file=sys.stderr)
+    for line in problems:
+        print(f"error: {line}", file=sys.stderr)
+    return 1 if problems else 0
+
+
+def capture_names(raw: str) -> list[str]:
+    names = raw.split(",")
+    if any(not name or name != name.strip() for name in names) or len(set(names)) != len(names):
+        raise argparse.ArgumentTypeError("use distinct, nonempty comma-separated names")
+    return names
+
+
+def full_sha(raw: str) -> str:
+    if not re.fullmatch(r"[0-9a-f]{40}", raw):
+        raise argparse.ArgumentTypeError("expected a full lowercase Git SHA")
+    return raw
+
+
+def check_capture_evidence(directory: Path, pattern: str, expected: list[str], captures: list[str],
+          sha: str, canonical=None, run_id=None, run_attempt=None) -> tuple[bool, list[str], list[str]]:
+    """Multi-capture receipts (``captures[]`` with file, bytes, sha256[, width, height]): require a whole capture set per
+    project; validate every matching receipt/retry. Returns ``(ok, notes, problems)``."""
+    problems = []
+    notes = []
+    covered = set()
+    if not expected or not captures or len(set(expected)) != len(expected) or len(set(captures)) != len(captures):
+        return False, notes, ["expected projects and captures must be nonempty and distinct"]
+    metadata = {}
+    if canonical is not None:
+        try:
+            metadata = {"sha": canonical["head"]["sha"],
+                        "committed_at": canonical["head"]["timestamp"],
+                        "generated_at": canonical["generated_at"]}
+            if metadata["sha"] != sha or any(not isinstance(v, str) or not v for v in metadata.values()):
+                raise ValueError("canonical SHA/timestamps missing or inconsistent with expected SHA")
+        except (KeyError, TypeError, ValueError) as exc:
+            return False, notes, [f"invalid canonical metadata: {exc}"]
+    if run_id is None or run_attempt is None:
+        notes.append("run identity not fully checked; use a clean output directory for this attempt")
+    try:
+        receipts = sorted(directory.glob(pattern))
+    except (ValueError, NotImplementedError) as exc:
+        return False, notes, [f"invalid receipt pattern: {exc}"]
+    root = directory.resolve()
+    for path in receipts:
+        try:
+            path.resolve().relative_to(root)
+            receipt = json.loads(path.read_text(encoding="utf-8"))
+            if not isinstance(receipt, dict):
+                raise ValueError("receipt must be an object")
+            project = receipt.get("project")
+            if not isinstance(project, str) or not project:
+                raise ValueError("missing project")
+            if receipt.get("stage", "complete") != "complete":
+                notes.append(f"{path}: incomplete receipt ignored")
+                continue
+            if receipt.get("sha") != sha:
+                raise ValueError("SHA does not match expected checkout")
+            for key, value in metadata.items():
+                if receipt.get(key) != value:
+                    raise ValueError(f"{key} does not match canonical metadata")
+            for key, value in (("run_id", run_id), ("run_attempt", run_attempt)):
+                if value is not None and receipt.get(key) != value:
+                    raise ValueError(f"{key} does not match expected identity")
+            records = receipt.get("captures")
+            if not isinstance(records, list) or not records:
+                raise ValueError("captures must be a nonempty list")
+            seen = set()
+            for record in records:
+                if not isinstance(record, dict):
+                    raise ValueError("capture must be an object")
+                filename = record.get("file")
+                if not isinstance(filename, str) or not filename or filename in seen:
+                    raise ValueError("capture file must be nonempty and unique")
+                seen.add(filename)
+                relative = Path(filename)
+                if relative.is_absolute() or ".." in relative.parts:
+                    raise ValueError("capture path must stay inside the receipt directory")
+                image = (path.parent / relative).resolve()
+                image.relative_to(path.parent.resolve())
+                image.relative_to(root)
+                data = image.read_bytes()
+                width, height = png_dimensions(data)
+                if width < 1 or height < 1:
+                    raise ValueError(f"{filename}: invalid PNG dimensions")
+                if type(record.get("bytes")) is not int or record["bytes"] != len(data):
+                    raise ValueError(f"{filename}: byte count mismatch")
+                if record.get("sha256") != hashlib.sha256(data).hexdigest():
+                    raise ValueError(f"{filename}: SHA-256 mismatch")
+                for key, value in (("width", width), ("height", height)):
+                    if key in record and (type(record[key]) is not int or record[key] != value):
+                        raise ValueError(f"{filename}: {key} mismatch")
+            missing = set(captures) - seen
+            if missing:
+                raise ValueError("missing captures: " + ", ".join(sorted(missing)))
+            covered.add(project)
+        except (OSError, UnicodeError, ValueError, TypeError) as exc:
+            problems.append(f"{path}: {exc}")
+    for project in expected:
+        if project not in covered:
+            problems.append(f"missing complete capture set for project: {project}")
+    extra = covered - set(expected)
+    if extra:
+        notes.append("additional validated projects: " + ", ".join(sorted(extra)))
+    return not problems, notes, problems
+
+
+def check_capture_evidence_cli(argv=None) -> int:
+    parser = argparse.ArgumentParser(prog="btk.py check-capture-evidence", description="Validate multi-capture receipts and provenance.")
+    parser.add_argument("directory", type=Path)
+    parser.add_argument("--pattern", default="**/evidence.json")
+    parser.add_argument("--expect", required=True, type=capture_names, help="required projects")
+    parser.add_argument("--captures", required=True, type=capture_names, help="required capture file names")
+    parser.add_argument("--sha", required=True, type=full_sha, help="tested checkout SHA")
+    parser.add_argument("--canonical", type=Path, help="JSON with head.sha, head.timestamp, generated_at")
+    parser.add_argument("--run-id", help="exact receipt run_id string")
+    parser.add_argument("--run-attempt", help="exact receipt run_attempt string")
+    args = parser.parse_args(argv)
+    try:
+        canonical = json.loads(args.canonical.read_text(encoding="utf-8")) if args.canonical else None
+        if args.canonical and not isinstance(canonical, dict):
+            raise ValueError("canonical metadata must be an object")
+    except (OSError, UnicodeError, ValueError) as exc:
+        print(f"invalid canonical metadata: {exc}", file=sys.stderr)
+        return 1
+    ok, notes, problems = check_capture_evidence(args.directory, args.pattern, args.expect, args.captures,
+                                args.sha, canonical, args.run_id, args.run_attempt)
+    for note in notes[:20]:
+        print("note: " + note)
+    for problem in problems[:20]:
+        print("error: " + problem, file=sys.stderr)
+    if len(notes) > 20 or len(problems) > 20:
+        print(f"{len(notes)} notes, {len(problems)} errors; output limited to 20 each")
+    print("capture evidence: " + ("PASS" if ok else "FAIL"))
+    return 0 if ok else 1
+
+
+def write_capture_evidence_cli(argv=None) -> int:
+    """Seal a current-run capture bundle; failed/skipped bundles cannot cover success.
+    
+    Call only after the owning application's capture/assertion step. Clear old output
+    before capture; this tool cannot tell whether an unchanged PNG was freshly taken."""
+    parser = argparse.ArgumentParser(prog="btk.py write-capture-evidence", description="Seal a current-run capture bundle; failed/skipped bundles cannot cover success.")
+    parser.add_argument("directory", type=Path)
+    parser.add_argument("--receipt", default="evidence.json")
+    parser.add_argument("--project", required=True)
+    parser.add_argument("--captures", required=True, type=capture_names)
+    parser.add_argument("--sha", required=True, type=full_sha)
+    parser.add_argument("--run-id", required=True)
+    parser.add_argument("--run-attempt", required=True)
+    parser.add_argument("--stage", choices=("complete", "failed", "skipped"), required=True)
+    parser.add_argument("--canonical", type=Path)
+    args = parser.parse_args(argv)
+    if Path(args.receipt).name != args.receipt or not args.run_id or not args.run_attempt or not args.project:
+        parser.error("receipt must be a filename; project and run identity must be nonempty")
+    args.directory.mkdir(parents=True, exist_ok=True)
+    receipt = {"stage": args.stage, "project": args.project, "sha": args.sha,
+               "run_id": args.run_id, "run_attempt": args.run_attempt, "captures": []}
+    target = args.directory / args.receipt
+    # Remove any previous complete receipt before reading this attempt's inputs.
+    target.unlink(missing_ok=True)
+    canonical = None
+    try:
+        if args.canonical:
+            canonical = json.loads(args.canonical.read_text(encoding="utf-8"))
+            receipt.update(committed_at=canonical["head"]["timestamp"], generated_at=canonical["generated_at"])
+        for filename in args.captures:
+            relative = Path(filename)
+            if relative.is_absolute() or ".." in relative.parts:
+                raise ValueError("capture must stay inside the receipt directory")
+            image = (args.directory / relative).resolve()
+            image.relative_to(args.directory.resolve())
+            if args.stage != "complete" and not image.is_file():
+                continue
+            data = image.read_bytes()
+            width, height = png_dimensions(data)
+            receipt["captures"].append({"file": filename, "bytes": len(data),
+                "sha256": hashlib.sha256(data).hexdigest(), "width": width, "height": height})
+        target.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+        if args.stage == "complete":
+            ok, _, errors = check_capture_evidence(args.directory, args.receipt, [args.project], args.captures,
+                args.sha, canonical, args.run_id, args.run_attempt)
+            if not ok:
+                raise ValueError("; ".join(errors))
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        receipt.update(stage="failed", error=str(exc))
+        target.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+        print(str(exc), file=sys.stderr)
+        return 1
+    print(f"capture receipt: {args.stage} ({args.project})")
+    return 0
+
+
+def probe_capture_rejections_cli(argv=None) -> int:
+    """Check a real capture bundle, then require four mutated copies to be rejected."""
+    parser = argparse.ArgumentParser(prog="btk.py probe-capture-rejections", description="Check a real capture bundle, then require four mutated copies to be rejected.")
+    parser.add_argument("directory", type=Path)
+    parser.add_argument("--pattern", default="**/evidence.json")
+    parser.add_argument("--expect", required=True, type=capture_names)
+    parser.add_argument("--captures", required=True, type=capture_names)
+    parser.add_argument("--sha", required=True, type=full_sha)
+    parser.add_argument("--run-id", required=True)
+    parser.add_argument("--run-attempt", required=True)
+    args = parser.parse_args(argv)
+    def check(root):
+        return check_capture_evidence(root, args.pattern, args.expect, args.captures,
+                               args.sha, run_id=args.run_id, run_attempt=args.run_attempt)
+    ok, _, errors = check(args.directory)
+    if not ok:
+        raise SystemExit("baseline failed: " + "; ".join(errors))
+    for mutation in ("missing-image", "wrong-hash", "stale-run", "failed-receipt"):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "bundle"
+            shutil.copytree(args.directory, root)
+            paths = list(root.glob(args.pattern))
+            for path in paths:
+                receipt = json.loads(path.read_text(encoding="utf-8"))
+                if receipt.get("stage") != "complete":
+                    continue
+                if mutation == "missing-image":
+                    (path.parent / receipt["captures"][0]["file"]).unlink(missing_ok=True)
+                elif mutation == "wrong-hash":
+                    receipt["captures"][0]["sha256"] = "0" * 64
+                elif mutation == "stale-run":
+                    receipt["run_id"] = args.run_id + "-old"
+                else:
+                    receipt["stage"] = "failed"
+                path.write_text(json.dumps(receipt), encoding="utf-8")
+            if check(root)[0]:
+                raise SystemExit("mutation unexpectedly accepted: " + mutation)
+            print("correctly rejected: " + mutation)
+    return 0
+
+
 # ---- command line ----------------------------------------------------------------------
 
 FETCH_COMMANDS = ("fetch",)
 PLAN_COMMANDS = ("plan",)
 PAGE_COMMANDS = ("observe", "act", "pages", "scenario", "locate", "count", "describe", "compare", "operations")
-COMMANDS = FETCH_COMMANDS + PLAN_COMMANDS + PAGE_COMMANDS
+EVIDENCE_COMMANDS = {"check-png": check_png_cli, "check-evidence": check_evidence_cli, "check-capture-evidence": check_capture_evidence_cli,
+                     "write-capture-evidence": write_capture_evidence_cli, "probe-capture-rejections": probe_capture_rejections_cli}
+COMMANDS = FETCH_COMMANDS + PLAN_COMMANDS + PAGE_COMMANDS + tuple(EVIDENCE_COMMANDS)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -3903,6 +4264,8 @@ def main(argv: list[str] | None = None) -> int:
         return plan_cli(argv[1:])
     if argv[0] in PAGE_COMMANDS:
         return page_main(argv)
+    if argv[0] in EVIDENCE_COMMANDS:
+        return EVIDENCE_COMMANDS[argv[0]](argv[1:])
     sys.stderr.write(f"btk.py: unknown command {argv[0]!r}; expected one of {COMMANDS}\n")
     return 2
 

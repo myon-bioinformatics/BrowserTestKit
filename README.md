@@ -58,7 +58,7 @@ uv run --group pages --group browser python tools/evidence_gif.py docs/evidence/
 ## Python support
 
 - Stdlib-only modules and the base package: **Python 3.11+**, with no runtime dependencies.
-  Run a source script with `python -S tools/check_png.py --help`, or install the
+  Run a source script with `python -S tools/btk.py check-png --help`, or install the
   base package with `uv venv && uv pip install .` (an active virtual environment is required) and use `python -m btk --help`. Every tool lives
   under `tools/` (the former `scripts/` copies were merged into it); installed modules keep their names.
 - Image diff (`tools/image_diff.py` / `python -m image_diff`): **Python 3.11+**, using the vendored stdlib-only `pillow_min.py` backend. See [image comparison](docs/image-diff.md).
@@ -213,7 +213,7 @@ uv run --group pages python tools/platform_probe.py render platform-results --ou
 - Adopted third-party JS (`js-adopt`, see the parent's `js_adopt.py`) is checked here too: the fixture loads every file in `js.lock.json` with its SRI, and an environment passes only if DOMPurify sanitizes, seedrandom returns the same first value as every other engine, and a tag with a deliberately wrong `integrity` is refused. `collect` serves the fixture over a local HTTP server because SRI with `crossorigin` does not apply to `file://` pages.
 - Only `collect` needs Playwright. Exit codes: 0 OK; 1 an environment failed; 2 input error.
 
-### Element annotation overlay, DOM highlight CSS, and TAP assertions (`tools/element_overlay.py` / `tools/element_overlay.mjs`)
+### Element annotation overlay, DOM highlight CSS, and TAP assertions (`tools/element_overlay.py`)
 
 Target coordinate calculation, SVG annotation overlays, DOM element highlight CSS, and Poku-style TAP element assertions: [element overlay](docs/element-overlay.md) (`tools/element_overlay.py` / `tools/element_overlay.mjs`). Absorbs patterns from SeleniumBase, Callstack agent-device, Midscene, Poku, and PuppetSharp.
 

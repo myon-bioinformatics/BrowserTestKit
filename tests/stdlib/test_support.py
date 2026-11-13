@@ -15,7 +15,7 @@ class StdlibSupport(unittest.TestCase):
                 importlib.import_module(source.stem)
 
     def test_png_validation_without_image_dependency(self):
-        from check_png import dimensions
+        from btk import png_dimensions as dimensions
         png = base64.b64decode(
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII="
         )
@@ -32,7 +32,7 @@ class StdlibSupport(unittest.TestCase):
         self.assertEqual(h("ul", h("li", "item")), "<ul><li>item</li></ul>")
 
     def test_representative_cli_help(self):
-        for name in ("check_png", "page_text", "image_diff"):
+        for name in ("btk", "page_text", "image_diff"):
             with self.subTest(module=name):
                 result = subprocess.run(
                     [sys.executable, "-S", str(ROOT / "tools" / (name + ".py")), "--help"],

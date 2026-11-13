@@ -8,10 +8,10 @@ RESULTS = ROOT / "test-results" / "python"
 BROWSERS = ("chromium", "firefox", "webkit")
 PROFILES = (("desktop", None), ("mobile", "iPhone 13"))
 
-_spec = importlib.util.spec_from_file_location("check_png", ROOT / "tools" / "check_png.py")
-_check_png = importlib.util.module_from_spec(_spec)
+_spec = importlib.util.spec_from_file_location("btk", ROOT / "tools" / "btk.py")
+_btk = importlib.util.module_from_spec(_spec)
 assert _spec.loader
-_spec.loader.exec_module(_check_png)
+_spec.loader.exec_module(_btk)
 
 def build_context_args(pw, browser_name: str, device_name: str | None) -> dict:
     if not device_name:
@@ -72,8 +72,8 @@ def test_shared_fixture(browser_name: str, profile: str, device_name: str | None
             stage = "screenshot"
             page.screenshot(path=png, full_page=True)
             stage = "artifact"
-            width, height = _check_png.dimensions(png.read_bytes())
-            # "artifact" is relative to the metadata file, as in the Node lane; see tools/check_evidence.py.
+            width, height = _btk.png_dimensions(png.read_bytes())
+            # "artifact" is relative to the metadata file, as in the Node lane; see btk.py check-evidence.
             meta.write_text(json.dumps({"runtime":"python","project":f"{browser_name}-{profile}","browser":browser_name,"profile":profile,"emulation":"partial" if browser_name=="firefox" and profile=="mobile" else "full","stage":"complete","artifact":png.name,"width":width,"height":height})+"\n", encoding="utf-8")
         except Exception as exc:
             failed = True

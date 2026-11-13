@@ -134,7 +134,7 @@ Extracted from intermediate work that did not reach a shared place:
 | --- | --- | --- |
 | flutter_navigation_basic `e2e/tests/shared_header.spec.ts` (two copies) and PR #182 `home_discovery_journeys.spec.ts` | measured `press`, fractional centre | `press` (integer centre, viewport ratio, hit record) |
 | flutter_navigation_basic `e2e/utils/helpers.ts` `tapSemantics` | `element.evaluate(n => n.click())` | `SYNTHETIC_DOM_CLICK` |
-| flutter_navigation_basic PR #182 `route-audit.json` | hand-written receipt after the full journey | existing `write_capture_evidence.py` / `check_capture_evidence.py` |
+| flutter_navigation_basic PR #182 `route-audit.json` | hand-written receipt after the full journey | existing `btk.py write-capture-evidence` / `btk.py check-capture-evidence` |
 | myon-bioinformatics.github.io `tests/html-import.spec.js` | request/dialog/storage inertness, download → JSON, no horizontal scroll | `watch`, one-liners above |
 | PR #182 verification script | TypeScript transpile + vm stub to count tests; `replace` with `$` | `HANDROLLED_SPEC_CENSUS`, `REPLACEMENT_STRING_SPECIALS` |
 

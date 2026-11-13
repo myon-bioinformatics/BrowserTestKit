@@ -33,8 +33,8 @@ def test_browser_install_and_config_parity() -> None:
 
 def _evidence_expectations(workflow: str, directory: str) -> set[str]:
     # A directory can be checked by more than one lane; the expectations of all of them are collected.
-    matches = re.findall(rf"check_evidence\.py {re.escape(directory)} .*--expect ([\w,-]+)", workflow)
-    assert matches, f"no check_evidence.py step for {directory}"
+    matches = re.findall(rf"btk\.py check-evidence {re.escape(directory)} .*--expect ([\w,-]+)", workflow)
+    assert matches, f"no btk.py check-evidence step for {directory}"
     return set(",".join(matches).split(","))
 
 def test_evidence_expectations_match_the_test_matrices() -> None:
@@ -57,7 +57,7 @@ def test_evidence_expectations_match_the_test_matrices() -> None:
     jobs = yaml.safe_load(workflow)["jobs"]
     for name, wanted in lanes.items():
         steps = "\n".join(step.get("run", "") for step in jobs[name]["steps"])
-        assert set(re.findall(r"check_evidence\.py test-results/python .*--expect ([\w,-]+)", steps)[0].split(",")) == wanted, name
+        assert set(re.findall(r"btk\.py check-evidence test-results/python .*--expect ([\w,-]+)", steps)[0].split(",")) == wanted, name
 
 
 def test_browserless_lanes_do_not_install_engines_and_gate_browser_work():

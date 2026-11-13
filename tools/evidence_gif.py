@@ -409,11 +409,11 @@ def still_name(prefix: str, shot: int, label: str, viewport: tuple[int, int], nu
 
 
 def seal_stills(directory: Path, written: list[dict], engine: str, sha: str | None, *, ok: bool) -> dict:
-    """📸 The stills as a capture bundle ``check_capture_evidence.py`` reads: ``evidence-<engine>.json`` next to them, ``project`` = the
+    """📸 The stills as a capture bundle ``btk.py check-capture-evidence`` reads: ``evidence-<engine>.json`` next to them, ``project`` = the
     engine, ``stage`` complete only when every shot passed and ``sha`` (``--sha``) is a full commit; then checked here by that validator.
 
-    ``python -S tools/check_capture_evidence.py DIR --pattern 'evidence-*.json' --expect chromium --captures A.png,B.png --sha SHA``"""
-    validator = _sibling("check_capture_evidence")
+    ``python -S tools/btk.py check-capture-evidence DIR --pattern 'evidence-*.json' --expect chromium --captures A.png,B.png --sha SHA``"""
+    kit = _sibling("btk")
     name = f"evidence-{engine}.json"
     target = directory / name
     target.unlink(missing_ok=True)                                     # an old complete receipt must not cover this run
@@ -428,7 +428,7 @@ def seal_stills(directory: Path, written: list[dict], engine: str, sha: str | No
         receipt["error"] = "a shot failed: failed bundles cannot cover success"
     target.write_text(json.dumps(receipt, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     if receipt["stage"] == "complete":
-        passed, _, problems = validator.check(directory, name, [engine], [c["file"] for c in captures], sha)
+        passed, _, problems = kit.check_capture_evidence(directory, name, [engine], [c["file"] for c in captures], sha)
         if not passed:                                                 # never leave a complete receipt the validator rejects
             receipt.update(stage="failed", error="; ".join(problems))
             target.write_text(json.dumps(receipt, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -448,7 +448,7 @@ def record(out: Path, shots: list[dict], *, serve_dir: Path | None = None, width
     """Run every shot in ``browser_name``, write ``out`` (GIF) and ``out.with_suffix('.json')`` (receipt); returns the receipt.
 
     📸 ``stills``: also write the page as loaded and every 🔲 frame of each shot as a PNG there (see still_name), sealed as a
-    capture bundle (seal_stills) that check_capture_evidence.py validates.
+    capture bundle (seal_stills) that ``btk.py check-capture-evidence`` validates.
     🪶 Without PySaiyanWeBoo's web_ui (a nano environment) only the stills and the receipt are written, and ``stills`` is required.
     🧭 ``executable``: ``auto`` launches Playwright's build, or one already on disk when that revision is missing (btk.find_browser);
     ``bundled`` only Playwright's; a path that browser."""
@@ -504,7 +504,7 @@ def record(out: Path, shots: list[dict], *, serve_dir: Path | None = None, width
                     number = sum(1 for x in written if x["shot"] == shot)
                     name = still_name(stills_prefix, shot, label, size, number, what, stills_suffix)
                     (stills / name).write_bytes(png)
-                    width, height = _sibling("check_capture_evidence")._png.dimensions(png)
+                    width, height = _sibling("btk").png_dimensions(png)
                     written.append({"file": name, "shot": shot, "what": what, "bytes": len(png), "sha256": hashlib.sha256(png).hexdigest(),
                                     "width": width, "height": height})
                 try:

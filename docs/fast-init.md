@@ -57,7 +57,7 @@ Machine checks:
 - dimensions when relevant;
 - expected DOM/URL state independently of the screenshot.
 
-In this repository, each successful attempt writes a metadata JSON file (`runtime`, `project`, `stage`, and `artifact`, a file name relative to the metadata file) next to its PNG. `tools/check_evidence.py` then requires every expected project, by exact name, to have a `complete` record with a valid PNG, and it validates every record it finds, retries included. CI names the expected projects, and a parity test keeps that list equal to the Playwright config and the Python test matrix. A file count such as `-eq 6` is not evidence (`SUCCESS_COUNT_VS_RETRY_ARTIFACTS`). Project names follow each lane's own identity: Node uses the Playwright project name (`chromium`, `mobile-webkit`, ...), and Python uses `<browser>-<profile>` (`chromium-desktop`, `webkit-mobile`, ...).
+In this repository, each successful attempt writes a metadata JSON file (`runtime`, `project`, `stage`, and `artifact`, a file name relative to the metadata file) next to its PNG. `btk.py check-evidence` then requires every expected project, by exact name, to have a `complete` record with a valid PNG, and it validates every record it finds, retries included. CI names the expected projects, and a parity test keeps that list equal to the Playwright config and the Python test matrix. A file count such as `-eq 6` is not evidence (`SUCCESS_COUNT_VS_RETRY_ARTIFACTS`). Project names follow each lane's own identity: Node uses the Playwright project name (`chromium`, `mobile-webkit`, ...), and Python uses `<browser>-<profile>` (`chromium-desktop`, `webkit-mobile`, ...).
 
 Human checks:
 - upload screenshots to GitHub Actions artifacts;

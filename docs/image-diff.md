@@ -17,7 +17,7 @@ exit codes as well as the packaged backend and license bytes.
 
 Exit `0` = identical within tolerance, `1` = differs, `2` = input error or missing vendored backend.
 
-See also [screenshot-evidence.md](screenshot-evidence.md) for how this fits next to `check_png.py` and receipt validators.
+See also [screenshot-evidence.md](screenshot-evidence.md) for how this fits next to `btk.py check-png` and receipt validators.
 
 ## Regression tests
 
