@@ -128,3 +128,16 @@ def test_find_browser_uses_a_build_already_on_disk(tmp_path):
     assert pip.find_browser("firefox", str(tmp_path / "firefox-1510" / "firefox" / "firefox"), roots=[elsewhere], system=())["path"] == other
     assert pip.find_browser("webkit", None, roots=[], system=(older,))["source"] == "missing"          # no system WebKit
     assert pip.find_browser("chromium", None, roots=[], system=(older,)) == {"source": "system", "path": older}
+
+
+def test_find_browser_same_revision_in_other_cache_needs_explicit_path(tmp_path):
+    for engine, folder, executable in (
+        ("firefox", "firefox-1500", "firefox/firefox"),
+        ("chromium", "chromium_headless_shell-1500", "chrome-headless-shell-linux64/chrome-headless-shell"),
+    ):
+        expected = tmp_path / "configured" / f"{engine}-1500" / ("firefox/firefox" if engine == "firefox" else "chrome-linux64/chrome")
+        other = tmp_path / "other" / folder / executable
+        other.parent.mkdir(parents=True, exist_ok=True)
+        other.touch()
+        assert pip.find_browser(engine, str(expected), roots=[tmp_path / "other"], system=()) == {
+            "source": "revision", "path": str(other), "revision": 1500}

@@ -2075,7 +2075,11 @@ def find_browser(engine: str, expected: str | None, *, headless: bool = True, ro
                         if other.isdigit():
                             found += [(int(other), rank, str(path)) for path in paths(directory) if path.is_file()]
         break
-    if any(revision == wanted for revision, _, _ in found):
+    # Only the shell in Playwright's own cache is a valid implicit launch.
+    # The same revision in another cache still needs its explicit path.
+    native_shell = Path(*parts[:at]) / f"chromium_headless_shell-{wanted}" if wanted is not None else None
+    if engine == "chromium" and headless and any(
+            revision == wanted and Path(path).parent.parent == native_shell for revision, _, path in found):
         return {"source": "playwright", "path": None}
     if found:
         revision, _, path = max(found)
