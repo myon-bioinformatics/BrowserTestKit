@@ -66,7 +66,7 @@ uv run --group pages --group browser python tools/evidence_gif.py docs/evidence/
   environment/lockfile: Python 3.11+**. Use
   `uv run --locked --python 3.11 pytest tests/python -q -m "not browser"`. Add `--group browser` for browser
   integration dependencies; `--group pages` (included in `dev`) adds [PySaiyanWeBoo](https://github.com/myon-bioinformatics/PySaiyanWeBoo)'s
-  `web_ui`, pinned to a commit, which builds the platform-matrix and app-digest pages (`render` / `app_digest.py`;
+  `pysaiyanweboo`, pinned to a commit, which builds the platform-matrix and app-digest pages (`render` / `app_digest.py`;
   `collect` / `merge` / `summary` stay stdlib-only). The requirements-test files have the same floor.
 
 The Python support CI checks actual 3.11 stdlib execution and base wheel
@@ -204,7 +204,7 @@ Opens `fixtures/platform_probe.html` in one environment and records `btk-platfor
 python tools/platform_probe.py collect --browser webkit --profile iphone --out platform-results
 xvfb-run -a python tools/platform_probe.py collect --browser chromium --headed --out platform-results
 python -S tools/platform_probe.py summary platform-results            # one line each; exit 1 if any fail
-uv run --group pages python tools/platform_probe.py render platform-results --out matrix.html  # the page comes from PySaiyanWeBoo's web_ui
+uv run --group pages python tools/platform_probe.py render platform-results --out matrix.html  # the page comes from PySaiyanWeBoo's pysaiyanweboo
 ```
 
 - `matrix.html` is self-contained: tab rows for OS, browser (engine or channel), device and mode. Switching a tab highlights every value that changed from the previous selection; `*` marks values that differ anywhere in the dataset; a scaled diagram shows screen, available area, window, viewport and scrollbar.

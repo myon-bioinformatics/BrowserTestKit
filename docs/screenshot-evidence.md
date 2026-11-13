@@ -219,7 +219,7 @@ page ──📸 PNG──▶ Python ──(identical? ♻️ skip)──▶ enco
   `btk.py check-capture-evidence` reads (`project` = the engine; `complete` only when every shot passed and `--sha` is a
   full commit, and only after that validator accepted it):
   `python -S tools/btk.py check-capture-evidence DIR --pattern 'evidence-*.json' --expect chromium --captures A.png,B.png --sha SHA`.
-- 🪶 Nano environments: without PySaiyanWeBoo's `web_ui` installed, `--stills` still records (stills and receipt, no
+- 🪶 Nano environments: without PySaiyanWeBoo's `pysaiyanweboo` installed, `--stills` still records (stills and receipt, no
   GIF), so a Playwright-only environment needs no git dependency. 🧭 `--executable auto` (default) launches
   Playwright's own build, or — when that revision is not installed — the newest build of the same browser already on
   disk (`PLAYWRIGHT_BROWSERS_PATH`, the per-OS caches), or an installed Chrome / Chromium / Edge for chromium; the
@@ -237,7 +237,7 @@ page ──📸 PNG──▶ Python ──(identical? ♻️ skip)──▶ enco
 - ⛔ A page error, console error (with its URL) or HTTP ≥ 400 fails the shot; `"allow": ["text"]` keeps
   errors a fixture raises on purpose (a deliberately wrong SRI hash) under `allowed` instead. Exit 1 still
   writes the GIF so the failure can be seen.
-- 🏷️ Each shot records the page's `<meta name="generator">` as `generator` (PySaiyanWeBoo's `web_ui` writes
+- 🏷️ Each shot records the page's `<meta name="generator">` as `generator` (PySaiyanWeBoo writes
   `web_ui <commit>`), so the receipt says which generator drew what the GIF shows.
 - 🧾 The receipt (`btk-evidence-gif/2`) holds the GIF's sha256, frames, browser, tested commit, per-shot results,
   the encoder's report (colours, buckets, merged / synthesised frames, budget steps), `transfer` (screenshots,

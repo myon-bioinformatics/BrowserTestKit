@@ -100,7 +100,7 @@ jobs:
           pattern: platform-*
           path: platform-results
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-      - name: Merge and render the tabbed comparison (the page is built with PySaiyanWeBoo's web_ui)
+      - name: Merge and render the tabbed comparison (the page is built with PySaiyanWeBoo's pysaiyanweboo)
         run: |
           python -S tools/platform_probe.py merge platform-results --out platform-matrix/dataset.json
           uv run --locked --group pages python tools/platform_probe.py render platform-matrix/dataset.json --out platform-matrix/index.html

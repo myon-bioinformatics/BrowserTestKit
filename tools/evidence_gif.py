@@ -296,7 +296,7 @@ def console_error(msg, errors: list, external: list) -> None:
 
 
 def page_generator(page) -> str | None:
-    """``<meta name="generator">`` of the page just loaded (PySaiyanWeBoo's web_ui writes ``web_ui <commit>``), so the
+    """``<meta name="generator">`` of the page just loaded (PySaiyanWeBoo writes ``web_ui <commit>``), so the
     receipt says which generator drew what the GIF shows; None when the page has none."""
     with contextlib.suppress(Exception):
         content = page.evaluate("() => document.querySelector('meta[name=generator]')?.content ?? null")
