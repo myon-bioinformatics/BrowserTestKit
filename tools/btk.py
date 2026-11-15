@@ -2104,18 +2104,28 @@ const base = require(o.config);
 const cfg = base.default || base;
 const dir = path.dirname(o.config);
 const use = (u) => {
-  const next = { ...u, launchOptions: { ...((u && u.launchOptions) || {}), ...(o.browser ? { executablePath: o.browser } : {}) } };
-  if (o.browser) delete next.channel;  // a path replaces the channel build
+  const next = { ...u, launchOptions: { ...((u && u.launchOptions) || {}) } };
+  if (o.browser && (next.browserName || 'chromium') === 'chromium') {
+    next.launchOptions.executablePath = o.browser;
+    delete next.channel;  // a path replaces the Chromium channel build only
+  }
   return next;
 };
+const paths = (config) => Object.fromEntries(['testDir', 'outputDir', 'snapshotDir']
+  .filter(key => config[key] !== undefined).map(key => [key, path.resolve(dir, config[key])]));
 const cwd = (s) => ({ ...s, cwd: path.resolve(dir, s.cwd || '.') });
 module.exports = {
   ...cfg,
   ...(cfg.webServer ? { webServer: Array.isArray(cfg.webServer) ? cfg.webServer.map(cwd) : cwd(cfg.webServer) } : {}),
   testDir: path.resolve(dir, cfg.testDir || '.'),
   outputDir: path.resolve(dir, cfg.outputDir || 'test-results'),
-  use: use(cfg.use || {}),
-  projects: (cfg.projects || []).map((p) => ({ ...p, use: use(p.use || {}) })),
+  ...paths(cfg),
+  // Do not let a global Chromium executable leak into a Firefox/WebKit project.
+  use: cfg.projects ? (cfg.use || {}) : use(cfg.use || {}),
+  ...(cfg.projects ? { projects: cfg.projects.map((p) => ({ ...p, ...paths(p), use: use({
+    ...(cfg.use || {}), ...(p.use || {}),
+    launchOptions: { ...((cfg.use || {}).launchOptions || {}), ...((p.use || {}).launchOptions || {}) },
+  }) })) } : {}),
 };
 """
 

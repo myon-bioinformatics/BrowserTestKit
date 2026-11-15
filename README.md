@@ -348,7 +348,9 @@ fingerprints only. See [REA observation](docs/rea-observation.md).
 `btk.py pw-test` runs a repository's own Playwright Test (Node) and prints a short JSON receipt (`btk-pw-test/1`:
 exit code, the browser used, the result lines). When Playwright's own Chromium is not installed it uses one already on
 disk (another revision, then an installed Chrome / Chromium / Edge), so no `playwright install` is needed. The
-repository's config is used unchanged, through a bridge file written for the run.
+repository's config is loaded through a bridge file written for the run. Chromium receives the fallback executable;
+Firefox and WebKit retain their own settings and still need their browsers installed. Project test, output and snapshot
+paths remain relative to the original configuration directory.
 
 ```sh
 python tools/btk.py pw-test --root ../myon-bioinformatics.github.io tests/project-catalog.spec.js
