@@ -4,7 +4,6 @@ name: Platform matrix
 # (+ branded Chrome/Edge) x desktop/iPhone/Pixel x headless/headed, then build one
 # tabbed page to compare them (tools/platform_probe.py, issue #89).
 on:
-  workflow_dispatch:
   pull_request:
     paths:
       - fixtures/platform_probe.html

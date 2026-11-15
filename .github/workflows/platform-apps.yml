@@ -2,17 +2,9 @@ name: platform-apps (published network lane)
 
 # Explicitly independent from the reproducible local 42-environment matrix.
 # Failures here may be app regressions OR deployment/network failures.
-# Pull requests check adapter changes on Linux; a manual run or the weekly schedule
+# Pull requests check adapter changes on Linux; the weekly schedule
 # measures the same pages on Linux, macOS and Windows.
 on:
-  workflow_dispatch:
-    inputs:
-      width_step:
-        description: 'Width search grid in px: 8 aligns results; 1 finds exact breakpoint edges'
-        default: '8'
-      widths:
-        description: 'Extra click widths, space separated (e.g. "320 384" or device widths "390 412")'
-        default: '320 384'
   schedule:
     - cron: '17 3 * * 1'
   pull_request:
@@ -40,8 +32,8 @@ jobs:
       - id: os
         env:
           EVENT: ${{ github.event_name }}
-          WIDTH_STEP: ${{ inputs.width_step || '8' }}
-          WIDTHS: ${{ inputs.widths || '320 384' }}
+          WIDTH_STEP: '8'
+          WIDTHS: '320 384'
         run: |
           [[ "$WIDTH_STEP" =~ ^([1-9]|[1-5][0-9]|6[0-4])$ && "$WIDTHS" =~ ^[0-9]+( [0-9]+)*$ ]] || { echo "::error::invalid width_step or widths"; exit 2; }
           read -ra widths <<< "$WIDTHS"
