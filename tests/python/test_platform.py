@@ -111,9 +111,9 @@ def test_fixture_linux_system_setup_has_its_own_bounded_allowance():
     assert upload['with']['if-no-files-found'] == 'error'
 
 
-def test_published_lane_runs_three_os_on_dispatch_and_schedule_but_linux_on_pull_requests():
+def test_published_lane_runs_three_os_on_schedule_but_linux_on_pull_requests():
     apps = (ROOT / '.github/workflows/platform-apps.yml').read_text()
-    assert 'workflow_dispatch:' in apps and "cron: '17 3 * * 1'" in apps
+    assert 'workflow_dispatch:' not in apps and "cron: '17 3 * * 1'" in apps
     assert """echo 'os=["ubuntu-24.04"]'""" in apps
     assert """echo 'os=["ubuntu-24.04","macos-latest","windows-latest"]'""" in apps
     assert 'runs-on: ${{ matrix.os }}' in apps and 'shell: bash' in apps
@@ -243,9 +243,10 @@ def test_cli_accepts_device_and_edge_widths_and_rejects_below_250(tmp_path, monk
     assert not seen
 
 
-def test_manual_runs_can_switch_grid_and_widths_while_schedule_keeps_defaults():
+def test_schedule_and_pull_requests_keep_the_default_grid():
     apps = (ROOT / '.github/workflows/platform-apps.yml').read_text()
-    assert "WIDTH_STEP: ${{ inputs.width_step || '8' }}" in apps and "WIDTHS: ${{ inputs.widths || '320 384' }}" in apps
+    assert "inputs.width_step" not in apps and "workflow_dispatch:" not in apps
+    assert "WIDTH_STEP: '8'" in apps and "WIDTHS: '320 384'" in apps
     assert '--widths "${widths[@]}" --width-step "$WIDTH_STEP"' in apps and '^[0-9]+( [0-9]+)*$' in apps
 
 
@@ -279,7 +280,7 @@ def test_workflow_plan_validates_actual_inputs(tmp_path, step, widths, expected)
     script = workflow['jobs']['plan']['steps'][0]['run']
     output = tmp_path / 'outputs'
     run = subprocess.run(['bash', '-e', '-o', 'pipefail', '-c', script], capture_output=True, text=True,
-                         env={**os.environ, 'WIDTH_STEP': step, 'WIDTHS': widths, 'EVENT': 'workflow_dispatch',
+                         env={**os.environ, 'WIDTH_STEP': step, 'WIDTHS': widths, 'EVENT': 'schedule',
                               'GITHUB_OUTPUT': str(output)})
     if expected is None:
         assert run.returncode == 2 and not output.exists()
