@@ -21,7 +21,7 @@ ExcelJS itself only uses `archiver` append/finalize and `unzipper.Parse`, so it 
 
 Only these break: calling `archiver-utils` `file.expand` directly, and `rimraf` / `rimraf.sync` with a path that contains `*` or `?`
 (for example through unzipper `Extract` / fstream).
-CI job `ExcelJS smoke` (`.github/workflows/exceljs-smoke.yml`, script `tools/exceljs_smoke.cjs`) checks the following: the xlsx write/read
+The browserless Node lane of `ci.yml` (`npm ls minimatch --all`, then `tests/node-unit/exceljs_minimatch.test.cjs` through `tests/browserless/node-unit.spec.ts`) checks the following: the xlsx write/read
 round-trip, the streaming WorkbookWriter/WorkbookReader, and CSV.
 
 Remove the override once exceljs ships a release whose dependency tree resolves to minimatch >= 11.0.1.
