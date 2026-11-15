@@ -641,7 +641,7 @@ def test_pw_test_runs_the_repository_config_through_a_bridge_and_keeps_a_short_r
     assert btk.main(["pw-test", *base, "--limit", "1"]) == 1
     assert json.loads(capsys.readouterr().out)["lines"] == ["  3 passed (1.0s)"]
     bridge = btk.PW_TEST_BRIDGE % json.dumps({"config": str(root / "playwright.config.js"), "browser": str(browser)})
-    assert "executablePath: o.browser" in bridge and "delete next.channel" in bridge and str(browser) in bridge
+    assert "next.launchOptions.executablePath = o.browser" in bridge and "delete next.channel" in bridge and str(browser) in bridge
 
 
 def test_pw_test_reports_timeout_missing_node_and_usage_errors(tmp_path, capsys):
@@ -708,3 +708,50 @@ def test_every_script_runs_as_a_module(module: str, tmp_path: Path) -> None:
                           capture_output=True, text=True, timeout=60)
     assert done.returncode == 0, done.stderr
     assert "usage" in done.stdout.lower()
+
+
+def test_pw_test_bridge_preserves_engines_and_project_relative_paths(tmp_path):
+    import shutil
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node is required to execute the Playwright configuration bridge")
+    root = tmp_path / "repo"
+    root.mkdir()
+    config = root / "playwright.config.cjs"
+    original = {
+        "testDir": "tests", "outputDir": "results", "snapshotDir": "snapshots",
+        "use": {"viewport": {"width": 800, "height": 600}, "launchOptions": {"timeout": 1234}},
+        "projects": [
+            {"name": "chromium", "testDir": "tests/chrome", "outputDir": "results/chrome",
+             "snapshotDir": "shots/chrome", "use": {"channel": "chrome"}},
+            {"name": "firefox", "use": {"browserName": "firefox", "launchOptions": {"executablePath": "/own/firefox"}}},
+            {"name": "webkit", "use": {"browserName": "webkit"}},
+        ],
+    }
+    config.write_text("module.exports = " + json.dumps(original), encoding="utf-8")
+    bridge = tmp_path / "bridge.cjs"  # deliberately not beside the original config
+    bridge.write_text(btk.PW_TEST_BRIDGE % json.dumps({"config": str(config), "browser": "/fallback/chromium"}), encoding="utf-8")
+    output = subprocess.run([node, "-e", "console.log(JSON.stringify(require(process.argv[1])))", str(bridge)],
+                            check=True, capture_output=True, text=True)
+    actual = json.loads(output.stdout)
+    chrome, firefox, webkit = actual["projects"]
+    assert chrome["use"]["launchOptions"] == {"timeout": 1234, "executablePath": "/fallback/chromium"}
+    assert "channel" not in chrome["use"]
+    assert firefox["use"]["launchOptions"] == {"timeout": 1234, "executablePath": "/own/firefox"}
+    assert webkit["use"]["launchOptions"] == {"timeout": 1234}
+    assert "executablePath" not in actual["use"]["launchOptions"]
+    assert chrome["use"]["viewport"] == original["use"]["viewport"]
+    for key, value in (("testDir", "tests/chrome"), ("outputDir", "results/chrome"), ("snapshotDir", "shots/chrome")):
+        assert chrome[key] == str(root / value)
+    assert actual["testDir"] == str(root / "tests")
+    assert actual["snapshotDir"] == str(root / "snapshots")
+
+    # Without projects Playwright's implicit project must stay implicit.
+    del original["projects"]
+    original["use"]["browserName"] = "firefox"
+    config.write_text("module.exports = " + json.dumps(original), encoding="utf-8")
+    output = subprocess.run([node, "-e", "console.log(JSON.stringify(require(process.argv[1])))", str(bridge)],
+                            check=True, capture_output=True, text=True)
+    actual = json.loads(output.stdout)
+    assert "projects" not in actual
+    assert "executablePath" not in actual["use"]["launchOptions"]
