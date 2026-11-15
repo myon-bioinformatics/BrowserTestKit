@@ -1,4 +1,4 @@
-"""Repository contracts: action pins, workflows, vendor locks, parent pins, btk fetch/plan and python -m entry points."""
+"""Repository contracts: action pins, workflows, vendor CI, btk fetch/plan and python -m entry points (lock bytes and parent pins: test_fleet.py)."""
 
 import base64
 import hashlib
@@ -349,27 +349,6 @@ def test_real_canonical_staging_preserves_locked_bytes(tmp_path):
         assert hashlib.sha256(data).hexdigest() == meta['sha256'][name]
 
 
-def test_launcher_pin_uses_canonical_first_parent_source():
-    entry = next(e for e in LOCK["files"] if e["destination"] == "vendor/py_launch.cjs")
-    assert entry["repository"] == "myon-bioinformatics/myon-bioinformatics"
-    assert entry["source"] == "py_launch.cjs"
-    assert entry["commit"] == entry["ref"] == "384f5dd532076062f7833038764e9a62322c387c"
-
-
-# ═══ · browser test kit vendor lock ══════════════════════════════════════════════════════════════════════
-
-def test_vendor_lock_matches_checked_in_bytes() -> None:
-    lock = json.loads((ROOT / "vendor.lock.json").read_text(encoding="utf-8"))
-    assert lock["schema"] == "vendor-lock/1"
-    for entry in lock["files"]:
-        assert re.fullmatch(r"[0-9a-f]{40}", entry["ref"]), entry["destination"]
-        assert entry["ref"] == entry["commit"], entry["destination"]
-        data = (ROOT / entry["destination"]).read_bytes()
-        blob = hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest()
-        assert blob == entry["blob_sha"], entry["destination"]
-        assert hashlib.sha256(data).hexdigest() == entry["sha256"], entry["destination"]
-
-
 # ═══ · node26 profile workflow ═══════════════════════════════════════════════════════════════════════════
 # The live Node browser lane deliberately selects the exact Node 26 profile.
 
@@ -393,30 +372,6 @@ def test_live_browser_workflow_keeps_pins_and_exact_node26_guards():
     assert 'nano.read_snapshot(checkout' in script
     assert "'live_checkout_tests': True" in script
     assert '|| true' not in script
-
-
-# ═══ · parent workflow pins ══════════════════════════════════════════════════════════════════════════════
-# Local rollout contract; adopted vendor locks are deliberately independent.
-
-PARENT = "myon-bioinformatics/myon-bioinformatics"
-PARENT_WORKFLOW_PIN = "9e3da7ae1846e9604ebc24bb5178f7de094a4e77"
-
-
-def test_parent_workflow_references_use_reviewed_rollout_commit():
-    pins = []
-    for path in sorted((ROOT / ".github/workflows").glob("*")):
-        if path.suffix not in (".yml", ".yaml"):
-            continue
-        text = path.read_text(encoding="utf-8")
-        # Capture mutable and shortened references too, rather than ignoring them.
-        pins.extend(re.findall(r"uses:\s*['\"]?" + re.escape(PARENT) + r"/[^\s@'\"]+@([^\s'\"]+)", text))
-        lines = text.splitlines()
-        for i, line in enumerate(lines):
-            if re.fullmatch(r"\s+repository:\s*['\"]?" + re.escape(PARENT) + r"['\"]?\s*", line):
-                refs = [re.fullmatch(r"\s+ref:\s*['\"]?([^\s'\"]+)['\"]?\s*", item) for item in lines[i + 1:i + 12]]
-                pins.append(next((m.group(1) for m in refs if m), None))
-    assert pins, "shared parent references must remain observable"
-    assert set(pins) == {PARENT_WORKFLOW_PIN}, pins
 
 
 # ═══ · btk fetch ═════════════════════════════════════════════════════════════════════════════════════════
