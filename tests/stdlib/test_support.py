@@ -3,7 +3,6 @@ import base64, importlib, pathlib, subprocess, sys, unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
-sys.path.insert(0, str(ROOT / "tools"))
 
 
 class StdlibSupport(unittest.TestCase):
@@ -39,7 +38,6 @@ class StdlibSupport(unittest.TestCase):
                     capture_output=True, text=True, timeout=30,
                 )
                 self.assertEqual(result.returncode, 0, result.stderr)
-
 
 
 if __name__ == "__main__":
