@@ -613,6 +613,52 @@ def test_install_deps_is_not_a_browser_install():
     assert match is not None and match.group(1).split() == ["--only-shell", "chromium"]
 
 
+def _pw_test_repository(tmp_path, exit_code=0):
+    """A repository whose "Playwright CLI" is a Python script, so the run needs no Node: it prints its arguments and a result."""
+    root = tmp_path / "repo"
+    cli = root / "node_modules/@playwright/test/cli.js"
+    cli.parent.mkdir(parents=True)
+    (root / "playwright.config.js").write_text("module.exports = {};\n", encoding="utf-8")
+    cli.write_text("import sys\nprint('ARGS', *sys.argv[1:])\nprint('noise')\nprint('  3 passed (1.0s)')\n"
+                   f"print('  1 failed', file=sys.stderr)\nraise SystemExit({exit_code})\n", encoding="utf-8")
+    browser = tmp_path / "chrome"
+    browser.write_text("", encoding="utf-8")
+    return root, browser
+
+
+def test_pw_test_runs_the_repository_config_through_a_bridge_and_keeps_a_short_receipt(tmp_path, capsys):
+    root, browser = _pw_test_repository(tmp_path, exit_code=1)
+    base = ["--root", str(root), "--node", sys.executable, "--browser", str(browser)]
+    assert btk.main(["pw-test", *base, "--dry-run", "tests/a.spec.js"]) == 0
+    plan = json.loads(capsys.readouterr().out)
+    assert plan["schema"] == "btk-pw-test/1" and plan["browser"] == {"source": "explicit", "path": str(browser.resolve())}
+    assert plan["command"][1:3] == [str(root / "node_modules/@playwright/test/cli.js"), "test"]
+    assert plan["command"][-2:] == ["tests/a.spec.js", "--reporter=line"] and plan["cwd"] == str(root)
+    assert btk.main(["pw-test", *base, "tests/a.spec.js"]) == 1                                   # the run's own exit code
+    receipt = json.loads(capsys.readouterr().out)
+    assert receipt["exit_code"] == 1 and receipt["timed_out"] is False
+    assert receipt["lines"] == ["  3 passed (1.0s)", "  1 failed"]                                # the result lines only
+    assert btk.main(["pw-test", *base, "--limit", "1"]) == 1
+    assert json.loads(capsys.readouterr().out)["lines"] == ["  3 passed (1.0s)"]
+    bridge = btk.PW_TEST_BRIDGE % json.dumps({"config": str(root / "playwright.config.js"), "browser": str(browser)})
+    assert "executablePath: o.browser" in bridge and "delete next.channel" in bridge and str(browser) in bridge
+
+
+def test_pw_test_reports_timeout_missing_node_and_usage_errors(tmp_path, capsys):
+    root, browser = _pw_test_repository(tmp_path)
+    (root / "node_modules/@playwright/test/cli.js").write_text("import time\ntime.sleep(30)\n", encoding="utf-8")
+    base = ["--root", str(root), "--browser", str(browser)]
+    assert btk.main(["pw-test", *base, "--node", sys.executable, "--timeout", "0.5"]) == 124
+    assert json.loads(capsys.readouterr().out)["timed_out"] is True
+    assert btk.main(["pw-test", *base, "--node", str(tmp_path / "no-such-node")]) == 127
+    assert "error" in json.loads(capsys.readouterr().out)
+    for bad in (["--root", str(tmp_path)], [*base, "--timeout", "0"], ["--root", str(root), "--browser", str(tmp_path / "missing")]):
+        with pytest.raises(SystemExit) as stop:
+            btk.main(["pw-test", *bad])
+        assert stop.value.code == 2
+    assert "pw-test" in btk.COMMANDS
+
+
 def test_find_browser_uses_a_build_already_on_disk(tmp_path):
     def build(*parts):
         path = tmp_path.joinpath(*parts)

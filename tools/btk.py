@@ -2094,6 +2094,89 @@ def find_browser(engine: str, expected: str | None, *, headless: bool = True, ro
     return {"source": "missing", "path": None}
 
 
+# ---- 🎭 another repository's Playwright Test, with a browser already on disk -------------------------------------------
+
+PW_TEST_BRIDGE = """'use strict';
+// Written by btk.py pw-test: the repository's own config, unchanged except for the browser and absolute paths.
+const path = require('node:path');
+const o = %s;
+const base = require(o.config);
+const cfg = base.default || base;
+const dir = path.dirname(o.config);
+const use = (u) => {
+  const next = { ...u, launchOptions: { ...((u && u.launchOptions) || {}), ...(o.browser ? { executablePath: o.browser } : {}) } };
+  if (o.browser) delete next.channel;  // a path replaces the channel build
+  return next;
+};
+const cwd = (s) => ({ ...s, cwd: path.resolve(dir, s.cwd || '.') });
+module.exports = {
+  ...cfg,
+  ...(cfg.webServer ? { webServer: Array.isArray(cfg.webServer) ? cfg.webServer.map(cwd) : cwd(cfg.webServer) } : {}),
+  testDir: path.resolve(dir, cfg.testDir || '.'),
+  outputDir: path.resolve(dir, cfg.outputDir || 'test-results'),
+  use: use(cfg.use || {}),
+  projects: (cfg.projects || []).map((p) => ({ ...p, use: use(p.use || {}) })),
+};
+"""
+
+
+def pw_test_cli(argv: list[str] | None = None) -> int:
+    """Run a repository's Playwright Test (Node) and print a short JSON receipt (``btk-pw-test/1``).
+
+    When Playwright's own Chromium is not installed, the run uses one already on disk (``find_browser``: another
+    revision, then an installed Chrome / Chromium / Edge) instead of failing, so a nano environment needs no
+    ``playwright install``. The repository's config is used as it is, through a bridge file written for the run.
+    Exit code: the test run's own, 124 on timeout, 127 when node could not start, 2 for a usage error."""
+    import subprocess
+    parser = argparse.ArgumentParser(prog="btk.py pw-test", description=pw_test_cli.__doc__.split("\n\n")[0], allow_abbrev=False)
+    parser.add_argument("--root", default=".", help="the repository to test (holds node_modules/@playwright/test)")
+    parser.add_argument("--config", default="playwright.config.js", help="its Playwright config, relative to --root")
+    parser.add_argument("--browser", help="launch this executable instead of looking for one")
+    parser.add_argument("--timeout", type=float, default=900, help="seconds before the run is stopped")
+    parser.add_argument("--limit", type=int, default=20, help="receipt lines to keep; 0 keeps all")
+    parser.add_argument("--match", default=r"passed|failed|skipped|flaky|^\s+\d+\) |Error:", help="regex of output lines worth keeping")
+    parser.add_argument("--node", default="node")
+    parser.add_argument("--dry-run", action="store_true", help="print the command and the browser, run nothing")
+    parser.add_argument("specs", nargs="*", help="spec files or filters passed to playwright test")
+    args = parser.parse_args(argv)
+    if args.timeout <= 0 or args.limit < 0:
+        parser.error("timeout must be positive and limit nonnegative")
+    root = Path(args.root).resolve()
+    config, cli = root / args.config, root / "node_modules/@playwright/test/cli.js"
+    if not config.is_file():
+        parser.error(f"missing {config}")
+    if args.browser:
+        if not Path(args.browser).is_file():
+            parser.error(f"browser not found: {args.browser}")
+        browser = {"source": "explicit", "path": str(Path(args.browser).resolve())}
+    else:
+        expected = None                                               # where this Playwright would look for its own build
+        with contextlib.suppress(OSError, subprocess.SubprocessError):
+            asked = subprocess.run([args.node, "-e", "process.stdout.write(require('@playwright/test').chromium.executablePath())"],
+                                   cwd=root, capture_output=True, text=True, timeout=30)
+            expected = asked.stdout.strip() if asked.returncode == 0 and asked.stdout.strip() else None
+        browser = find_browser("chromium", expected)
+    with tempfile.TemporaryDirectory(prefix="btk-pw-test-") as directory:
+        bridge = Path(directory) / "playwright.bridge.config.cjs"
+        bridge.write_text(PW_TEST_BRIDGE % json.dumps({"config": str(config), "browser": browser["path"]}), encoding="utf-8")
+        command = [args.node, str(cli), "test", "-c", str(bridge), *args.specs, "--reporter=line"]
+        if args.dry_run:
+            print(json.dumps({"schema": "btk-pw-test/1", "command": command, "browser": browser, "cwd": str(root)}, ensure_ascii=False))
+            return 0
+        receipt = {"schema": "btk-pw-test/1", "exit_code": None, "timed_out": False, "browser": browser, "lines": []}
+        try:
+            done = subprocess.run(command, cwd=root, capture_output=True, text=True, errors="replace", timeout=args.timeout)
+            lines = [line for line in (done.stdout + "\n" + done.stderr).splitlines() if re.search(args.match, line)]
+            receipt.update(exit_code=done.returncode if done.returncode >= 0 else 128 - done.returncode,
+                           lines=lines[:args.limit] if args.limit else lines)
+        except subprocess.TimeoutExpired:
+            receipt.update(exit_code=124, timed_out=True)
+        except OSError as exc:
+            receipt.update(exit_code=127, error=str(exc))
+    print(json.dumps(receipt, ensure_ascii=False))
+    return receipt["exit_code"]
+
+
 def _playwright():
     try:
         from playwright.sync_api import sync_playwright
@@ -4250,7 +4333,7 @@ PLAN_COMMANDS = ("plan",)
 PAGE_COMMANDS = ("observe", "act", "pages", "scenario", "locate", "count", "describe", "compare", "operations")
 EVIDENCE_COMMANDS = {"check-png": check_png_cli, "check-evidence": check_evidence_cli, "check-capture-evidence": check_capture_evidence_cli,
                      "write-capture-evidence": write_capture_evidence_cli, "probe-capture-rejections": probe_capture_rejections_cli}
-COMMANDS = FETCH_COMMANDS + PLAN_COMMANDS + PAGE_COMMANDS + tuple(EVIDENCE_COMMANDS)
+COMMANDS = FETCH_COMMANDS + PLAN_COMMANDS + PAGE_COMMANDS + tuple(EVIDENCE_COMMANDS) + ("pw-test",)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -4266,6 +4349,8 @@ def main(argv: list[str] | None = None) -> int:
         return page_main(argv)
     if argv[0] in EVIDENCE_COMMANDS:
         return EVIDENCE_COMMANDS[argv[0]](argv[1:])
+    if argv[0] == "pw-test":
+        return pw_test_cli(argv[1:])
     sys.stderr.write(f"btk.py: unknown command {argv[0]!r}; expected one of {COMMANDS}\n")
     return 2
 

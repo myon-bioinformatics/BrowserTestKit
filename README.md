@@ -343,6 +343,18 @@ without following them. Service workers are blocked. This is a browser request
 boundary, not an OS-level sandbox. Storage records key names and SHA-256
 fingerprints only. See [REA observation](docs/rea-observation.md).
 
+## 🎭 Another repository's Playwright Test
+
+`btk.py pw-test` runs a repository's own Playwright Test (Node) and prints a short JSON receipt (`btk-pw-test/1`:
+exit code, the browser used, the result lines). When Playwright's own Chromium is not installed it uses one already on
+disk (another revision, then an installed Chrome / Chromium / Edge), so no `playwright install` is needed. The
+repository's config is used unchanged, through a bridge file written for the run.
+
+```sh
+python tools/btk.py pw-test --root ../myon-bioinformatics.github.io tests/project-catalog.spec.js
+python tools/btk.py pw-test --root ../some-repo --dry-run          # the command and the browser, nothing run
+```
+
 ## Optional nano environment
 
 [Opt-in Markdown/HTML nano environment](docs/nano-environment.md): both parsers and the existing browserless runner, with isolated outputs and no browser download; full XLSX/browser lanes stay unchanged.
