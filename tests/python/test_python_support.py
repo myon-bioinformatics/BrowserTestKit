@@ -51,9 +51,9 @@ def test_built_wheel_metadata_when_present():
             metadata = Parser().parsestr(archive.read(path).decode())
             backend = next(p for p in archive.namelist()
                            if p.endswith('/share/browser-test-kit/pillow_min/pillow_min.py'))
-            license_path = backend.rsplit('/', 1)[0] + '/Ironmate-LICENSE'
+            license_path = backend.rsplit('/', 1)[0] + '/myon-bioinformatics-LICENSE'
             assert archive.read(backend) == (ROOT / 'vendor/pillow_min/pillow_min.py').read_bytes()
-            assert archive.read(license_path) == (ROOT / 'vendor/pillow_min/Ironmate-LICENSE').read_bytes()
+            assert archive.read(license_path) == (ROOT / 'vendor/pillow_min/myon-bioinformatics-LICENSE').read_bytes()
         assert metadata['Requires-Python'] == '>=3.11'
         assert metadata.get_all('Requires-Dist') is None
 

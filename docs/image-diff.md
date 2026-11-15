@@ -2,7 +2,7 @@
 
 Compare two screenshots (`PATH` or `ZIP::member`) and print one line: size, changed pixels, bbox, max channel delta.
 
-Canonical implementation lives in this repository (`tools/image_diff.py`). Python 3.11+ is required. PNG decoding and pixel comparison use the vendored `pillow_min.py` from [Ironmate](https://github.com/myon-bioinformatics/Ironmate) (recorded in `vendor.lock.json`); no third-party Python packages are needed.
+Canonical implementation lives in this repository (`tools/image_diff.py`). Python 3.11+ is required. PNG decoding and pixel comparison use the vendored `pillow_min.py` from the parent repository's [tools/stdlib_min/](https://github.com/myon-bioinformatics/myon-bioinformatics/tree/main/tools/stdlib_min) (moved there from Ironmate; recorded in `vendor.lock.json`); no third-party Python packages are needed.
 
 ```bash
 python tools/image_diff.py a.png b.png [--clip X,Y,W,H] [--viewport-width CSS_PX] [--tolerance N]
