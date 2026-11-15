@@ -186,7 +186,6 @@ def test_browserless_lanes_do_not_install_engines_and_gate_browser_work():
         assert '--group browser' not in commands
         assert '-m "not browser"' in commands
         assert 'pip install' not in commands
-    assert 'playwright' not in (ROOT / 'requirements-test-core.txt').read_text().lower()
     dev_group = re.search(r'(?ms)^dev = \[(.*?)^\]', (ROOT / 'pyproject.toml').read_text())
     assert dev_group and 'playwright' not in dev_group.group(1).lower()
     for name in ('node', 'python-browser'):

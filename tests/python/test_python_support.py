@@ -17,10 +17,9 @@ def test_metadata_has_one_runtime_floor():
         assert project['tool']['uv']['dependency-groups'][name]['requires-python'] == '>=3.11'
     assert 'pillow' not in str(project['dependency-groups']['dev'])
     assert 'pip>=26.2' in project['dependency-groups']['dev']
-    requirements = (ROOT / 'requirements-test-core.txt').read_text()
-    assert 'pillow' not in requirements
-    assert 'pip>=26.2' in requirements
-    assert 'pytest>=9.0.3' in requirements
+    assert 'pytest>=9.0.3' in project['dependency-groups']['dev']
+    # pyproject.toml's groups (resolved in uv.lock) are the only dependency list; no requirements-*.txt copies.
+    assert not list(ROOT.glob('requirements*.txt'))
 
 
 def test_lock_has_no_legacy_pillow_or_pip():

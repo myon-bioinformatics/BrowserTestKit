@@ -1585,8 +1585,9 @@ def test_pages_then_trail_and_emoji_goto_drive_the_same_routes(site):
 @pytest.mark.browser
 def test_pages_many_links_cli_is_bounded(site):
     base, work = site
-    fixture = ROOT / "tests/fixtures/pages/many-links.html"
-    (work / "many.html").write_bytes(fixture.read_bytes())
+    # 5000 links, built in memory (formerly the 263 kB tests/fixtures/pages/many-links.html, byte for byte).
+    (work / "many.html").write_bytes(('<!doctype html><meta charset="utf-8"><title>Many links</title>\n' + "".join(
+        f'<a href="/p{i}?private=secret#hidden">Page {i}</a>\n' for i in range(5000))).encode())
     result = run_btk(["pages", f"{base}/many.html", "--max-pages", "1", "--json"])
     assert result.returncode == 0, result.stderr
     payload = json.loads(result.stdout)
