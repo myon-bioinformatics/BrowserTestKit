@@ -280,7 +280,7 @@ Implemented:
 2. Shared local deterministic fixtures and artifact validators (`fixtures/`, `tools/evidence_board.py`).
 3. Playwright Node matrix (`.github/workflows/ci.yml`, `platform-matrix.yml`).
 4. Playwright Python API and CLI matrix (`tools/platform_probe.py`).
-5. Browser parity guards (Node `tests/node-launch` runs observe, act, and scenario through `vendor/py_launch.cjs` in Chromium).
+5. Browser parity guards (Node `tests/node-unit/btk_playwright.test.mjs` runs observe, act, and scenario through `vendor/py_launch.cjs` in Chromium).
 7. terminal-browser quick CLI/TUI lane (`tools/terminal_browser.py`).
 10. Passive page observe, locate, and a fixed act vocabulary (`tools/btk.py`). Stagehand is still a separate, unimplemented lane.
 

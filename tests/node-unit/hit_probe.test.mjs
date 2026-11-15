@@ -8,7 +8,7 @@ import * as hp from '../../tools/hit_probe.mjs';
 
 const python = process.env.PYTHON || 'python';
 export function oracle(cases) {
-  const result = spawnSync(python, ['-S', 'tests/helpers/hit_probe_oracle.py'], {
+  const result = spawnSync(python, ['-S', 'tests/node-unit/hit_probe_oracle.py'], {
     input: JSON.stringify(cases), encoding: 'utf8', maxBuffer: 32 * 1024 * 1024,
   });
   assert.equal(result.status, 0, result.stderr || result.error?.message);

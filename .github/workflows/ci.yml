@@ -324,7 +324,7 @@ jobs:
         run: |
           BTK_PYTHON="$(uv run --locked --no-dev --group browser-test --group pages python -c 'import sys; print(sys.executable)')"
           export BTK_PYTHON
-          BTK_REQUIRE_PLAYWRIGHT=1 node --test tests/node-unit/page_inspect.test.mjs tests/node-launch/btk_playwright.test.mjs
+          BTK_REQUIRE_PLAYWRIGHT=1 node --test tests/node-unit/page_inspect.test.mjs tests/node-unit/btk_playwright.test.mjs
       - name: Run Python browser tests with JUnit (Chromium only)
         env:
           BTK_BROWSER_ENGINES: chromium
