@@ -32,7 +32,7 @@ test('adaptive hit maps match Python and exhaustive observations for plain, roun
     const points = Array.from({length: width * height}, (_, i) => [i % width, Math.floor(i / width)]);
     const values = await probe(points);
     const scores = Array.from({length: height}, (_, y) => values.slice(y * width, (y + 1) * width));
-    const py = spawnSync(process.env.PYTHON || 'python', ['-S', 'tests/helpers/hit_probe_oracle.py'], {
+    const py = spawnSync(process.env.PYTHON || 'python', ['-S', 'tests/node-unit/hit_probe_oracle.py'], {
       input: JSON.stringify([{width, height, scores, options: {stride: 8, margin: 0.25}}]), encoding: 'utf8', maxBuffer: 16 * 1024 * 1024,
     });
     expect(py.status, py.stderr).toBe(0);

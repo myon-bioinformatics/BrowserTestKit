@@ -75,4 +75,4 @@ jobs:
       - name: Build and inspect the distributable package
         run: |
           uv build
-          uv run --locked python -m pytest tests/python/test_python_support.py tests/python/test_legacy_entrypoints.py -q
+          uv run --locked python -m pytest tests/python/test_python_support.py -q

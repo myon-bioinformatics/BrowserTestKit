@@ -1,3 +1,0 @@
-# Browser integration tests require Python >=3.11.
--r requirements-test-core.txt
-playwright>=1.64.1

@@ -5,7 +5,7 @@
 const assert = require('node:assert/strict')
 const fs = require('node:fs'), os = require('node:os'), path = require('node:path')
 const ExcelJS = require('exceljs')
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'exceljs-smoke-'))
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'exceljs-minimatch-'))
 const f = (n) => path.join(dir, n)
 ;(async () => {
   const wb = new ExcelJS.Workbook()

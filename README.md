@@ -67,7 +67,7 @@ uv run --group pages --group browser python tools/evidence_gif.py docs/evidence/
   `uv run --locked --python 3.11 pytest tests/python -q -m "not browser"`. Add `--group browser` for browser
   integration dependencies; `--group pages` (included in `dev`) adds [PySaiyanWeBoo](https://github.com/myon-bioinformatics/PySaiyanWeBoo)'s
   `pysaiyanweboo`, pinned to a commit, which builds the platform-matrix and app-digest pages (`render` / `app_digest.py`;
-  `collect` / `merge` / `summary` stay stdlib-only). The requirements-test files have the same floor.
+  `collect` / `merge` / `summary` stay stdlib-only).
 
 The Python support CI checks actual 3.11 stdlib execution and base wheel
 installation without test dependencies, and the complete browserless test suite at the 3.11 floor. Existing browser CI
@@ -215,7 +215,7 @@ uv run --group pages python tools/platform_probe.py render platform-results --ou
 
 ### Element annotation overlay, DOM highlight CSS, and TAP assertions (`tools/element_overlay.py`)
 
-Target coordinate calculation, SVG annotation overlays, DOM element highlight CSS, and Poku-style TAP element assertions: [element overlay](docs/element-overlay.md) (`tools/element_overlay.py` / `tools/element_overlay.mjs`). Absorbs patterns from SeleniumBase, Callstack agent-device, Midscene, Poku, and PuppetSharp.
+Target coordinate calculation, SVG annotation overlays, DOM element highlight CSS, and Poku-style TAP element assertions: [element overlay](docs/element-overlay.md) (`tools/element_overlay.py`). Absorbs patterns from SeleniumBase, Callstack agent-device, Midscene, Poku, and PuppetSharp.
 
 ```bash
 python -S tools/element_overlay.py --file elements.json --viewport 1280x720
@@ -280,7 +280,7 @@ Implemented:
 2. Shared local deterministic fixtures and artifact validators (`fixtures/`, `tools/evidence_board.py`).
 3. Playwright Node matrix (`.github/workflows/ci.yml`, `platform-matrix.yml`).
 4. Playwright Python API and CLI matrix (`tools/platform_probe.py`).
-5. Browser parity guards (Node `tests/node-launch` runs observe, act, and scenario through `vendor/py_launch.cjs` in Chromium).
+5. Browser parity guards (Node `tests/node-unit/btk_playwright.test.mjs` runs observe, act, and scenario through `vendor/py_launch.cjs` in Chromium).
 7. terminal-browser quick CLI/TUI lane (`tools/terminal_browser.py`).
 10. Passive page observe, locate, and a fixed act vocabulary (`tools/btk.py`). Stagehand is still a separate, unimplemented lane.
 
