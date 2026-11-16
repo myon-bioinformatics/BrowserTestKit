@@ -112,8 +112,12 @@ Existing Dart map parsing remains a source-text compatibility adapter.
 
 `fixtures/route_trail_execution.json` is the shared portable catalog. Its delayed
 hash router proves marker waits, forward/return visits and retained document
-state. Python tests cover sync/async and Chromium/Firefox/WebKit (desktop
-projects; mobile emulation of the trail is not covered). Unit tests
+state. Python tests cover sync/async on desktop Chromium/Firefox/WebKit and
+mobile emulation using Playwright's Pixel 7 (Chromium) and iPhone 13 (WebKit)
+device descriptors, matching the Node project profiles. Each profile checks
+navigation, delayed rendering, return visits, retained document state and
+failure receipts containing only the completed prefix. These are emulation
+checks, not physical-device tests. Unit tests
 cover strict catalogs, whole-plan validation, hooks, prefix errors, bounded
 subprocesses and receipt validation. These execute in existing CI jobs.
 

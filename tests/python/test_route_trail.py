@@ -97,6 +97,13 @@ def test_cli(tmp_path, capsys):
 # Real browsers exercise shared navigation, readiness and resumable execution.
 
 BASE = (ROOT / "fixtures" / "route_trail_delayed.html").as_uri()
+BROWSER_CASES = (
+    pytest.param("chromium", None, id="desktop-chromium"),
+    pytest.param("firefox", None, id="desktop-firefox"),
+    pytest.param("webkit", None, id="desktop-webkit"),
+    pytest.param("chromium", "Pixel 7", id="mobile-chromium-pixel-7"),
+    pytest.param("webkit", "iPhone 13", id="mobile-webkit-iphone-13"),
+)
 
 
 def registry():
@@ -104,18 +111,26 @@ def registry():
 
 
 @pytest.mark.browser
-@pytest.mark.parametrize("browser_name", ("chromium", "firefox", "webkit"))
-def test_walk_resume_and_failure(browser_name, tmp_path):
+@pytest.mark.parametrize(("browser_name", "device_name"), BROWSER_CASES)
+def test_walk_resume_and_failure(browser_name, device_name, tmp_path):
     from playwright.sync_api import sync_playwright
     with sync_playwright() as pw:
         browser = getattr(pw, browser_name).launch()
         try:
-            page = browser.new_page()
+            page = browser.new_page(**(pw.devices[device_name] if device_name else {}))
+            def check(page, step):
+                assert page.url == step["url"]
+                assert page.locator("#page").inner_text() == step["ready"]["text"]
+                assert page.locator("#visits").inner_text() == str(step["index"] + 1)
+                page.screenshot(path=str(tmp_path / f"{step['index']:03}.png"), full_page=True)
             iterator = route_trail.walk_steps(page, "🏠 → @hub → 🌍 → 🏠", registry(), base=BASE,
-                check=lambda page, step: page.screenshot(path=str(tmp_path / f"{step['index']:03}.png"), full_page=True))
-            assert next(iterator)["index"] == 0
+                check=check)
+            first = next(iterator)
+            assert first["index"] == 0
             page.evaluate("window.retained = 42")
-            assert len(list(iterator)) == 3
+            steps = [first, *iterator]
+            assert [s["route"] for s in steps] == ["/", "/hub", "/screen1", "/"]
+            assert all(s["verification"] == "url+marker" for s in steps)
             assert page.evaluate("window.retained") == 42
             assert page.locator("#visits").inner_text() == "4"
             shots = sorted(tmp_path.glob("*.png"))
@@ -129,29 +144,57 @@ def test_walk_resume_and_failure(browser_name, tmp_path):
             bad["@hub"]["ready"]["text"] = "Never rendered"
             with pytest.raises(route_trail.TrailExecutionError) as err:
                 route_trail.walk(page, "@home → @hub → @world", bad, base=BASE, timeout_ms=250)
-            assert err.value.receipt["completed"] == 1
-            assert err.value.receipt["error"]["phase"] == "ready"
+            receipt = err.value.receipt
+            assert receipt["schema"] == "route-trail-run/1" and not receipt["ok"]
+            assert receipt["completed"] == 1 and receipt["total"] == 3
+            assert [s["route"] for s in receipt["steps"]] == ["/"]
+            assert receipt["steps"][0]["observed_url"] == BASE + "#/"
+            assert receipt["error"]["index"] == 1
+            assert receipt["error"]["route"] == "/hub"
+            assert receipt["error"]["phase"] == "ready"
             assert page.url.endswith("#/hub")
         finally:
             browser.close()
 
 
 @pytest.mark.browser
-@pytest.mark.parametrize("browser_name", ("chromium", "firefox", "webkit"))
-def test_async_walk(browser_name, tmp_path):
+@pytest.mark.parametrize(("browser_name", "device_name"), BROWSER_CASES)
+def test_async_walk(browser_name, device_name, tmp_path):
     from playwright.async_api import async_playwright
     async def run():
         async with async_playwright() as pw:
             browser = await getattr(pw, browser_name).launch()
             try:
-                page = await browser.new_page()
+                page = await browser.new_page(**(pw.devices[device_name] if device_name else {}))
                 async def check(page, step):
                     await asyncio.sleep(0)
+                    assert page.url == step["url"]
+                    assert await page.locator("#page").inner_text() == step["ready"]["text"]
                     assert await page.locator("#visits").inner_text() == str(step["index"] + 1)
+                    if step["index"] == 0:
+                        await page.evaluate("window.retained = 42")
+                    assert await page.evaluate("window.retained") == 42
                     await page.screenshot(path=str(tmp_path / f"{step['index']:03}.png"), full_page=True)
                 result = await route_trail.awalk(page, "🏠 ↔ 🗺️", registry(), base=BASE, check=check)
                 assert result["ok"] and result["completed"] == 3
-                assert len(list(tmp_path.glob("*.png"))) == 3
+                assert [s["route"] for s in result["steps"]] == ["/", "/hub", "/"]
+                assert all(s["verification"] == "url+marker" for s in result["steps"])
+                shots = sorted(tmp_path.glob("*.png"))
+                assert len(shots) == 3
+                assert all(p.read_bytes().startswith(b"\x89PNG\r\n\x1a\n") for p in shots)
+                bad = registry()
+                bad["@hub"]["ready"]["text"] = "Never rendered"
+                with pytest.raises(route_trail.TrailExecutionError) as err:
+                    await route_trail.awalk(page, "@home → @hub → @world", bad, base=BASE, timeout_ms=250)
+                receipt = err.value.receipt
+                assert receipt["schema"] == "route-trail-run/1" and not receipt["ok"]
+                assert receipt["completed"] == 1 and receipt["total"] == 3
+                assert [s["route"] for s in receipt["steps"]] == ["/"]
+                assert receipt["steps"][0]["observed_url"] == BASE + "#/"
+                assert receipt["error"]["index"] == 1
+                assert receipt["error"]["route"] == "/hub"
+                assert receipt["error"]["phase"] == "ready"
+                assert page.url.endswith("#/hub")
             finally:
                 await browser.close()
     asyncio.run(run())
