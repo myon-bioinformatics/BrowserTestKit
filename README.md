@@ -188,7 +188,7 @@ Browserless mirror tests — several independent implementations (markdown-it / 
 
 Run these existing comparisons without downloading browsers: `npm ci --ignore-scripts && npm run test:browserless`. Python rules use `uv run --locked pytest -m "not browser"` (3.11+ uv environment; see **Python support** above); real browser tests use `uv run --locked --group browser pytest -m browser`. See [separate execution](docs/mirror-tests.md#separate-browserless-execution).
 The same JSON catalog supports stable `@id` names and readiness markers; Python
-sync/async and dependency-light Node execution reuse one Page for the whole trail.
+sync/async execution reuse one Page for the whole trail.
 
 ### OS × browser × device comparison (`tools/platform_probe.py`, `platform-matrix`)
 

@@ -96,10 +96,10 @@ def resolve(trail: str, registry: dict, *, base: str = "http://localhost:8080/",
 
 
 MAX_STEPS = 1000
-# Shared grammar with route_trail_node.mjs (TWIN_PARSER_DRIFT). The match only
+# One explicit grammar instead of a language's own URL parser (TWIN_PARSER_DRIFT). The match only
 # splits the URL; _execution_url also checks host semantics and destination port.
 # Deliberately supported hosts: ASCII DNS, canonical dotted IPv4, bracketed IPv6.
-# IDN/ACE labels are excluded until both twins have the same IDNA implementation.
+# IDN/ACE labels are excluded: no IDNA implementation is used here.
 EXECUTION_URL_SOURCE = r'^(?:([Hh][Tt][Tt][Pp][Ss]?):\/\/([A-Za-z0-9.-]+|\[[0-9A-Fa-f:.]+\])(?::([0-9]{1,5}))?(?:[/?#][^\x00-\x20\x7f-\x9f\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff\\]*)?|[Ff][Ii][Ll][Ee]:\/\/(?:[Ll][Oo][Cc][Aa][Ll][Hh][Oo][Ss][Tt])?\/[^\x00-\x20\x7f-\x9f\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff\\]*)$'
 EXECUTION_URL = re.compile(EXECUTION_URL_SOURCE)
 
@@ -193,8 +193,8 @@ def validate_steps(steps, timeout_ms=10000):
         if any(not isinstance(step.get(k), str) for k in ('emoji', 'route', 'url')):
             raise ValueError('step requires emoji, route and url strings')
         url = step['url']
-        # One explicit rule shared with route_trail_node.mjs (EXECUTION_URL): each language's own
-        # URL parser accepts and repairs different inputs (TWIN_PARSER_DRIFT).
+        # One explicit rule (EXECUTION_URL): each language's own URL parser accepts and
+        # repairs different inputs (TWIN_PARSER_DRIFT).
         if len(url) > 4096 or not _execution_url(url):
             raise ValueError('execution URLs must be absolute HTTP(S) or local file URLs without credentials')
         _ready_spec(step.get('ready'))
@@ -416,36 +416,23 @@ def _worker_main():
     return 0 if result['ok'] else 1
 
 
-def run_plan(steps, *, backend='python', browser='chromium', timeout_ms=10000, run_timeout=120, node_cwd=None):
+def run_plan(steps, *, backend='python', browser='chromium', timeout_ms=10000, run_timeout=120):
     """Bounded subprocess bridge. Python -S planning needs no browser dependency.
 
-    The optional runtime runs once with site packages enabled. A Node backend
-    receives the same plan and uses the consumer's existing Playwright install.
+    The optional runtime runs once with site packages enabled.
     """
     import subprocess
     from pathlib import Path
     validate_steps(steps, timeout_ms)
-    if backend not in {'python', 'python-async', 'node'} or browser not in {'chromium', 'firefox', 'webkit'}:
+    if backend not in {'python', 'python-async'} or browser not in {'chromium', 'firefox', 'webkit'}:
         raise ValueError('invalid backend or browser')
     if type(run_timeout) is not int or not 1 <= run_timeout <= 3600:
         raise ValueError('run_timeout must be 1..3600 seconds')
     request = {'steps': steps, 'backend': backend, 'browser': browser, 'timeout_ms': timeout_ms}
-    if backend == 'node':
-        asset = Path(__file__).with_name('route_trail_node.mjs')
-        if not asset.exists():
-            asset = Path(sys.prefix) / 'share/browser-test-kit/route_trail_node.mjs'
-        if not asset.exists():
-            import site
-            asset = Path(site.getuserbase()) / 'share/browser-test-kit/route_trail_node.mjs'
-        if not asset.exists():
-            raise ValueError('Node helper is unavailable; reinstall the package including its shared asset')
-        cmd = ['node', str(asset.resolve())]
-    else:
-        cmd = [sys.executable, str(Path(__file__).resolve()), '--worker']
+    cmd = [sys.executable, str(Path(__file__).resolve()), '--worker']
     try:
         child = subprocess.run(cmd, input=json.dumps(request, ensure_ascii=False), capture_output=True,
-                               text=True, encoding='utf-8', errors='replace', timeout=run_timeout, check=False,
-                               cwd=node_cwd if backend == 'node' else None)
+                               text=True, encoding='utf-8', errors='replace', timeout=run_timeout, check=False)
     except (OSError, subprocess.TimeoutExpired) as exc:
         return _receipt([], len(steps), {'phase': 'process', 'message': str(exc)[:2000], 'type': type(exc).__name__})
     try:
@@ -485,10 +472,9 @@ def main(argv=None) -> int:
     parser.add_argument("--path-routing", action="store_true", help="BASE/route instead of BASE#route")
     parser.add_argument("--json", action="store_true", help="emoji, route and url per step")
     parser.add_argument('--run', action='store_true', help='execute the whole trail once in an optional Playwright runtime')
-    parser.add_argument('--backend', choices=('python', 'python-async', 'node'), default='python')
+    parser.add_argument('--backend', choices=('python', 'python-async'), default='python')
     parser.add_argument('--browser', choices=('chromium', 'firefox', 'webkit'), default='chromium')
     parser.add_argument('--timeout-ms', type=int, default=10000, help='per navigation/wait timeout')
-    parser.add_argument('--node-cwd', help='consumer directory containing the existing Node Playwright install')
     parser.add_argument('--run-timeout', type=int, default=120, help='overall subprocess deadline in seconds')
     parser.add_argument('--ready-selector', help='default visible marker for pages without a ready record')
     args = parser.parse_args(argv)
@@ -502,7 +488,7 @@ def main(argv=None) -> int:
                     if not row.get('ready'):
                         row['ready'] = _ready_spec({'selector': args.ready_selector})
             result = run_plan(rows, backend=args.backend, browser=args.browser,
-                              timeout_ms=args.timeout_ms, run_timeout=args.run_timeout, node_cwd=args.node_cwd)
+                              timeout_ms=args.timeout_ms, run_timeout=args.run_timeout)
             if args.json:
                 print(json.dumps(result, ensure_ascii=False))
             else:

@@ -4,7 +4,6 @@ import asyncio
 import copy
 import importlib.util
 import json
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -273,8 +272,8 @@ def test_bridge_is_one_process_and_checks_receipt(monkeypatch):
         calls.append((cmd,kw));request=json.loads(kw['input']);rows=[{**s,'index':i,'status':'passed','observed_url':s['url']} for i,s in enumerate(request['steps'])]
         return SimpleNamespace(stdout=json.dumps(m._receipt(rows,len(rows))),stderr='',returncode=0)
     monkeypatch.setattr(subprocess,'run',run)
-    result=m.run_plan(steps,backend='node',node_cwd='/consumer')
-    assert result['ok'] and len(calls)==1 and calls[0][1]['cwd']=='/consumer'
+    result=m.run_plan(steps)
+    assert result['ok'] and len(calls)==1 and calls[0][0][0]==sys.executable and 'cwd' not in calls[0][1]
     assert calls[0][1]['timeout']==120 and 'shell' not in calls[0][1]
 
 @pytest.mark.parametrize('raw',[
@@ -313,25 +312,8 @@ def test_multicodepoint_emoji_is_a_whole_identity():
         m.resolve('👩‍💻', registry)  # Skin tone and ZWJ are not discarded.
 
 
-def test_node_helper_found_in_user_install(monkeypatch, tmp_path):
-    import site
-    helper = tmp_path / 'user/share/browser-test-kit/route_trail_node.mjs'
-    helper.parent.mkdir(parents=True)
-    helper.write_text('// installed asset')
-    monkeypatch.setattr(m, '__file__', str(tmp_path/'site-packages/route_trail.py'))
-    monkeypatch.setattr(m.sys, 'prefix', str(tmp_path/'environment'))
-    monkeypatch.setattr(site, 'getuserbase', lambda: str(tmp_path/'user'))
-    steps = m.resolve('🏠', LEGACY)
-    def run(cmd, **kwargs):
-        assert cmd == ['node', str(helper.resolve())]
-        rows = [{**steps[0], 'index':0, 'status':'passed', 'observed_url':steps[0]['url']}]
-        return SimpleNamespace(stdout=json.dumps(m._receipt(rows,1)), stderr='', returncode=0)
-    monkeypatch.setattr(subprocess, 'run', run)
-    assert m.run_plan(steps, backend='node')['ok']
-
-
 # ═══ · execution url contract ════════════════════════════════════════════════════════════════════════════
-# Expected URL decisions and preflight side effects for the Python and Node route trails.
+# Expected URL decisions and preflight side effects for the route trail.
 
 def load(name):
     spec = importlib.util.spec_from_file_location(name, ROOT / 'tools' / (name + '.py'))
@@ -341,29 +323,6 @@ def load(name):
 
 
 trail = load('route_trail')
-
-NODE_PROGRAM = r"""
-import {pathToFileURL} from 'node:url';
-const chunks = [];
-for await (const chunk of process.stdin) chunks.push(chunk);
-const {module, name, cases} = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-const fn = (await import(pathToFileURL(module).href))[name];
-const out = [];
-for (const args of cases) {
-  try { out.push({ok: true, value: await fn(...args)}); }
-  catch (error) { out.push({ok: false, error: String(error?.message ?? error)}); }
-}
-process.stdout.write(JSON.stringify(out));
-"""
-
-
-def node_calls(module, name, cases):
-    done = subprocess.run(['node', '--input-type=module', '-e', NODE_PROGRAM],
-                          input=json.dumps({'module': str(module), 'name': name, 'cases': cases}),
-                          capture_output=True, text=True, encoding='utf-8', timeout=60)
-    assert done.returncode == 0, done.stderr
-    return json.loads(done.stdout)
-
 
 def python_calls(fn, cases):
     out = []
@@ -421,28 +380,13 @@ def test_python_expected_url_decisions(url, expected):
             trail.validate_steps([step(url)])
 
 
-@pytest.mark.skipif(shutil.which('node') is None, reason='node unavailable')
-def test_node_expected_decisions_and_native_parser_agree():
-    cases = [[[step(url)]] for url in VALID + INVALID]
-    actual = node_calls(ROOT / 'tools/route_trail_node.mjs', 'validateSteps', cases)
-    assert [r['ok'] for r in actual] == [True]*len(VALID) + [False]*len(INVALID)
-    # An independent implementation checks the positive oracle is browser-parseable.
-    parsed = subprocess.run(['node', '--input-type=module', '-e',
-        'const urls=JSON.parse(process.argv[1]);for(const u of urls)new URL(u);', json.dumps(VALID)],
-        capture_output=True, text=True, timeout=30)
-    assert parsed.returncode == 0, parsed.stderr
-
-
-@pytest.mark.skipif(shutil.which('node') is None, reason='node unavailable')
-def test_port_boundaries_have_expected_decisions_in_python_and_node():
+def test_port_boundaries_have_expected_decisions():
     urls = [f'http://{host}:{port}/' for host in ('a', '127.0.0.1', '[::1]')
             for port in (0, 1, 65534, 65535, 65536, 99999)]
     expected = [port in (1, 65534, 65535) for _ in range(3)
                 for port in (0, 1, 65534, 65535, 65536, 99999)]
     cases = [[[step(u)]] for u in urls]
-    for results in (python_calls(trail.validate_steps, cases),
-                    node_calls(ROOT / 'tools/route_trail_node.mjs', 'validateSteps', cases)):
-        assert [r['ok'] for r in results] == expected
+    assert [r['ok'] for r in python_calls(trail.validate_steps, cases)] == expected
 
 
 @pytest.mark.parametrize('bad_url', INVALID)
@@ -459,28 +403,6 @@ def test_invalid_later_step_prevents_python_navigation_and_process(monkeypatch, 
         trail.walk(Page(), 'unused', {})
     with pytest.raises(ValueError):
         asyncio.run(trail.awalk(Page(), 'unused', {}))
-    for backend in ('python', 'python-async', 'node'):
+    for backend in ('python', 'python-async'):
         with pytest.raises(ValueError):
             trail.run_plan(plan, backend=backend)
-
-
-@pytest.mark.skipif(shutil.which('node') is None, reason='node unavailable')
-def test_invalid_later_step_prevents_node_navigation():
-    script = """
-import {walk,walkSteps} from './tools/route_trail_node.mjs';
-let calls=0;
-const page={goto(){calls++;throw Error('navigation called');}};
-for(const url of JSON.parse(process.argv[1])){
-  const plan=[{emoji:'a',route:'/',url:'http://localhost/'},{emoji:'b',route:'/b',url}];
-  for(const iterate of [false,true]){
-    let rejected=false;
-    try{if(iterate){for await(const row of walkSteps(page,plan)){};}else await walk(page,plan);}
-    catch(e){if(!e.message.includes('execution URLs'))throw e;rejected=true;}
-    if(!rejected)throw Error('invalid plan accepted');
-  }
-}
-if(calls!==0)throw Error('navigation began');
-"""
-    result = subprocess.run(['node', '--input-type=module', '-e', script, json.dumps(INVALID)],
-                            cwd=ROOT, capture_output=True, text=True, timeout=30)
-    assert result.returncode == 0, result.stderr
