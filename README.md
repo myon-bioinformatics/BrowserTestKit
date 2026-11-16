@@ -182,7 +182,7 @@ python -S tools/route_trail.py '🏠 ↔ 🗺' --registry fixtures/route_trail_r
 
 Execution APIs and CLI (`--run`) are documented in [route trail execution](docs/route-trail-execution.md).
 
-Measured mouse/touch `press` for canvas-painted UIs (Flutter Web) and a `watch` that records requests, dialogs, errors and storage while untrusted input is handled: [interaction](docs/interaction.md) (`tools/interaction.mjs` / `tools/interaction.py`).
+Measured mouse/touch `press` for canvas-painted UIs (Flutter Web) and a `watch` that records requests, dialogs, errors and storage while untrusted input is handled: [interaction](docs/interaction.md) (`tools/browser_execution.mjs` / `tools/interaction.py`).
 
 Browserless mirror tests — several independent implementations (markdown-it / marked, ExcelJS / SheetJS / a stdlib OOXML reader, your own code) must agree on one artifact: [mirror tests](docs/mirror-tests.md) (`tools/mirror_facts.mjs` / `tools/mirror_check.py`).
 

@@ -7,7 +7,7 @@ let press, watch, inventory;
 test.beforeAll(async () => {
   // Native import avoids the CommonJS test runner transforming the ESM asset.
   ({press, watch, inventory} = await new Function('url', 'return import(url)')(
-    pathToFileURL(resolve('tools/interaction.mjs')).href));
+    pathToFileURL(resolve('tools/browser_execution.mjs')).href));
 });
 const url = pathToFileURL(resolve('fixtures/interaction.html')).href;
 
