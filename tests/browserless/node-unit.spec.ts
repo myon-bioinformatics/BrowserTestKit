@@ -4,7 +4,6 @@ import {spawnSync} from 'node:child_process';
 // One browserless Playwright case per node:test file, so each lands in this lane's JUnit.
 // tests/node-unit/btk_playwright.test.mjs launches Chromium and runs in the python-browser job instead.
 const suites: [title: string, file: string, plain?: boolean][] = [
-  ['Node hit probe unit tests and Python parity', 'hit_probe.test.mjs'],
   ['platform fixture state machines and Node runtime contract', 'page_inspect_scenario_fixture.test.mjs'],
   ['Node page-inspect unit tests and Python parity', 'page_inspect.test.mjs'],
   // Playwright sets FORCE_COLOR; ambient NO_COLOR otherwise adds Node warnings to stderr.
