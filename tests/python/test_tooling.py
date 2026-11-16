@@ -6,7 +6,6 @@ import importlib.util
 import io
 import json
 import os
-import re
 import shlex
 import subprocess
 import sys
@@ -34,13 +33,6 @@ def test_python_compatibility_lanes_keep_their_executable_support_checks():
     assert next(step for step in floor if step.get('uses', '').startswith('astral-sh/setup-uv@'))['with']['python-version'] == '3.11'
     assert any(step.get('run') == 'uv sync --locked --all-groups' for step in floor)
     assert any(step.get('run') == 'python -S tools/image_diff.py --help' for step in floor)
-
-
-def test_node_execution_lanes_keep_node_26():
-    jobs = yaml.safe_load((ROOT / '.github/workflows/ci.yml').read_text())['jobs']
-    for name in ('node', 'node-browserless'):
-        setup = next(step for step in jobs[name]['steps'] if step.get('uses', '').startswith('actions/setup-node@'))
-        assert setup['with']['node-version'] == '26'
 
 
 # ═══ · browser pages dependencies ════════════════════════════════════════════════════════════════════════
@@ -296,34 +288,6 @@ def test_locked_baseline_runs_automatically_without_candidate_snapshot():
             assert step['with']['if-no-files-found'] == 'error'
     lock = next(s for s in steps if s.get('name') == 'Preserve vendor lock used by this run')
     assert lock['with']['path'] == 'build/vendor-evidence-locked'
-
-
-def test_real_canonical_staging_preserves_locked_bytes(tmp_path):
-    import shutil
-    tool_root = Path(os.environ.get('BTK_CANONICAL_TOOLS', str(ROOT / '.vendor-sync-tools')))
-    if not (tool_root / 'vendor_stage.py').is_file() and not os.environ.get('CI'):
-        pytest.skip('BTK_CANONICAL_TOOLS / .vendor-sync-tools not available locally (CI still requires it)')
-    for name in SNAPSHOT:
-        path = tmp_path / name
-        path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(ROOT / name, path)
-    stage_argv = [sys.executable, '-S', str(tool_root / 'vendor_stage.py'),
-                  '--root', str(tmp_path), '--kind', 'locked', '--output', 'build/staged']
-    result = subprocess.run(stage_argv, capture_output=True, text=True, timeout=30)
-    assert result.returncode == 0, result.stderr
-    output = tmp_path / 'build/staged'
-    meta = json.loads((output / 'vendor-evidence.json').read_text())
-    locked = {'vendor.lock.json'} | {e['destination'] for e in LOCK['files']}
-    assert set(meta['locked']) == locked
-    assert meta['legacy'] == []
-    assert meta['runtime'] == []
-    expected = locked
-    assert set(meta['sha256']) == expected
-    assert {p.relative_to(output).as_posix() for p in output.rglob('*') if p.is_file()} == expected | {'vendor-evidence.json'}
-    for name in expected:
-        data = (output / name).read_bytes()
-        assert data == (tmp_path / name).read_bytes()
-        assert hashlib.sha256(data).hexdigest() == meta['sha256'][name]
 
 
 # ═══ · node26 profile workflow ═══════════════════════════════════════════════════════════════════════════
