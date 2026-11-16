@@ -4,6 +4,8 @@ import asyncio
 import copy
 import importlib.util
 import json
+import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -12,6 +14,30 @@ from types import SimpleNamespace
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node unavailable")
+@pytest.mark.parametrize("tool,invalid", [("route_trail", False), ("route_trail", True),
+                                         ("hit_probe", False), ("hit_probe", True)])
+def test_node_launcher_preserves_python_cli(tool, invalid, tmp_path):
+    """The replacement Node entry point preserves output, errors and exit codes."""
+    if tool == "route_trail":
+        args = ["🦄" if invalid else "🏠 ↔ 🗺", "--registry",
+                str(ROOT / "fixtures/route_trail_registry.json"), "--json"]
+    else:
+        saved = tmp_path / "map.json"
+        saved.write_text(json.dumps({"map": ["110", "110"]}), encoding="utf-8")
+        args = ["factorize", str(saved), "--rank", "0" if invalid else "2"]
+    script = str(ROOT / "tools" / f"{tool}.py")
+    env = {**os.environ, "BTK_PYTHON": sys.executable}
+    direct = subprocess.run([sys.executable, "-S", script, *args], env=env,
+                            capture_output=True, timeout=30)
+    bridged = subprocess.run([shutil.which("node"), str(ROOT / "vendor/py_launch.cjs"),
+                              "--env-var", "BTK_PYTHON", script, *args], env=env,
+                             capture_output=True, timeout=30)
+    assert direct.returncode == (2 if invalid else 0)
+    assert (bridged.returncode, bridged.stdout, bridged.stderr) == (
+        direct.returncode, direct.stdout, direct.stderr)
 
 
 # ═══ · route trail ═══════════════════════════════════════════════════════════════════════════════════════
