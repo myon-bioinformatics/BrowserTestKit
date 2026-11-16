@@ -49,4 +49,4 @@ package-dir = { "" = "tools" }
 [tool.setuptools.data-files]
 "share/browser-test-kit" = ["tools/route_trail_node.mjs", "tools/interaction.mjs", "tools/hit_probe.mjs", "tools/mirror_facts.mjs"]
 
-"share/browser-test-kit/pillow_min" = ["vendor/pillow_min/pillow_min.py", "vendor/pillow_min/Ironmate-LICENSE"]
+"share/browser-test-kit/pillow_min" = ["vendor/pillow_min/pillow_min.py", "vendor/pillow_min/myon-bioinformatics-LICENSE"]
