@@ -9,7 +9,11 @@ published Flutter app separately on Chromium/Firefox/WebKit desktop plus Chromiu
 Pixel and WebKit iPhone **emulation**. These are not physical phones, and Playwright
 WebKit is not Safari. Pull requests that touch adapters run it on Linux; a manual
 run (`workflow_dispatch`) or the weekly schedule runs the same five browser/profile
-lanes on Linux, macOS and Windows (15 jobs). The adapters cover representative pages:
+lanes on Linux, macOS and Windows (15 jobs). The adapters live in one set file,
+`adapters/flutter.json` (`btk-platform-adapters/1`): `shared` holds the header contract every page has, and `adapters`
+maps each id to what differs (usually just the URL). `--adapter adapters/flutter.json#flutter-home` measures one of
+them, `--adapter adapters/flutter.json` measures all, and a single-adapter file (`btk-platform-adapter/1`) still works.
+They cover representative pages:
 
 | Adapter | Route | Layout scope | Real coordinate input and postcondition |
 | --- | --- | --- | --- |
@@ -57,7 +61,7 @@ real-input postcondition still fails when an overlay blocks the action.
 
 ```sh
 python tools/platform_probe.py collect --browser chromium --profile desktop \
-  --adapter adapters/flutter-counter.json --widths 320 384 \
+  --adapter adapters/flutter.json#flutter-counter --widths 320 384 \
   --out app-results --evidence-dir app-results/counter/screenshots
 python -S tools/platform_probe.py merge app-results --out app-matrix/dataset.json
 uv run --group pages python tools/platform_probe.py render app-matrix/dataset.json --out app-matrix/index.html

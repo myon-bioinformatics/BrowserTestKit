@@ -15,7 +15,7 @@ overlays). watch() records requests, dialogs (dismissed), uncaught errors,
 popups and Web Storage changes (key count plus a fingerprint of the sorted
 key/value pairs, so overwriting an existing key counts; raw values are not
 recorded) while untrusted input is handled.
-Node twin: tools/interaction.mjs (same records).
+Node twin: tools/browser_execution.mjs (same records).
 
 CLI (offline, assert-late): check saved `pointer-press/1` / `side-effects/1` records.
 
@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import argparse, json, math, sys
 
-# Same snapshot function text as storage() in interaction.mjs.
+# Same snapshot function text as storage() in browser_execution.mjs.
 _STORAGE = """() => {
   // Per area: key count and an FNV-1a fingerprint of the sorted key/value pairs,
   // so an overwrite of an existing key is detected without exposing raw values.
@@ -45,7 +45,7 @@ _STORAGE = """() => {
   return {local: snap('localStorage'), session: snap('sessionStorage')};
 }"""
 INVENTORY_SELECTOR = "flt-semantics, [role], button, a, input, select, textarea"
-# Same function text as inventory() in interaction.mjs.
+# Same function text as inventory() in browser_execution.mjs.
 _INVENTORY = r"""([selector, limit]) => {
   // Role, aria-label, text, identifier and box of each matching element:
   // shows when a framework merged a control into a larger container.
@@ -71,7 +71,7 @@ _HIT = """(el, [x, y]) => { const top = document.elementFromPoint(x, y);
 
 
 def _round(value):
-    # Same float operations as interaction.mjs: round() ties to even, Math.round ties up
+    # Same float operations as browser_execution.mjs: round() ties to even, Math.round ties up
     # (9/16 gave 0.562 here and 0.563 in Node).
     return math.floor(value * 1000 + 0.5) / 1000
 
@@ -131,7 +131,7 @@ def _inventory_record(selector, data):
 
 
 def inventory(page, *, selector=INVENTORY_SELECTOR, limit=200):
-    """Role, aria-label, text, identifier and box of matching elements (see interaction.mjs).
+    """Role, aria-label, text, identifier and box of matching elements (see browser_execution.mjs).
 
     `aria_label` is the raw attribute, not the computed accessible name: a
     `<button>Submit</button>` has `aria_label: None` and `text: "Submit"`.

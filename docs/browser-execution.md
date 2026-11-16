@@ -1,8 +1,8 @@
 # Shared browser execution ownership
 
 `browser_execution.mjs` extracts the generic machinery first exercised by Flutter
-PR #206. It imports Node standard libraries and the existing `interaction.mjs`
-real-pointer helper; it does not launch/install a browser or add a dependency.
+PR #206. It imports Node standard libraries and also holds the real-pointer
+`press`, `watch` and `inventory` helpers (formerly `interaction.mjs`); it does not launch/install a browser or add a dependency.
 
 ```js
 import {workerBudget, explore} from './tools/browser_execution.mjs';

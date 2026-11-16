@@ -4,6 +4,7 @@ import asyncio
 import copy
 import importlib.util
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -13,6 +14,30 @@ from types import SimpleNamespace
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node unavailable")
+@pytest.mark.parametrize("tool,invalid", [("route_trail", False), ("route_trail", True),
+                                         ("hit_probe", False), ("hit_probe", True)])
+def test_node_launcher_preserves_python_cli(tool, invalid, tmp_path):
+    """The replacement Node entry point preserves output, errors and exit codes."""
+    if tool == "route_trail":
+        args = ["🦄" if invalid else "🏠 ↔ 🗺", "--registry",
+                str(ROOT / "fixtures/route_trail_registry.json"), "--json"]
+    else:
+        saved = tmp_path / "map.json"
+        saved.write_text(json.dumps({"map": ["110", "110"]}), encoding="utf-8")
+        args = ["factorize", str(saved), "--rank", "0" if invalid else "2"]
+    script = str(ROOT / "tools" / f"{tool}.py")
+    env = {**os.environ, "BTK_PYTHON": sys.executable}
+    direct = subprocess.run([sys.executable, "-S", script, *args], env=env,
+                            capture_output=True, timeout=30)
+    bridged = subprocess.run([shutil.which("node"), str(ROOT / "vendor/py_launch.cjs"),
+                              "--env-var", "BTK_PYTHON", script, *args], env=env,
+                             capture_output=True, timeout=30)
+    assert direct.returncode == (2 if invalid else 0)
+    assert (bridged.returncode, bridged.stdout, bridged.stderr) == (
+        direct.returncode, direct.stdout, direct.stderr)
 
 
 # ═══ · route trail ═══════════════════════════════════════════════════════════════════════════════════════
@@ -98,6 +123,13 @@ def test_cli(tmp_path, capsys):
 # Real browsers exercise shared navigation, readiness and resumable execution.
 
 BASE = (ROOT / "fixtures" / "route_trail_delayed.html").as_uri()
+BROWSER_CASES = (
+    pytest.param("chromium", None, id="desktop-chromium"),
+    pytest.param("firefox", None, id="desktop-firefox"),
+    pytest.param("webkit", None, id="desktop-webkit"),
+    pytest.param("chromium", "Pixel 7", id="mobile-chromium-pixel-7"),
+    pytest.param("webkit", "iPhone 13", id="mobile-webkit-iphone-13"),
+)
 
 
 def registry():
@@ -105,18 +137,26 @@ def registry():
 
 
 @pytest.mark.browser
-@pytest.mark.parametrize("browser_name", ("chromium", "firefox", "webkit"))
-def test_walk_resume_and_failure(browser_name, tmp_path):
+@pytest.mark.parametrize(("browser_name", "device_name"), BROWSER_CASES)
+def test_walk_resume_and_failure(browser_name, device_name, tmp_path):
     from playwright.sync_api import sync_playwright
     with sync_playwright() as pw:
         browser = getattr(pw, browser_name).launch()
         try:
-            page = browser.new_page()
+            page = browser.new_page(**(pw.devices[device_name] if device_name else {}))
+            def check(page, step):
+                assert page.url == step["url"]
+                assert page.locator("#page").inner_text() == step["ready"]["text"]
+                assert page.locator("#visits").inner_text() == str(step["index"] + 1)
+                page.screenshot(path=str(tmp_path / f"{step['index']:03}.png"), full_page=True)
             iterator = route_trail.walk_steps(page, "🏠 → @hub → 🌍 → 🏠", registry(), base=BASE,
-                check=lambda page, step: page.screenshot(path=str(tmp_path / f"{step['index']:03}.png"), full_page=True))
-            assert next(iterator)["index"] == 0
+                check=check)
+            first = next(iterator)
+            assert first["index"] == 0
             page.evaluate("window.retained = 42")
-            assert len(list(iterator)) == 3
+            steps = [first, *iterator]
+            assert [s["route"] for s in steps] == ["/", "/hub", "/screen1", "/"]
+            assert all(s["verification"] == "url+marker" for s in steps)
             assert page.evaluate("window.retained") == 42
             assert page.locator("#visits").inner_text() == "4"
             shots = sorted(tmp_path.glob("*.png"))
@@ -130,29 +170,57 @@ def test_walk_resume_and_failure(browser_name, tmp_path):
             bad["@hub"]["ready"]["text"] = "Never rendered"
             with pytest.raises(route_trail.TrailExecutionError) as err:
                 route_trail.walk(page, "@home → @hub → @world", bad, base=BASE, timeout_ms=250)
-            assert err.value.receipt["completed"] == 1
-            assert err.value.receipt["error"]["phase"] == "ready"
+            receipt = err.value.receipt
+            assert receipt["schema"] == "route-trail-run/1" and not receipt["ok"]
+            assert receipt["completed"] == 1 and receipt["total"] == 3
+            assert [s["route"] for s in receipt["steps"]] == ["/"]
+            assert receipt["steps"][0]["observed_url"] == BASE + "#/"
+            assert receipt["error"]["index"] == 1
+            assert receipt["error"]["route"] == "/hub"
+            assert receipt["error"]["phase"] == "ready"
             assert page.url.endswith("#/hub")
         finally:
             browser.close()
 
 
 @pytest.mark.browser
-@pytest.mark.parametrize("browser_name", ("chromium", "firefox", "webkit"))
-def test_async_walk(browser_name, tmp_path):
+@pytest.mark.parametrize(("browser_name", "device_name"), BROWSER_CASES)
+def test_async_walk(browser_name, device_name, tmp_path):
     from playwright.async_api import async_playwright
     async def run():
         async with async_playwright() as pw:
             browser = await getattr(pw, browser_name).launch()
             try:
-                page = await browser.new_page()
+                page = await browser.new_page(**(pw.devices[device_name] if device_name else {}))
                 async def check(page, step):
                     await asyncio.sleep(0)
+                    assert page.url == step["url"]
+                    assert await page.locator("#page").inner_text() == step["ready"]["text"]
                     assert await page.locator("#visits").inner_text() == str(step["index"] + 1)
+                    if step["index"] == 0:
+                        await page.evaluate("window.retained = 42")
+                    assert await page.evaluate("window.retained") == 42
                     await page.screenshot(path=str(tmp_path / f"{step['index']:03}.png"), full_page=True)
                 result = await route_trail.awalk(page, "🏠 ↔ 🗺️", registry(), base=BASE, check=check)
                 assert result["ok"] and result["completed"] == 3
-                assert len(list(tmp_path.glob("*.png"))) == 3
+                assert [s["route"] for s in result["steps"]] == ["/", "/hub", "/"]
+                assert all(s["verification"] == "url+marker" for s in result["steps"])
+                shots = sorted(tmp_path.glob("*.png"))
+                assert len(shots) == 3
+                assert all(p.read_bytes().startswith(b"\x89PNG\r\n\x1a\n") for p in shots)
+                bad = registry()
+                bad["@hub"]["ready"]["text"] = "Never rendered"
+                with pytest.raises(route_trail.TrailExecutionError) as err:
+                    await route_trail.awalk(page, "@home → @hub → @world", bad, base=BASE, timeout_ms=250)
+                receipt = err.value.receipt
+                assert receipt["schema"] == "route-trail-run/1" and not receipt["ok"]
+                assert receipt["completed"] == 1 and receipt["total"] == 3
+                assert [s["route"] for s in receipt["steps"]] == ["/"]
+                assert receipt["steps"][0]["observed_url"] == BASE + "#/"
+                assert receipt["error"]["index"] == 1
+                assert receipt["error"]["route"] == "/hub"
+                assert receipt["error"]["phase"] == "ready"
+                assert page.url.endswith("#/hub")
             finally:
                 await browser.close()
     asyncio.run(run())
@@ -273,8 +341,8 @@ def test_bridge_is_one_process_and_checks_receipt(monkeypatch):
         calls.append((cmd,kw));request=json.loads(kw['input']);rows=[{**s,'index':i,'status':'passed','observed_url':s['url']} for i,s in enumerate(request['steps'])]
         return SimpleNamespace(stdout=json.dumps(m._receipt(rows,len(rows))),stderr='',returncode=0)
     monkeypatch.setattr(subprocess,'run',run)
-    result=m.run_plan(steps,backend='node',node_cwd='/consumer')
-    assert result['ok'] and len(calls)==1 and calls[0][1]['cwd']=='/consumer'
+    result=m.run_plan(steps)
+    assert result['ok'] and len(calls)==1 and calls[0][0][0]==sys.executable and 'cwd' not in calls[0][1]
     assert calls[0][1]['timeout']==120 and 'shell' not in calls[0][1]
 
 @pytest.mark.parametrize('raw',[
@@ -313,25 +381,8 @@ def test_multicodepoint_emoji_is_a_whole_identity():
         m.resolve('👩‍💻', registry)  # Skin tone and ZWJ are not discarded.
 
 
-def test_node_helper_found_in_user_install(monkeypatch, tmp_path):
-    import site
-    helper = tmp_path / 'user/share/browser-test-kit/route_trail_node.mjs'
-    helper.parent.mkdir(parents=True)
-    helper.write_text('// installed asset')
-    monkeypatch.setattr(m, '__file__', str(tmp_path/'site-packages/route_trail.py'))
-    monkeypatch.setattr(m.sys, 'prefix', str(tmp_path/'environment'))
-    monkeypatch.setattr(site, 'getuserbase', lambda: str(tmp_path/'user'))
-    steps = m.resolve('🏠', LEGACY)
-    def run(cmd, **kwargs):
-        assert cmd == ['node', str(helper.resolve())]
-        rows = [{**steps[0], 'index':0, 'status':'passed', 'observed_url':steps[0]['url']}]
-        return SimpleNamespace(stdout=json.dumps(m._receipt(rows,1)), stderr='', returncode=0)
-    monkeypatch.setattr(subprocess, 'run', run)
-    assert m.run_plan(steps, backend='node')['ok']
-
-
 # ═══ · execution url contract ════════════════════════════════════════════════════════════════════════════
-# Expected URL decisions and preflight side effects for the Python and Node route trails.
+# Expected URL decisions and preflight side effects for the route trail.
 
 def load(name):
     spec = importlib.util.spec_from_file_location(name, ROOT / 'tools' / (name + '.py'))
@@ -341,29 +392,6 @@ def load(name):
 
 
 trail = load('route_trail')
-
-NODE_PROGRAM = r"""
-import {pathToFileURL} from 'node:url';
-const chunks = [];
-for await (const chunk of process.stdin) chunks.push(chunk);
-const {module, name, cases} = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-const fn = (await import(pathToFileURL(module).href))[name];
-const out = [];
-for (const args of cases) {
-  try { out.push({ok: true, value: await fn(...args)}); }
-  catch (error) { out.push({ok: false, error: String(error?.message ?? error)}); }
-}
-process.stdout.write(JSON.stringify(out));
-"""
-
-
-def node_calls(module, name, cases):
-    done = subprocess.run(['node', '--input-type=module', '-e', NODE_PROGRAM],
-                          input=json.dumps({'module': str(module), 'name': name, 'cases': cases}),
-                          capture_output=True, text=True, encoding='utf-8', timeout=60)
-    assert done.returncode == 0, done.stderr
-    return json.loads(done.stdout)
-
 
 def python_calls(fn, cases):
     out = []
@@ -421,28 +449,13 @@ def test_python_expected_url_decisions(url, expected):
             trail.validate_steps([step(url)])
 
 
-@pytest.mark.skipif(shutil.which('node') is None, reason='node unavailable')
-def test_node_expected_decisions_and_native_parser_agree():
-    cases = [[[step(url)]] for url in VALID + INVALID]
-    actual = node_calls(ROOT / 'tools/route_trail_node.mjs', 'validateSteps', cases)
-    assert [r['ok'] for r in actual] == [True]*len(VALID) + [False]*len(INVALID)
-    # An independent implementation checks the positive oracle is browser-parseable.
-    parsed = subprocess.run(['node', '--input-type=module', '-e',
-        'const urls=JSON.parse(process.argv[1]);for(const u of urls)new URL(u);', json.dumps(VALID)],
-        capture_output=True, text=True, timeout=30)
-    assert parsed.returncode == 0, parsed.stderr
-
-
-@pytest.mark.skipif(shutil.which('node') is None, reason='node unavailable')
-def test_port_boundaries_have_expected_decisions_in_python_and_node():
+def test_port_boundaries_have_expected_decisions():
     urls = [f'http://{host}:{port}/' for host in ('a', '127.0.0.1', '[::1]')
             for port in (0, 1, 65534, 65535, 65536, 99999)]
     expected = [port in (1, 65534, 65535) for _ in range(3)
                 for port in (0, 1, 65534, 65535, 65536, 99999)]
     cases = [[[step(u)]] for u in urls]
-    for results in (python_calls(trail.validate_steps, cases),
-                    node_calls(ROOT / 'tools/route_trail_node.mjs', 'validateSteps', cases)):
-        assert [r['ok'] for r in results] == expected
+    assert [r['ok'] for r in python_calls(trail.validate_steps, cases)] == expected
 
 
 @pytest.mark.parametrize('bad_url', INVALID)
@@ -459,28 +472,6 @@ def test_invalid_later_step_prevents_python_navigation_and_process(monkeypatch, 
         trail.walk(Page(), 'unused', {})
     with pytest.raises(ValueError):
         asyncio.run(trail.awalk(Page(), 'unused', {}))
-    for backend in ('python', 'python-async', 'node'):
+    for backend in ('python', 'python-async'):
         with pytest.raises(ValueError):
             trail.run_plan(plan, backend=backend)
-
-
-@pytest.mark.skipif(shutil.which('node') is None, reason='node unavailable')
-def test_invalid_later_step_prevents_node_navigation():
-    script = """
-import {walk,walkSteps} from './tools/route_trail_node.mjs';
-let calls=0;
-const page={goto(){calls++;throw Error('navigation called');}};
-for(const url of JSON.parse(process.argv[1])){
-  const plan=[{emoji:'a',route:'/',url:'http://localhost/'},{emoji:'b',route:'/b',url}];
-  for(const iterate of [false,true]){
-    let rejected=false;
-    try{if(iterate){for await(const row of walkSteps(page,plan)){};}else await walk(page,plan);}
-    catch(e){if(!e.message.includes('execution URLs'))throw e;rejected=true;}
-    if(!rejected)throw Error('invalid plan accepted');
-  }
-}
-if(calls!==0)throw Error('navigation began');
-"""
-    result = subprocess.run(['node', '--input-type=module', '-e', script, json.dumps(INVALID)],
-                            cwd=ROOT, capture_output=True, text=True, timeout=30)
-    assert result.returncode == 0, result.stderr

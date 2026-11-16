@@ -27,7 +27,7 @@ Both leading (`🏠 Home`) and trailing (`Home 🏠`) conventions are supported
 by passing the extracted identity. In Python use `title.split(maxsplit=1)[0]`
 for a leading identity or `title.rsplit(maxsplit=1)[-1]` for a trailing one.
 Flutter Navigation Basic uses the trailing convention. The shared browser
-fixture tests both positions in Python and Node.
+fixture tests both positions.
 There is no automatic scan of all title/body emojis or fuzzy title matching.
 Duplicate normalized identities are errors, and unknown emojis fail before any
 navigation. Registration is required; aliases resolve to the canonical page.
@@ -48,18 +48,14 @@ Planning still works with `python -S`, without installed Playwright:
 python -S tools/route_trail.py '@home ↔ @world' --registry pages.json --base https://example.test --json
 python -S tools/route_trail.py '@home ↔ @world' --registry pages.json --base https://example.test --run --json
 python -S tools/route_trail.py '@home ↔ @world' --registry pages.json --base https://example.test --run --backend python-async --json
-python -S tools/route_trail.py '@home ↔ @world' --registry pages.json --base https://example.test --run --backend node --node-cwd /path/to/existing/node/project --json
 ```
 
 Execution starts **one worker, one browser and one Page for the entire trail**.
 Python workers use the same interpreter with site packages enabled; install the
-consumer's Playwright and browser binaries first. Node uses the consumer's existing
-`playwright` installation in `--node-cwd` (default current directory), falling
-back to `@playwright/test` when the top-level `playwright` package is absent. No extra
-npm library, TypeScript compiler, Deno or Dart runtime is required. The `.mjs`
-helper ships in the Python wheel under `share/browser-test-kit`. Resolution
-checks the module sibling, environment prefix, then `site.getuserbase()` for
-`pip install --user` (including when the planner runs with `-S`).
+consumer's Playwright and browser binaries first. From Node, start the same CLI
+through the vendored launcher: `node vendor/py_launch.cjs --env-var BTK_PYTHON --site
+tools/route_trail.py … --run --json` (the former `--backend node` and its `.mjs`
+helper are gone; Python is the one runtime).
 
 `--browser chromium|firefox|webkit`, `--timeout-ms` (per Playwright wait, default
 10000), `--run-timeout` (whole subprocess, default 120 seconds), `--path-routing`
@@ -95,16 +91,7 @@ Hooks `navigate(page, step)`, `ready(page, step)`, `check(page, step)` run in th
 order (step includes zero-based index). Explicit `False` fails a hook. Sync
 execution rejects awaitables; async execution accepts sync or async hooks.
 
-```js
-import {walk, walkSteps} from './tools/route_trail_node.mjs';
-// steps are JSON records from the Python planner; Node does not duplicate its parser.
-const result = await walk(page, steps, {check: async (page, step) => inspect(page, step)});
-for await (const step of walkSteps(page, steps)) await inspect(page, step);
-```
-
-Node uses the same readiness/receipt contract and exposes `navigate`, `ready`,
-`check`, `timeoutMs`. The generator snapshots the plan before the first action.
-Both runtimes validate the full plan first. Pausing between yields retains the
+The generator snapshots the plan before the first action and validates the full plan first. Pausing between yields retains the
 same Page and browser state **within that running process**. Separate CLI calls
 start fresh browser contexts; this is not a persistent browser service.
 
@@ -125,9 +112,12 @@ Existing Dart map parsing remains a source-text compatibility adapter.
 
 `fixtures/route_trail_execution.json` is the shared portable catalog. Its delayed
 hash router proves marker waits, forward/return visits and retained document
-state. Python tests cover sync/async and Chromium/Firefox/WebKit; the existing
-Node matrix also covers mobile Chromium/WebKit emulation. Node tests consume
-Python-generated plans and execute the Python → Node CLI bridge. Unit tests
+state. Python tests cover sync/async on desktop Chromium/Firefox/WebKit and
+mobile emulation using Playwright's Pixel 7 (Chromium) and iPhone 13 (WebKit)
+device descriptors, matching the Node project profiles. Each profile checks
+navigation, delayed rendering, return visits, retained document state and
+failure receipts containing only the completed prefix. These are emulation
+checks, not physical-device tests. Unit tests
 cover strict catalogs, whole-plan validation, hooks, prefix errors, bounded
 subprocesses and receipt validation. These execute in existing CI jobs.
 
@@ -177,15 +167,15 @@ PY
 
 The built-in `--run` currently emits receipts; screenshot capture uses these
 API hooks, not a new CLI screenshot flag. For an installed kit, omit
-`PYTHONPATH=tools`. Existing sync/async Python and Node browser matrix tests
-capture each step and check that actual PNG files were produced; Node retains
-them in its CI artifact. This validates capture, not visual-baseline comparison.
+`PYTHONPATH=tools`. Existing sync/async Python browser matrix tests
+capture each step and check that actual PNG files were produced.
+This validates capture, not visual-baseline comparison.
 
 
-### Execution URL contract (Python and Node)
+### Execution URL contract
 
-The full plan is checked before navigation or a runtime subprocess starts. Both
-twins accept HTTP(S) with ASCII DNS labels (including localhost and a trailing
+The full plan is checked before navigation or a runtime subprocess starts. It
+accepts HTTP(S) with ASCII DNS labels (including localhost and a trailing
 dot), canonical four-octet decimal IPv4, or bracketed IPv6 without a zone ID.
 An explicit destination port must be **1..65535**: 65535 is accepted; 0, 65536,
 and 99999 are rejected. Port 0 is reserved and is not a supported destination.
@@ -199,7 +189,7 @@ This tightens the Unicode-host acceptance once proposed in the (since removed)
 `twin_parity.py` design; the contract is now checked by
 `tests/python/test_route_trail.py`.
 Unicode remains supported in paths, queries and fragments. URL length is at
-most 4096 Unicode code points in both runtimes.
+most 4096 Unicode code points.
 
 Credentials, empty/malformed authorities, controls, Unicode whitespace, and
 backslashes are rejected. Local absolute `file:///path` and

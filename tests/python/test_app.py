@@ -107,7 +107,7 @@ def run(tmp_path):
     adapters = tmp_path / 'adapters'
     adapters.mkdir()
     for name in ('flutter-home', 'flutter-hub'):
-        (adapters / f'{name}.json').write_text((ROOT / 'adapters' / f'{name}.json').read_text(encoding='utf-8'),
+        (adapters / f'{name}.json').write_text(json.dumps(comparison.probe.adapters.load_adapter(ROOT / f'adapters/flutter.json#{name}')),
                                               encoding='utf-8')
     results = tmp_path / 'app-results'
     for n, (adapter, verdict, failed) in enumerate([('flutter-home', 'pass', ()), ('flutter-hub', 'fail', ('overlap:#a:#b',))]):
@@ -160,9 +160,17 @@ def test_digest_rejects_ambiguous_records():
 # ═══ · app selection ═════════════════════════════════════════════════════════════════════════════════════
 # Selected plans stay consistent across comparison and digest entry points.
 
+def test_selection_reads_ids_from_an_adapter_set_file():
+    pages, _ = comparison.select_targets(ROOT / 'adapters', ['ubuntu-24.04'])
+    assert len(pages) == 9 and pages == sorted(pages) and all(page.startswith('flutter-') for page in pages)
+    assert comparison.select_targets(ROOT / 'adapters', ['ubuntu-24.04'], pages=['flutter-h*'])[0] == ['flutter-home', 'flutter-http-request-draft', 'flutter-hub']
+    with pytest.raises(ValueError, match='no selected adapters'):
+        comparison.select_targets(ROOT / 'adapters', ['ubuntu-24.04'], pages=['flutter'])      # the file name is not a page
+
+
 def adapters(root):
     root.mkdir()
-    original = json.loads((ROOT / 'adapters/flutter-home.json').read_text(encoding='utf-8'))
+    original = comparison.probe.adapters.load_adapter(ROOT / 'adapters/flutter.json#flutter-home')
     for name in ('flutter-home', 'portal-home'):
         (root / (name + '.json')).write_text(json.dumps(dict(original, id=name)), encoding='utf-8')
     return root

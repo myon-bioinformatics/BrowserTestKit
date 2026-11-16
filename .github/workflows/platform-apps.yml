@@ -129,12 +129,10 @@ jobs:
         run: |
           read -ra widths <<< "$WIDTHS"
           status=0
-          for adapter in adapters/flutter-*.json; do
-            name=$(basename "$adapter" .json)
-            uv run --locked --group browser python tools/platform_probe.py collect --browser "$BROWSER" --profile "$PROFILE" \
-              --adapter "$adapter" --widths "${widths[@]}" --width-step "$WIDTH_STEP" --out app-results \
-              --evidence-dir "app-results/$name/$RUNNER_OS-$BROWSER-$PROFILE" || status=1
-          done
+          # adapters/flutter.json is a set: collect measures every adapter in it and keeps going past a failing page.
+          uv run --locked --group browser python tools/platform_probe.py collect --browser "$BROWSER" --profile "$PROFILE" \
+            --adapter adapters/flutter.json --widths "${widths[@]}" --width-step "$WIDTH_STEP" --out app-results \
+            --evidence-dir "app-results/{adapter}/$RUNNER_OS-$BROWSER-$PROFILE" || status=1
           python -S tools/platform_probe.py summary app-results > app-results/summary.txt || status=1
           { echo 'Published-site observations; mobile profiles are emulation, not physical devices.'; echo '```text'; cat app-results/summary.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           exit "$status"
