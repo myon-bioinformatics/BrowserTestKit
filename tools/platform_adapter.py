@@ -43,8 +43,37 @@ LAYOUT_JS = r"""cfg => {
 }"""
 
 
+def load_adapters(path: str | Path) -> dict[str, dict]:
+    """Every adapter in one JSON file, by id: a single ``btk-platform-adapter/1`` object, or a set.
+
+    A set (``btk-platform-adapters/1``) keeps pages that differ only by URL in one file: ``shared`` holds the common
+    fields and ``adapters`` maps each id to what differs. Each resolved adapter is the same object a file of its own
+    would hold, so its target identity does not depend on which form it is written in."""
+    data = json.loads(Path(path).read_text(encoding='utf-8'))
+    if isinstance(data, dict) and data.get('schema') == 'btk-platform-adapters/1':
+        shared, entries = data.get('shared', {}), data.get('adapters')
+        if (not isinstance(shared, dict) or not isinstance(entries, dict) or not entries
+                or not all(isinstance(name, str) and isinstance(entry, dict) for name, entry in entries.items())):
+            raise ValueError('adapter set needs a shared object and a nonempty adapters object')
+        return {name: _validated({**shared, **entry, 'schema': 'btk-platform-adapter/1', 'id': name}) for name, entry in entries.items()}
+    config = _validated(data)
+    return {config['id']: config}
+
+
 def load_adapter(path: str | Path) -> dict:
-    config = json.loads(Path(path).read_text(encoding='utf-8'))
+    """One adapter: a single-adapter file, or ``FILE#ID`` for one adapter of a set."""
+    source, _, wanted = str(path).partition('#')
+    found = load_adapters(source)
+    if wanted:
+        if wanted not in found:
+            raise ValueError(f'no adapter {wanted!r} in {source}')
+        return found[wanted]
+    if len(found) != 1:
+        raise ValueError(f'{source} holds {len(found)} adapters; name one as {source}#ID')
+    return next(iter(found.values()))
+
+
+def _validated(config) -> dict:
     if not isinstance(config, dict):
         raise ValueError('adapter must be a JSON object')
     if config.get('schema') != 'btk-platform-adapter/1':

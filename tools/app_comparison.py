@@ -27,7 +27,9 @@ def planned_envs(runners):
 
 
 def select_targets(adapter_dir, runners, *, pages=None, environments=('*',)):
-    """Select adapter filename stems and planned environments; OR within each group."""
+    """Select adapters and planned environments; OR within each group.
+
+    A page rule matches the filename stem of a single-adapter file, or the ids inside an adapter set file."""
     pages = ('flutter-*',) if pages is None else pages
     if isinstance(pages, str) or isinstance(environments, str):
         raise TypeError('selection rules must be sequences')
@@ -38,13 +40,22 @@ def select_targets(adapter_dir, runners, *, pages=None, environments=('*',)):
     if not directory.is_dir():
         raise ValueError('adapter directory must exist')
     selected = []
+    wanted = lambda name: any(fnmatch.fnmatchcase(name, rule) for rule in pages)
     for path in sorted(directory.glob('*.json')):
-        if path.is_symlink() or not path.is_file() or not any(fnmatch.fnmatchcase(path.stem, rule) for rule in pages):
+        if path.is_symlink() or not path.is_file():
             continue
-        identifier = probe.adapters.load_adapter(path)['id']
-        if identifier in selected:
-            raise ValueError(f'duplicate selected adapter id: {identifier}')
-        selected.append(identifier)
+        try:
+            is_set = json.loads(path.read_text(encoding='utf-8')).get('schema') == 'btk-platform-adapters/1'
+        except (ValueError, AttributeError):
+            is_set = False                                # not an adapter set; judged by its filename as before
+        if not is_set and not wanted(path.stem):
+            continue
+        for identifier in probe.adapters.load_adapters(path):
+            if is_set and not wanted(identifier):
+                continue
+            if identifier in selected:
+                raise ValueError(f'duplicate selected adapter id: {identifier}')
+            selected.append(identifier)
     envs = sorted({env for env in planned_envs(runners)
                    if any(fnmatch.fnmatchcase(env, rule) for rule in environments)})
     if not selected or not envs:
@@ -58,7 +69,7 @@ def select_records(records, pages, envs):
 
 
 def selection_arguments(parser):
-    parser.add_argument('--page', action='append', help='adapter filename-stem glob; repeat for OR (default flutter-*)')
+    parser.add_argument('--page', action='append', help='adapter glob (id in a set, filename stem of a single file); repeat for OR (default flutter-*)')
     parser.add_argument('--env', action='append', help='planned environment glob; repeat for OR')
     parser.add_argument('--list', action='store_true', help='list selected plan without loading records or images')
 

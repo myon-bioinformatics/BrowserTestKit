@@ -428,6 +428,36 @@ def render(records: list[dict]) -> str:
     return ui.render_document(trusted_html=body, title="Platform matrix", css=ui.core_css() + _PAGE_CSS)
 
 
+def _collect_one(args, adapter) -> int:
+    """Measure one environment for one target and write its record (or its error record): 0 pass, 1 fail, 2 error."""
+    name = adapter.partition('#')[2] or Path(adapter).stem if adapter else 'fixture'
+    evidence_dir = args.evidence_dir.replace('{adapter}', name) if args.evidence_dir else None
+    try:
+        if any(w < MIN_VIEWPORT_WIDTH or w > 3840 for w in args.widths):
+            raise ValueError('widths must be between 250 and 3840')
+        record = collect(args.browser, args.profile, headed=args.headed, channel=args.channel,
+                         adapter=adapter, url=args.url, widths=tuple(args.widths), evidence_dir=evidence_dir,
+                         width_step=args.width_step)
+    except Exception as exc:  # a browser that cannot launch or navigate is a finding, not a crash
+        where = f"{args.browser}{'/' + args.channel if args.channel else ''} {args.profile}" \
+                f"{' headed' if args.headed else ''}"
+        first = str(exc).strip().splitlines()[0][:300] if str(exc).strip() else ""
+        Path(args.out).mkdir(parents=True, exist_ok=True)
+        tag = name
+        error_path = Path(args.out) / f"error-{args.browser}-{args.profile}-{tag}.json"
+        error_path.write_text(json.dumps({'schema': 'btk-platform-error/1', 'environment': where,
+                             'adapter': tag, 'error_type': type(exc).__name__, 'message': first}) + '\n', encoding='utf-8')
+        print(f"error: {where}: {type(exc).__name__}: {first}", file=sys.stderr)
+        if os.environ.get("GITHUB_ACTIONS"):
+            print(f"::error title=platform_probe collect::{where}: {type(exc).__name__}: {first}")
+        return 2
+    Path(args.out).mkdir(parents=True, exist_ok=True)
+    path = Path(args.out) / f"{record_key(record)}.json"
+    path.write_text(json.dumps(record, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    print(summary_lines([record])[0])
+    return 0 if record["verdict"] == "pass" else 1
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
@@ -436,12 +466,12 @@ def main(argv=None) -> int:
     c.add_argument("--channel", help="installed branded browser, e.g. chrome or msedge (chromium only)")
     c.add_argument("--profile", choices=sorted(PROFILES), default="desktop")
     c.add_argument("--headed", action="store_true", help="a real window, so the frame size is measured")
-    c.add_argument('--adapter', help='JSON adapter for an application (default: original local fixture)')
+    c.add_argument('--adapter', help='JSON adapter for an application: FILE, FILE#ID for one of a set, or a set FILE to measure every adapter in it (default: original local fixture)')
     c.add_argument('--url', help='override adapter HTTP(S) target URL')
     c.add_argument('--widths', nargs='+', type=int, default=[320, 384], help='additional real-click widths; any width from 250, e.g. device widths 390 412')
     c.add_argument('--width-step', type=int, default=WIDTH_STEP,
                    help='width search grid in px: 8 (default, aligns results) or 1 (exact breakpoint edges)')
-    c.add_argument('--evidence-dir', help='screenshots; use a separate directory per environment')
+    c.add_argument('--evidence-dir', help='screenshots; use a separate directory per environment ({adapter} becomes the adapter id)')
     c.add_argument("--out", required=True, help="directory for <env-id>.json")
     m = sub.add_parser("merge", help="combine records into one dataset")
     m.add_argument("inputs", nargs="+", help="directories or JSON files")
@@ -456,30 +486,15 @@ def main(argv=None) -> int:
         if args.command == "collect":
             if args.channel and args.browser != "chromium":
                 raise ValueError("--channel needs --browser chromium")
-            try:
-                if any(w < MIN_VIEWPORT_WIDTH or w > 3840 for w in args.widths):
-                    raise ValueError('widths must be between 250 and 3840')
-                record = collect(args.browser, args.profile, headed=args.headed, channel=args.channel,
-                                 adapter=args.adapter, url=args.url, widths=tuple(args.widths), evidence_dir=args.evidence_dir,
-                                 width_step=args.width_step)
-            except Exception as exc:  # a browser that cannot launch or navigate is a finding, not a crash
-                where = f"{args.browser}{'/' + args.channel if args.channel else ''} {args.profile}" \
-                        f"{' headed' if args.headed else ''}"
-                first = str(exc).strip().splitlines()[0][:300] if str(exc).strip() else ""
-                Path(args.out).mkdir(parents=True, exist_ok=True)
-                tag = Path(args.adapter).stem if args.adapter else 'fixture'
-                error_path = Path(args.out) / f"error-{args.browser}-{args.profile}-{tag}.json"
-                error_path.write_text(json.dumps({'schema': 'btk-platform-error/1', 'environment': where,
-                                     'adapter': tag, 'error_type': type(exc).__name__, 'message': first}) + '\n', encoding='utf-8')
-                print(f"error: {where}: {type(exc).__name__}: {first}", file=sys.stderr)
-                if os.environ.get("GITHUB_ACTIONS"):
-                    print(f"::error title=platform_probe collect::{where}: {type(exc).__name__}: {first}")
-                return 2
-            Path(args.out).mkdir(parents=True, exist_ok=True)
-            path = Path(args.out) / f"{record_key(record)}.json"
-            path.write_text(json.dumps(record, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
-            print(summary_lines([record])[0])
-            return 0 if record["verdict"] == "pass" else 1
+            # An adapter set (no #ID) is measured adapter by adapter; one failing page does not stop the others.
+            targets = [args.adapter]
+            if args.adapter and '#' not in args.adapter:
+                try:
+                    found = adapters.load_adapters(args.adapter)
+                    targets = [f'{args.adapter}#{name}' for name in found] if len(found) > 1 else targets
+                except (OSError, ValueError):
+                    pass                                   # reported below as this target's error record
+            return max(_collect_one(args, target) for target in targets)
         records = load_records(args.inputs)
         if args.command in ("merge", "render"):
             Path(args.out).parent.mkdir(parents=True, exist_ok=True)

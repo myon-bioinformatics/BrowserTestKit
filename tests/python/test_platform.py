@@ -41,7 +41,7 @@ def test_reject_non_http_and_credentials(url):
 
 def test_adapters_are_valid_and_target_identity_is_sensitive_to_url_and_rules():
     for path in (ROOT / 'adapters').glob('*.json'):
-        pa.load_adapter(path)
+        assert pa.load_adapters(path)
     a = config()
     first = pa.target_identity(a, a['url'])
     assert first == pa.target_identity(a, a['url'])
@@ -121,7 +121,7 @@ def test_published_lane_runs_three_os_on_schedule_but_linux_on_pull_requests():
 
 
 def test_representative_flutter_pages_share_header_contract_and_provenance():
-    adapters = {p.stem: json.loads(p.read_text(encoding='utf-8')) for p in (ROOT / 'adapters').glob('flutter-*.json')}
+    adapters = pa.load_adapters(ROOT / 'adapters/flutter.json')      # one set file: shared header contract + what differs per page
     routes = {name: a['url'].split('#', 1)[1] for name, a in adapters.items()}
     assert routes == {'flutter-home': '/', 'flutter-hub': '/hub', 'flutter-clipboard-shelf': '/core/clipboard-shelf',
                       'flutter-now-timeline': '/tools/time/now-timeline', 'flutter-photo-studio': '/tools/media/photo-studio',
@@ -134,6 +134,52 @@ def test_representative_flutter_pages_share_header_contract_and_provenance():
                                          'field': ['repository', 'revision', 'sha']}
         assert adapter['elements'][:4] == home['elements']
     assert len({pa.target_identity(a, a['url'])['key'] for a in adapters.values()}) == len(adapters)
+
+
+def test_an_adapter_set_resolves_to_the_same_adapters_as_one_file_each(tmp_path):
+    single = config()
+    one = tmp_path / 'one.json'
+    one.write_text(json.dumps(single))
+    shared = {k: v for k, v in single.items() if k not in ('schema', 'id', 'url')}
+    many = tmp_path / 'set.json'
+    many.write_text(json.dumps({'schema': 'btk-platform-adapters/1', 'shared': shared, 'adapters': {
+        single['id']: {'url': single['url']}, 'other': {'url': single['url'] + '#other'}}}))
+    found = pa.load_adapters(many)
+    assert list(found) == [single['id'], 'other'] and found[single['id']] == single == pa.load_adapter(one)
+    assert pa.load_adapters(one) == {single['id']: single}
+    assert pa.target_identity(found[single['id']], single['url']) == pa.target_identity(single, single['url'])   # same history key
+    assert pa.load_adapter(f'{many}#other')['url'].endswith('#other')
+    for bad, message in ((many, 'holds 2 adapters'), (f'{many}#missing', 'no adapter'), (f'{one}#other', 'no adapter')):
+        with pytest.raises(ValueError, match=message):
+            pa.load_adapter(bad)
+    for broken in ({'adapters': {}}, {'adapters': {'a': 1}}, {'shared': [], 'adapters': {'a': {}}}, {'adapters': {'../bad': {'url': single['url']}}}):
+        many.write_text(json.dumps({'schema': 'btk-platform-adapters/1', 'shared': shared, **broken}))
+        with pytest.raises(ValueError):
+            pa.load_adapters(many)
+
+
+def test_collect_measures_every_adapter_of_a_set_and_reports_the_worst_result(tmp_path, monkeypatch, capsys):
+    single = config()
+    shared = {k: v for k, v in single.items() if k not in ('schema', 'id', 'url')}
+    many = tmp_path / 'set.json'
+    many.write_text(json.dumps({'schema': 'btk-platform-adapters/1', 'shared': shared, 'adapters': {
+        'first': {'url': single['url']}, 'second': {'url': single['url'] + '#second'}}}))
+    seen = []
+
+    def fake_collect(browser, profile, *, adapter, evidence_dir, **_):
+        seen.append((adapter, evidence_dir))
+        raise RuntimeError('no browser here')
+
+    monkeypatch.setattr(pp, 'collect', fake_collect)
+    base = ['collect', '--browser', 'chromium', '--out', str(tmp_path / 'out'), '--evidence-dir', str(tmp_path / 'shots/{adapter}/env')]
+    assert pp.main([*base, '--adapter', str(many)]) == 2
+    assert seen == [(f'{many}#first', str(tmp_path / 'shots/first/env')), (f'{many}#second', str(tmp_path / 'shots/second/env'))]
+    assert sorted(p.name for p in (tmp_path / 'out').iterdir()) == ['error-chromium-desktop-first.json', 'error-chromium-desktop-second.json']
+    seen.clear()
+    assert pp.main([*base, '--adapter', f'{many}#second']) == 2 and [target for target, _ in seen] == [f'{many}#second']
+    seen.clear()
+    assert pp.main(['collect', '--browser', 'chromium', '--out', str(tmp_path / 'fixture')]) == 2 and seen == [(None, None)]
+    capsys.readouterr()
 
 
 @pytest.mark.parametrize('provenance', [{'path': '/abs.json', 'field': ['a']}, {'path': '../up.json', 'field': ['a']},
@@ -213,7 +259,7 @@ def test_report_adds_the_web_ui_viewer_on_top_of_the_ironmate_comparison():
     assert '/pysaiyanweboo.py\n            /tools/\n' in apps and '/web_ui.py' not in apps  # tools/ import pysaiyanweboo, not the old forwarding name
     assert "hashFiles('app-matrix/screenshots/report.json')" in apps and 'screenshots/viewer.html' in apps
     # The viewer joins on adapter ids: web-ui's page table must name exactly these adapters.
-    assert {p.stem for p in (ROOT / 'adapters').glob('flutter-*.json')} == {
+    assert set(pa.load_adapters(ROOT / 'adapters/flutter.json')) == {
         'flutter-home', 'flutter-hub', 'flutter-clipboard-shelf', 'flutter-now-timeline', 'flutter-photo-studio',
         'flutter-http-request-draft', 'flutter-ui-showcase', 'flutter-counter', 'flutter-screen1'}
 
