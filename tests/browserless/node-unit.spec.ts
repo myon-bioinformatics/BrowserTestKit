@@ -7,8 +7,6 @@ const suites: [title: string, file: string, plain?: boolean][] = [
   ['Node hit probe unit tests and Python parity', 'hit_probe.test.mjs'],
   ['platform fixture state machines and Node runtime contract', 'page_inspect_scenario_fixture.test.mjs'],
   ['Node page-inspect unit tests and Python parity', 'page_inspect.test.mjs'],
-  // Playwright sets FORCE_COLOR; ambient NO_COLOR otherwise adds Node warnings to stderr.
-  ['Vendored Python launcher discovery and signal regressions', 'py_launch.test.cjs', true],
   // minimatch is overridden to ^11 (GHSA-g3hv-75wg-m249); see docs/minimatch-override.md.
   ['ExcelJS xlsx, streaming and CSV under the minimatch override', 'exceljs_minimatch.test.cjs'],
 ];

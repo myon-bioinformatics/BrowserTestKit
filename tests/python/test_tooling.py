@@ -1,4 +1,4 @@
-"""Repository contracts: action pins, workflows, vendor CI, btk fetch/plan and python -m entry points (lock bytes and parent pins: test_fleet.py)."""
+"""Repository contracts: workflows, vendor CI, btk fetch/plan and python -m entry points (lock bytes, action and parent pins: test_fleet.py)."""
 
 import base64
 import hashlib
@@ -21,29 +21,6 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
 
 import btk
-
-
-# ═══ · action pins ═══════════════════════════════════════════════════════════════════════════════════════
-# Every executable remote Actions reference must identify immutable code.
-
-def remote_refs(value):
-    if isinstance(value, dict):
-        for key, child in value.items():
-            if key == 'uses' and isinstance(child, str) and not child.startswith('./'):
-                yield child
-            else:
-                yield from remote_refs(child)
-    elif isinstance(value, list):
-        for child in value:
-            yield from remote_refs(child)
-
-
-@pytest.mark.parametrize('path', sorted((ROOT / '.github/workflows').glob('*.yml')), ids=lambda p: p.name)
-def test_all_remote_workflow_actions_and_reusable_jobs_pin_full_sha(path):
-    refs = list(remote_refs(yaml.safe_load(path.read_text())))
-    assert refs, f'{path.name}: no remote references inspected'
-    for ref in refs:
-        assert re.fullmatch(r'[^\s@]+@[0-9a-f]{40}', ref), f'{path.name}: mutable reference {ref}'
 
 
 def test_python_compatibility_lanes_keep_their_executable_support_checks():
