@@ -316,8 +316,8 @@ this repository's browserless Node lane; consumers keep their application
 contracts and immutable source/hash checks, rather than copying the test suite.
 Emoji identities and ordered page movement continue to use `route_trail.py`.
 
-Application adapters for the platform matrix (including published Flutter Home and Counter):
-[configuration, scope and independent network lane](docs/platform-adapters.md).
+Application adapters for the platform matrix (no adapter ships now; the published Flutter lane was retired):
+[configuration, scope and tooling](docs/platform-adapters.md).
 
 
 ## Discover production entry points

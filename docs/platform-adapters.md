@@ -4,47 +4,16 @@
 profile × mode workflow remains 42 environments (including optional Chrome/Edge).
 No published-site request is added to that fixture lane.
 
-The application lane is `.github/workflows/platform-apps.yml`. It observes the
-published Flutter app separately on Chromium/Firefox/WebKit desktop plus Chromium
-Pixel and WebKit iPhone **emulation**. These are not physical phones, and Playwright
-WebKit is not Safari. Pull requests that touch adapters run it on Linux; a manual
-run (`workflow_dispatch`) or the weekly schedule runs the same five browser/profile
-lanes on Linux, macOS and Windows (15 jobs). The adapters live in one set file,
-`adapters/flutter.json` (`btk-platform-adapters/1`): `shared` holds the header contract every page has, and `adapters`
-maps each id to what differs (usually just the URL). `--adapter adapters/flutter.json#flutter-home` measures one of
-them, `--adapter adapters/flutter.json` measures all, and a single-adapter file (`btk-platform-adapter/1`) still works.
-They cover representative pages:
-
-| Adapter | Route | Layout scope | Real coordinate input and postcondition |
-| --- | --- | --- | --- |
-| `flutter-home` | `/` 🏠 | Shared title, Home, favorite and menu hit regions | Favorite text changes from `Favorite this page` to `Remove favorite` |
-| `flutter-hub` | `/hub` 🗺️ | Same shared header | Same favorite transition |
-| `flutter-clipboard-shelf` | `/core/clipboard-shelf` 📋 | Same shared header | Same favorite transition |
-| `flutter-now-timeline` | `/tools/time/now-timeline` 🕒 | Same shared header | Same favorite transition |
-| `flutter-photo-studio` | `/tools/media/photo-studio` 🖼️ | Same shared header | Same favorite transition |
-| `flutter-http-request-draft` | `/tools/http/request-draft` 🌐 | Same shared header | Same favorite transition |
-| `flutter-ui-showcase` | `/examples/ui-showcase` 🎨 | Same shared header | Same favorite transition |
-| `flutter-screen1` | `/screen1` 🌍 (catalogue) | Same shared header | Same favorite transition |
-| `flutter-counter` | `/examples/counter-playground` 👾 | Shared regions plus Increase/Decrease body buttons | Press Increase; Reset changes from disabled to enabled |
-
-Routes and emojis follow flutter_navigation_basic's generated page identities
-(`lib/shared/navigation/page_identities.g.dart`). Coordinates (📍) is left out because
-it asks for geolocation permission. Screenshots are stored per page and environment
-(`app-results/<adapter>/<OS>-<browser>-<profile>/`).
-
-After the screenshot comparison (`tools/app_comparison.py` with the pinned Ironmate),
-the report job adds web-ui's `tools/capture_matrix.py` at a pinned merged commit (the page
-table comes from `pysaiyanweboo.py --example flutter-pages`):
-`screenshots/viewer.html` shows one section per page, opened from its emoji, with each
-environment's tile, pass/fail and deployed build. Update the web-ui SHA together with its
-test when the viewer changes.
-
-For a quick review the report job also writes `platform-app-digest`, a separate small
-artifact: `digest.html` is one self-contained page (every page x environment, thumbnail as
-a data URI, pass/fail, failure reasons, deployed build), with thumbnails starting at 64x128
-px and halved in each direction (a quarter of the pixels) until the page fits 1 MB, and
-`summary.md`, a short table that also goes to the job summary. The full matrix artifact
-stays for detailed checks. GitHub comment posting is not part of this workflow.
+The application lane (`.github/workflows/platform-apps.yml`) is retired. It observed the
+published Flutter app (nine pages from `adapters/flutter.json`) and was removed together with
+that adapter set on 2026-11-18, after flutter_navigation_basic was archived at 09:46 JST.
+No adapter ships in this repository now. The adapter format, `platform_probe.py collect
+--adapter`, `app_comparison.py` and `app_digest.py` stay and work with any adapter file you
+provide. The adapter set (`btk-platform-adapters/1`) keeps pages that differ only by URL in one
+file: `shared` holds the fields every page has, and `adapters` maps each id to what differs.
+`--adapter FILE#ID` measures one of them, `--adapter FILE` measures all, and a single-adapter
+file (`btk-platform-adapter/1`) works too. The earlier Flutter lane and its case record stay
+in git history and in `docs/antipatterns.md`.
 
 This is deliberately a selected-control contract, not a guarantee for every screen,
 all painted text, or every app feature. Flutter's invisible semantics labels do not
@@ -61,7 +30,7 @@ real-input postcondition still fails when an overlay blocks the action.
 
 ```sh
 python tools/platform_probe.py collect --browser chromium --profile desktop \
-  --adapter adapters/flutter.json#flutter-counter --widths 320 384 \
+  --adapter path/to/adapters.json#counter --widths 320 384 \
   --out app-results --evidence-dir app-results/counter/screenshots
 python -S tools/platform_probe.py merge app-results --out app-matrix/dataset.json
 uv run --group pages python tools/platform_probe.py render app-matrix/dataset.json --out app-matrix/index.html
@@ -134,9 +103,7 @@ flutter_navigation_basic itself branches at 420, 560, 620, 720, 760, 900, 1000 a
 1180 px; half of those (420, 620, 900, 1180) are not multiples of 8, so the 8 px grid
 reports only the first passing sample and can miss a passing interval between grid
 points. Use step 1 when an integer-pixel edge matters. Device
-profiles always keep their real viewports (iPhone 390, Pixel 412). Manual runs of the
-workflow take `width_step` and `widths` inputs; pull requests and the weekly schedule
-use the defaults. Records keep the grid used in `width_search.step` and `low`. The screenshot comparison
+profiles always keep their real viewports (iPhone 390, Pixel 412). `collect` takes `--width-step` and `--widths`. Records keep the grid used in `width_search.step` and `low`. The screenshot comparison
 and digest use the last requested click width (384px by default), so custom device
 widths do not leave the report searching for an uncaptured 384px image.
 
@@ -167,7 +134,7 @@ occlusion and missing elements. They use a loopback server and no public network
 
 ## Screenshot comparison artifact
 
-The report job also checks out a full-commit-pinned Ironmate and calls
+A report step can check out a full-commit-pinned Ironmate and call
 `tools/app_comparison.py`. `platform-app-matrix/screenshots/` contains `sheet.png`,
 a labeled `index.html`, `tiles/` and `report.json`. Open `screenshots/index.html` for
 the grid and independent capture evidence, or the parent `index.html` for all
@@ -181,7 +148,7 @@ python -S tools/app_comparison.py app-results --ironmate ../Ironmate \
 
 Use a trusted Ironmate checkout containing the planned-axis `browser_matrix.build`
 API. The report reuses Ironmate's PNG decoding, DPR-normalized tiles and existing
-`image_compare.metrics` MAE/RMSE. The OS plan and nine adapter files define expected
+`image_compare.metrics` MAE/RMSE. The OS plan and the adapter files define expected
 coverage, so even a completely absent page or environment appears as missing. No
 PNG at all is an error. Output must be new/empty and must not be a symlink; a report
 rerun uses a fresh output directory. Parent directories are trusted, matching Ironmate.
@@ -205,8 +172,8 @@ uv run --group pages python tools/app_digest.py app-results --runners-json '["ub
 
 Both commands accept repeatable case-sensitive `--page` adapter filename-stem
 and `--env` planned-environment globs. Rules are ORed within each group; groups
-intersect. The default page rule remains `flutter-*`; explicit rules allow
-other valid adapters. Repeated matches do not duplicate targets, while duplicate
+intersect. The default page rule is still `flutter-*`; pass explicit rules for
+any other adapter ids. Repeated matches do not duplicate targets, while duplicate
 selected adapter ids are errors. Missing planned cells remain missing, and the
 coverage denominator is the selected plan. Empty selections are input errors.
 
