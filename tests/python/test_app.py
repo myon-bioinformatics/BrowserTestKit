@@ -98,6 +98,11 @@ def record_app_digest(adapter, os_name, verdict='pass', failed=()):
             'layout': {'ok': not failed, 'failed': list(failed)}, 'click': {'ok': True}, 'samples': []}
 
 
+# A small local adapter; no published site is involved. Ids keep the flutter-* names the default plan selects.
+ADAPTER = {'schema': 'btk-platform-adapter/1', 'id': 'flutter-home', 'url': 'https://example.test/#/', 'elements': ['#a', '#b'],
+           'click': {'target': '#a', 'observe': '#a', 'attribute': 'textContent', 'before': 'Off', 'after': 'On'}}
+
+
 @pytest.fixture
 def run(tmp_path):
     ironmate = tmp_path / 'ironmate'
@@ -107,8 +112,7 @@ def run(tmp_path):
     adapters = tmp_path / 'adapters'
     adapters.mkdir()
     for name in ('flutter-home', 'flutter-hub'):
-        (adapters / f'{name}.json').write_text(json.dumps(comparison.probe.adapters.load_adapter(ROOT / f'adapters/flutter.json#{name}')),
-                                              encoding='utf-8')
+        (adapters / f'{name}.json').write_text(json.dumps(dict(ADAPTER, id=name)), encoding='utf-8')
     results = tmp_path / 'app-results'
     for n, (adapter, verdict, failed) in enumerate([('flutter-home', 'pass', ()), ('flutter-hub', 'fail', ('overlap:#a:#b',))]):
         (results / 'x').mkdir(parents=True, exist_ok=True)
@@ -160,19 +164,25 @@ def test_digest_rejects_ambiguous_records():
 # ═══ · app selection ═════════════════════════════════════════════════════════════════════════════════════
 # Selected plans stay consistent across comparison and digest entry points.
 
-def test_selection_reads_ids_from_an_adapter_set_file():
-    pages, _ = comparison.select_targets(ROOT / 'adapters', ['ubuntu-24.04'])
-    assert len(pages) == 9 and pages == sorted(pages) and all(page.startswith('flutter-') for page in pages)
-    assert comparison.select_targets(ROOT / 'adapters', ['ubuntu-24.04'], pages=['flutter-h*'])[0] == ['flutter-home', 'flutter-http-request-draft', 'flutter-hub']
+def test_selection_reads_ids_from_an_adapter_set_file(tmp_path):
+    shared = {key: ADAPTER[key] for key in ('elements', 'click')}
+    entries = {name: {'url': f'https://example.test/#/{name}'} for name in
+               ('flutter-home', 'flutter-http-request-draft', 'flutter-hub', 'portal-home')}
+    directory = tmp_path / 'adapters'
+    directory.mkdir()
+    (directory / 'set.json').write_text(json.dumps({'schema': 'btk-platform-adapters/1', 'shared': shared, 'adapters': entries}),
+                                        encoding='utf-8')
+    pages, _ = comparison.select_targets(directory, ['ubuntu-24.04'])
+    assert pages == ['flutter-home', 'flutter-http-request-draft', 'flutter-hub']
+    assert comparison.select_targets(directory, ['ubuntu-24.04'], pages=['flutter-ht*'])[0] == ['flutter-http-request-draft']
     with pytest.raises(ValueError, match='no selected adapters'):
-        comparison.select_targets(ROOT / 'adapters', ['ubuntu-24.04'], pages=['flutter'])      # the file name is not a page
+        comparison.select_targets(directory, ['ubuntu-24.04'], pages=['set'])      # the file name is not a page
 
 
 def adapters(root):
     root.mkdir()
-    original = comparison.probe.adapters.load_adapter(ROOT / 'adapters/flutter.json#flutter-home')
     for name in ('flutter-home', 'portal-home'):
-        (root / (name + '.json')).write_text(json.dumps(dict(original, id=name)), encoding='utf-8')
+        (root / (name + '.json')).write_text(json.dumps(dict(ADAPTER, id=name)), encoding='utf-8')
     return root
 
 

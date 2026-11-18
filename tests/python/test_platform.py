@@ -76,13 +76,12 @@ def test_narrow_width_failure_gates_verdict_even_if_initial_passes(layout, click
     assert pp.verdict(record) == 'fail'
 
 
-def test_fixture_workflow_remains_42_and_published_lane_is_separate():
+def test_fixture_workflow_remains_42_and_published_lane_is_retired():
     fixture = (ROOT / '.github/workflows/platform-matrix.yml').read_text()
-    apps = (ROOT / '.github/workflows/platform-apps.yml').read_text()
     assert 'os: [ubuntu-24.04, windows-latest, macos-latest]' in fixture
     assert 'for profile in desktop iphone pixel' in fixture
     assert '--adapter' not in fixture
-    assert '--adapter' in apps and 'needs: [plan, published-flutter]' in apps
+    assert not (ROOT / '.github/workflows/platform-apps.yml').exists() and not (ROOT / 'adapters/flutter.json').exists()
 
 
 def test_fixture_linux_system_setup_has_its_own_bounded_allowance():
@@ -109,31 +108,6 @@ def test_fixture_linux_system_setup_has_its_own_bounded_allowance():
     assert upload['with']['name'] == 'platform-${{ matrix.os }}'
     assert upload['with']['path'] == 'platform-results'
     assert upload['with']['if-no-files-found'] == 'error'
-
-
-def test_published_lane_runs_three_os_on_schedule_but_linux_on_pull_requests():
-    apps = (ROOT / '.github/workflows/platform-apps.yml').read_text()
-    assert 'workflow_dispatch:' not in apps and "cron: '17 3 * * 1'" in apps
-    assert """echo 'os=["ubuntu-24.04"]'""" in apps
-    assert """echo 'os=["ubuntu-24.04","macos-latest","windows-latest"]'""" in apps
-    assert 'runs-on: ${{ matrix.os }}' in apps and 'shell: bash' in apps
-    assert '$RUNNER_OS-$BROWSER-$PROFILE' in apps and 'platform-app-${{ runner.os }}-' in apps
-
-
-def test_representative_flutter_pages_share_header_contract_and_provenance():
-    adapters = pa.load_adapters(ROOT / 'adapters/flutter.json')      # one set file: shared header contract + what differs per page
-    routes = {name: a['url'].split('#', 1)[1] for name, a in adapters.items()}
-    assert routes == {'flutter-home': '/', 'flutter-hub': '/hub', 'flutter-clipboard-shelf': '/core/clipboard-shelf',
-                      'flutter-now-timeline': '/tools/time/now-timeline', 'flutter-photo-studio': '/tools/media/photo-studio',
-                      'flutter-http-request-draft': '/tools/http/request-draft', 'flutter-ui-showcase': '/examples/ui-showcase',
-                      'flutter-screen1': '/screen1', 'flutter-counter': '/examples/counter-playground'}
-    home = adapters['flutter-home']
-    for name, adapter in adapters.items():
-        assert adapter['id'] == name and adapter['flutter_semantics'] is True
-        assert adapter['provenance'] == {'path': 'assets/assets/diagnostics/build_metadata.json',
-                                         'field': ['repository', 'revision', 'sha']}
-        assert adapter['elements'][:4] == home['elements']
-    assert len({pa.target_identity(a, a['url'])['key'] for a in adapters.values()}) == len(adapters)
 
 
 def test_an_adapter_set_resolves_to_the_same_adapters_as_one_file_each(tmp_path):
@@ -246,24 +220,6 @@ def test_summary_reports_narrow_width_click_and_layout_failure():
     assert '320px:overlap:#a:#b' in line and '320px:click' in line
 
 
-def test_report_adds_the_web_ui_viewer_on_top_of_the_ironmate_comparison():
-    import re
-    apps = (ROOT / '.github/workflows/platform-apps.yml').read_text()
-    pin = re.search(r'repository: myon-bioinformatics/PySaiyanWeBoo\n\s+ref: ([0-9a-f]+)', apps)
-    assert pin and pin.group(1) == 'bbe5c0b0087f40ff3fffd53bec5111c2ba2d747d'
-    assert 'ref: e77d2a3f7b66f37c899832b261450b2bcd29f3dc' in apps
-    assert apps.count('repository: myon-bioinformatics/Ironmate') == 1  # one comparison, not two
-    assert '--report app-matrix/screenshots/report.json --dataset app-matrix/dataset.json' in apps and '--embed-css' not in apps
-    # web-ui keeps its page table and CSS in pysaiyanweboo.py (no examples/ or css/) and its helpers in tools/.
-    assert '.web-ui/pysaiyanweboo.py --example flutter-pages' in apps and '.web-ui/tools/capture_matrix.py' in apps
-    assert '/pysaiyanweboo.py\n            /tools/\n' in apps and '/web_ui.py' not in apps  # tools/ import pysaiyanweboo, not the old forwarding name
-    assert "hashFiles('app-matrix/screenshots/report.json')" in apps and 'screenshots/viewer.html' in apps
-    # The viewer joins on adapter ids: web-ui's page table must name exactly these adapters.
-    assert set(pa.load_adapters(ROOT / 'adapters/flutter.json')) == {
-        'flutter-home', 'flutter-hub', 'flutter-clipboard-shelf', 'flutter-now-timeline', 'flutter-photo-studio',
-        'flutter-http-request-draft', 'flutter-ui-showcase', 'flutter-counter', 'flutter-screen1'}
-
-
 @pytest.mark.parametrize('step,floor', [(1, 250), (2, 250), (8, 256), (10, 250), (64, 256)])
 def test_search_grid_is_a_default_that_can_be_switched(step, floor):
     assert pp.search_floor(step) == floor and pp.WIDTH_STEP == 8 and pp.MIN_SEARCH_WIDTH == 256
@@ -287,52 +243,6 @@ def test_cli_accepts_device_and_edge_widths_and_rejects_below_250(tmp_path, monk
     seen.clear()
     pp.main(['collect', '--browser', 'chromium', '--out', str(tmp_path), '--widths', '249'])
     assert not seen
-
-
-def test_schedule_and_pull_requests_keep_the_default_grid():
-    apps = (ROOT / '.github/workflows/platform-apps.yml').read_text()
-    assert "inputs.width_step" not in apps and "workflow_dispatch:" not in apps
-    assert "WIDTH_STEP: '8'" in apps and "WIDTHS: '320 384'" in apps
-    assert '--widths "${widths[@]}" --width-step "$WIDTH_STEP"' in apps and '^[0-9]+( [0-9]+)*$' in apps
-
-
-def test_report_publishes_a_small_digest_and_job_summary():
-    apps = (ROOT / '.github/workflows/platform-apps.yml').read_text()
-    assert 'tools/app_digest.py app-results --ironmate .ironmate' in apps and 'name: platform-app-digest' in apps
-    assert 'cat app-digest/summary.md >> "$GITHUB_STEP_SUMMARY"' in apps
-
-
-def test_workflow_checks_inputs_before_fanout_and_matches_capture_width():
-    apps = (ROOT / '.github/workflows/platform-apps.yml').read_text()
-    plan = apps.split('  published-flutter:', 1)[0]
-    assert '^([1-9]|[1-5][0-9]|6[0-4])$' in plan
-    assert '10#$width >= 250 && 10#$width <= 3840' in plan
-    assert 'shot=width-$((10#$width))' in plan
-    assert apps.count('--shot "$SHOT"') == 2
-    assert "- 'tools/app_digest.py'" in apps
-    import re
-    assert all(re.fullmatch(r'[0-9a-f]{40} # v[0-9]+(?:\.[0-9]+){0,2}', pin) for pin in re.findall(r'uses: actions/[^@]+@([^\n]+)', apps))
-
-
-@pytest.mark.parametrize('step,widths,expected', [('8', '320 384', 'width-384'), ('1', '390 412', 'width-412'),
-                                                  ('8', '0320 0384', 'width-384'), ('0', '320 384', None),
-                                                  ('65', '320 384', None), ('8', '249', None),
-                                                  ('8', '3841', None), ('8', '99999999999999999999', None)])
-def test_workflow_plan_validates_actual_inputs(tmp_path, step, widths, expected):
-    import os
-    import subprocess
-    import yaml
-    workflow = yaml.safe_load((ROOT / '.github/workflows/platform-apps.yml').read_text())
-    script = workflow['jobs']['plan']['steps'][0]['run']
-    output = tmp_path / 'outputs'
-    run = subprocess.run(['bash', '-e', '-o', 'pipefail', '-c', script], capture_output=True, text=True,
-                         env={**os.environ, 'WIDTH_STEP': step, 'WIDTHS': widths, 'EVENT': 'schedule',
-                              'GITHUB_OUTPUT': str(output)})
-    if expected is None:
-        assert run.returncode == 2 and not output.exists()
-    else:
-        assert run.returncode == 0, run.stderr
-        assert f'shot={expected}\n' in output.read_text()
 
 
 # ═══ · platform adapter browser ══════════════════════════════════════════════════════════════════════════
