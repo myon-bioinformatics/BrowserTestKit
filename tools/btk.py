@@ -2,6 +2,7 @@
 """btk: browser-test-kit's stdlib-only operations in one file.
 
 Commands:
+  js-search inventory JavaScript files and locate literal imports in JS and HTML
   fetch     fetch one archive from an allowed host, verify its integrity, and extract only named members
   plan      recommend the lightest ``playwright install`` for each workflow job of a checkout
   observe, act, locate, count, describe, compare, operations
@@ -15,6 +16,7 @@ kit is vendored: nothing else in tools/ is needed for these commands.
 from __future__ import annotations
 
 import argparse, base64, binascii, contextlib, contextvars, hashlib, io, json, math, os, platform, re, shutil, struct, sys, tarfile, tempfile, time, urllib.parse, urllib.request
+from html.parser import HTMLParser
 from pathlib import Path
 
 # ---- fetch -----------------------------------------------------------------------------
@@ -4336,6 +4338,125 @@ def probe_capture_rejections_cli(argv=None) -> int:
     return 0
 
 
+# ---- local JavaScript inventory --------------------------------------------------------
+
+_JS_QUOTE = r"""(?:"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*')"""
+_JS_GAP = r"(?:\s|/\*[\s\S]*?\*/|//[^\n]*(?:\n|$))*"
+_JS_TOKENS = re.compile(
+    r"//[^\n]*|/\*[\s\S]*?\*/|" + _JS_QUOTE + r"|`(?:\\.|[^`\\])*`|"
+    r"(?<![\w$.])(?:import|export|require)\b"
+)
+_JS_DYNAMIC = re.compile(_JS_GAP + r"\(" + _JS_GAP + "(" + _JS_QUOTE + ")" + _JS_GAP + r"(?=[,)])")
+_JS_STATIC = re.compile(
+    _JS_GAP + r"(?:(?:[\w$]+" + _JS_GAP + r"(?:," + _JS_GAP + r")?)?"
+    r"(?:\{[^{};]*\}|\*(?:" + _JS_GAP + r"as\s+[\w$]+)?)?" + _JS_GAP + r"\bfrom\b" + _JS_GAP + r")?"
+    + "(" + _JS_QUOTE + ")"
+)
+
+
+def _js_references(source, first_line=1):
+    from bisect import bisect_left
+    newlines = [m.start() for m in re.finditer("\n", source)]
+    for token in _JS_TOKENS.finditer(source):
+        if token.group() not in ("import", "export", "require"):
+            continue
+        if token.group() == "require":
+            match = _JS_DYNAMIC.match(source, token.end())
+            kind = "require"
+        else:
+            match = _JS_DYNAMIC.match(source, token.end()) if token.group() == "import" else None
+            kind = "dynamic-import" if match else "static-import"
+            match = match or _JS_STATIC.match(source, token.end())
+        if match:
+            yield first_line + bisect_left(newlines, token.start()), kind, match[1][1:-1]
+
+
+class _ScriptTags(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.refs = []
+        self.inline = False
+
+    def handle_starttag(self, tag, attrs):
+        attr = dict(attrs)
+        if tag == "link" and "modulepreload" in (attr.get("rel") or "").lower().split() and attr.get("href"):
+            self.refs.append((self.getpos()[0], "modulepreload", attr["href"]))
+        if tag == "script":
+            mime = (attr.get("type") or "").lower().split(";")[0].strip()
+            executable = mime in ("", "module", "text/javascript", "application/javascript", "text/ecmascript", "application/ecmascript")
+            self.inline = executable and "src" not in attr
+            if executable and attr.get("src"):
+                self.refs.append((self.getpos()[0], "script-src", attr["src"]))
+
+    def handle_data(self, data):
+        if self.inline:
+            self.refs.extend(_js_references(data, self.getpos()[0]))
+
+    def handle_endtag(self, tag):
+        if tag == "script":
+            self.inline = False
+
+
+def js_search(root, query="", *, limit=100):
+    """Inventory local JS files and literal loading references. The search is case-insensitive."""
+    root = Path(root)
+    if not root.is_dir() or limit < 1:
+        raise ValueError("root must be a directory and limit must be positive")
+    needle = query.casefold()
+    groups = {"files": [], "references": [], "matches": []}
+    counts = dict.fromkeys(groups, 0)
+
+    def add(group, row):
+        counts[group] += 1
+        if len(groups[group]) < limit:
+            groups[group].append(row)
+
+    def raise_error(error):
+        raise error
+
+    for directory, dirs, names in os.walk(root, onerror=raise_error):
+        dirs[:] = sorted(d for d in dirs if d not in (".git", "node_modules", ".venv", "venv", "__pycache__"))
+        for name in sorted(names):
+            path = Path(directory, name)
+            ext = path.suffix.lower()
+            if ext not in (".js", ".mjs", ".cjs", ".html", ".htm") or path.is_symlink() or not path.is_file():
+                continue
+            rel = path.relative_to(root).as_posix()
+            data = path.read_bytes()
+            source = data.decode("utf-8-sig", errors="replace")
+            if ext in (".html", ".htm"):
+                parser = _ScriptTags()
+                parser.feed(source)
+                parser.close()
+                refs = parser.refs
+            else:
+                if needle in rel.casefold():
+                    add("files", {"path": rel, "bytes": len(data)})
+                if needle:
+                    for line, value in enumerate(source.splitlines(), 1):
+                        if needle in value.casefold():
+                            add("matches", {"path": rel, "line": line})
+                refs = _js_references(source)
+            for line, kind, target in refs:
+                if needle in rel.casefold() or needle in target.casefold():
+                    add("references", {"path": rel, "line": line, "kind": kind, "target": target})
+    return {"counts": counts, "limit": limit, **groups}
+
+
+def js_search_cli(argv):
+    parser = argparse.ArgumentParser(prog="btk.py js-search", description=js_search.__doc__)
+    parser.add_argument("root", type=Path)
+    parser.add_argument("query", nargs="?", default="")
+    parser.add_argument("--limit", type=int, default=100, help="maximum returned rows per category")
+    args = parser.parse_args(argv)
+    try:
+        report = js_search(args.root, args.query, limit=args.limit)
+    except (OSError, ValueError) as exc:
+        parser.error(str(exc))
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    return 0
+
+
 # ---- command line ----------------------------------------------------------------------
 
 FETCH_COMMANDS = ("fetch",)
@@ -4343,7 +4464,7 @@ PLAN_COMMANDS = ("plan",)
 PAGE_COMMANDS = ("observe", "act", "pages", "scenario", "locate", "count", "describe", "compare", "operations")
 EVIDENCE_COMMANDS = {"check-png": check_png_cli, "check-evidence": check_evidence_cli, "check-capture-evidence": check_capture_evidence_cli,
                      "write-capture-evidence": write_capture_evidence_cli, "probe-capture-rejections": probe_capture_rejections_cli}
-COMMANDS = FETCH_COMMANDS + PLAN_COMMANDS + PAGE_COMMANDS + tuple(EVIDENCE_COMMANDS) + ("pw-test",)
+COMMANDS = FETCH_COMMANDS + PLAN_COMMANDS + PAGE_COMMANDS + tuple(EVIDENCE_COMMANDS) + ("js-search", "pw-test")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -4359,6 +4480,8 @@ def main(argv: list[str] | None = None) -> int:
         return page_main(argv)
     if argv[0] in EVIDENCE_COMMANDS:
         return EVIDENCE_COMMANDS[argv[0]](argv[1:])
+    if argv[0] == "js-search":
+        return js_search_cli(argv[1:])
     if argv[0] == "pw-test":
         return pw_test_cli(argv[1:])
     sys.stderr.write(f"btk.py: unknown command {argv[0]!r}; expected one of {COMMANDS}\n")
