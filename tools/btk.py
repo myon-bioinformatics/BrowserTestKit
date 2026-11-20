@@ -4340,7 +4340,8 @@ def probe_capture_rejections_cli(argv=None) -> int:
 
 # ---- local JavaScript inventory --------------------------------------------------------
 
-_JS_QUOTE = r"""(?:"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*')"""
+_JS_ESCAPE = r"\\(?:\r\n|[\s\S])"
+_JS_QUOTE = rf"""(?:"(?:{_JS_ESCAPE}|[^"\\\n])*"|'(?:{_JS_ESCAPE}|[^'\\\n])*')"""
 _JS_GAP = r"(?:\s|/\*[\s\S]*?\*/|//[^\n]*(?:\n|$))*"
 _JS_TOKENS = re.compile(
     r"//[^\n]*|/\*[\s\S]*?\*/|" + _JS_QUOTE + r"|`(?:\\.|[^`\\])*`|"

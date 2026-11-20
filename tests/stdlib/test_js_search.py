@@ -31,6 +31,22 @@ class JSSearchTests(unittest.TestCase):
                                     (4, "dynamic-import", "./Mermaid.mjs"), (6, "require", "./lib.cjs")])
             self.assertEqual(js_search(root, "mermaid")["counts"], {"files": 0, "references": 1, "matches": 1})
 
+    def test_continued_strings_do_not_create_import_references(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for quote, inner_quote in (('"', "'"), ("'", '"')):
+                for newline in ("\n", "\r\n"):
+                    with self.subTest(quote=quote, newline=newline):
+                        source = newline.join((
+                            f"const note = {quote}first\\",
+                            f"import({inner_quote}./fake.js{inner_quote}){quote};",
+                            'import "./real.js";',
+                        ))
+                        (root / "view.js").write_bytes(source.encode("utf-8"))
+                        self.assertEqual(js_search(root)["references"], [
+                            {"path": "view.js", "line": 3, "kind": "static-import", "target": "./real.js"},
+                        ])
+
     def test_cli_limits_results_and_scans_build_output(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
