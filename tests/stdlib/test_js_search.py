@@ -43,3 +43,36 @@ class JSSearchTests(unittest.TestCase):
             report = json.loads(done.stdout)
             self.assertEqual(report["counts"]["files"], 2)
             self.assertEqual(report["files"], [{"path": "dist/a.js", "bytes": 5}])
+
+    def test_shared_external_urls_across_projects(self):
+        from btk import shared_js
+
+        with tempfile.TemporaryDirectory() as directory:
+            a, b, c = (Path(directory, name) for name in "abc")
+            for project in (a, b, c):
+                project.mkdir()
+            url = "https://cdn.example/lib@1.js?v=1"
+            alt = "//cdn.example/other.js"
+            (a / "index.html").write_text(
+                '<script src="./local.js"></script>\n' * 2
+                + '<script src="https://cdn.example/only-a.js"></script>\n' * 2
+                + f'<link rel="modulepreload" href="{url}">\n' * 2
+                + f'<script src="{alt}"></script>', encoding="utf-8")
+            (b / "view.mjs").write_text(
+                f'import "./local.js";\nimport("{url}");\nimport "{alt}";\n'
+                'import "https://cdn.example/lib@2.js?v=1";', encoding="utf-8")
+            (c / "view.mjs").write_text(f'import "{url}";', encoding="utf-8")
+            report = shared_js([a, b, c], limit=1)
+            self.assertEqual(report["shared_count"], 2)
+            self.assertEqual(len(report["shared"]), 1)
+            item = report["shared"][0]
+            self.assertEqual(item["url"], url)
+            self.assertEqual(item["projects"][str(a)], {"count": 2, "locations": [
+                {"path": "index.html", "line": 5, "kind": "modulepreload"}]})
+            self.assertEqual(item["projects"][str(b)]["locations"][0]["kind"], "dynamic-import")
+            command = [sys.executable, "-S", str(TOOLS / "btk.py"), "js-search", str(a),
+                       "lib@", "--shared-with", str(b), "--shared-with", str(c)]
+            self.assertEqual(json.loads(subprocess.check_output(command))["shared_count"], 1)
+            for other in (a, a.parent):
+                with self.assertRaisesRegex(ValueError, "overlap"):
+                    shared_js([a, other])

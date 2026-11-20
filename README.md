@@ -81,6 +81,16 @@ matching source lines, and references from HTML and JavaScript. Each reference i
 line, raw target and kind: `script-src`, `modulepreload`, `static-import` (including re-exports), `dynamic-import`, or `require`. The optional case-insensitive literal query matches filenames, reference targets and JS source lines.
 Counts cover all matches; the limit applies separately to each output list. The search reads local files only.
 
+Compare two or more checkouts or built sites for shared external browser scripts:
+```sh
+python -S tools/btk.py js-search project-a --shared-with project-b --shared-with project-c
+```
+The Python API is `btk.shared_js([project_a, project_b, project_c])`. It groups identical HTTP(S)
+or protocol-relative URL literals, preserving versions and query strings. Results include the count
+and source locations per project. Repeated references within one project alone do not qualify.
+The limit caps reported URLs and locations per project after counting. Check whether a match
+comes from a vendored copy, fixture or generated file before changing its owner.
+
 For a diagram that opens on demand, call `await import("./mermaid.mjs")` inside the open/render handler.
 A dynamic import at module top level can still start during page load. Check the browser's network requests
 before and after opening the diagram to measure timing. This inventory uses common literal import syntax;

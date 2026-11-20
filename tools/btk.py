@@ -4397,20 +4397,7 @@ class _ScriptTags(HTMLParser):
             self.inline = False
 
 
-def js_search(root, query="", *, limit=100):
-    """Inventory local JS files and literal loading references. The search is case-insensitive."""
-    root = Path(root)
-    if not root.is_dir() or limit < 1:
-        raise ValueError("root must be a directory and limit must be positive")
-    needle = query.casefold()
-    groups = {"files": [], "references": [], "matches": []}
-    counts = dict.fromkeys(groups, 0)
-
-    def add(group, row):
-        counts[group] += 1
-        if len(groups[group]) < limit:
-            groups[group].append(row)
-
+def _js_rows(root, needle, *, inventory):
     def raise_error(error):
         raise error
 
@@ -4430,17 +4417,59 @@ def js_search(root, query="", *, limit=100):
                 parser.close()
                 refs = parser.refs
             else:
-                if needle in rel.casefold():
-                    add("files", {"path": rel, "bytes": len(data)})
-                if needle:
+                if inventory and needle in rel.casefold():
+                    yield "files", {"path": rel, "bytes": len(data)}
+                if inventory and needle:
                     for line, value in enumerate(source.splitlines(), 1):
                         if needle in value.casefold():
-                            add("matches", {"path": rel, "line": line})
+                            yield "matches", {"path": rel, "line": line}
                 refs = _js_references(source)
             for line, kind, target in refs:
                 if needle in rel.casefold() or needle in target.casefold():
-                    add("references", {"path": rel, "line": line, "kind": kind, "target": target})
+                    yield "references", {"path": rel, "line": line, "kind": kind, "target": target}
+
+
+def js_search(root, query="", *, limit=100):
+    """Inventory local JS files and literal loading references. The search is case-insensitive."""
+    root = Path(root)
+    if not root.is_dir() or limit < 1:
+        raise ValueError("root must be a directory and limit must be positive")
+    groups = {"files": [], "references": [], "matches": []}
+    counts = dict.fromkeys(groups, 0)
+    for group, row in _js_rows(root, query.casefold(), inventory=True):
+        counts[group] += 1
+        if len(groups[group]) < limit:
+            groups[group].append(row)
     return {"counts": counts, "limit": limit, **groups}
+
+
+def shared_js(roots, query="", *, limit=100):
+    """Find identical literal external browser script URLs in distinct project directories."""
+    projects = [Path(entry) for entry in roots]
+    resolved = [project.resolve() for project in projects]
+    if len(projects) < 2 or limit < 1:
+        raise ValueError("provide at least two project directories and a positive limit")
+    for index, path in enumerate(resolved):
+        if not path.is_dir():
+            raise ValueError(f"not a directory: {projects[index]}")
+        if any(path.is_relative_to(other) or other.is_relative_to(path) for other in resolved[:index]):
+            raise ValueError("project directories must be distinct and must not overlap")
+
+    urls = {}
+    for project in projects:
+        for _, ref in _js_rows(project, query.casefold(), inventory=False):
+            url = ref["target"]
+            if ref["kind"] == "require" or not re.match(r"^(?:https?:)?//[^/?#\s]+", url, re.I):
+                continue
+            uses = urls.setdefault(url, {})
+            entry = uses.setdefault(str(project), {"count": 0, "locations": []})
+            entry["count"] += 1
+            if len(entry["locations"]) < limit:
+                entry["locations"].append({k: ref[k] for k in ("path", "line", "kind")})
+
+    shared = [{"url": url, "projects": uses} for url, uses in urls.items() if len(uses) > 1]
+    shared.sort(key=lambda row: (-len(row["projects"]), row["url"]))
+    return {"shared_count": len(shared), "shared": shared[:limit], "limit": limit}
 
 
 def js_search_cli(argv):
@@ -4448,9 +4477,14 @@ def js_search_cli(argv):
     parser.add_argument("root", type=Path)
     parser.add_argument("query", nargs="?", default="")
     parser.add_argument("--limit", type=int, default=100, help="maximum returned rows per category")
+    parser.add_argument("--shared-with", type=Path, action="append", metavar="PROJECT",
+                        help="compare literal external script URLs with another project (repeatable)")
     args = parser.parse_args(argv)
     try:
-        report = js_search(args.root, args.query, limit=args.limit)
+        if args.shared_with:
+            report = shared_js([args.root, *args.shared_with], args.query, limit=args.limit)
+        else:
+            report = js_search(args.root, args.query, limit=args.limit)
     except (OSError, ValueError) as exc:
         parser.error(str(exc))
     print(json.dumps(report, ensure_ascii=False, indent=2))
