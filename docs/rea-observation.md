@@ -56,7 +56,7 @@ The snapshot after a step has `step` (index, action, target, URL before and afte
 
 JavaScript dialogs are recorded and dismissed unless `--dialog-policy accept` is set. New pages opened by the step are recorded and not entered. iPhone and Pixel profiles are labeled Playwright device emulation (`real_device: false`). `--viewport` is a size, not a device. `--touch` sets `hasTouch` without naming a phone.
 
-`compare` reads two `btk-page-observe/1` files and runs no browser. It reuses `evidence_relation`, so a section is `same` only when both sides are complete and their digests match. Shadow-root counts and child-frame and element totals are reported as left, right, and delta. A count is `null` when that side's section was not complete. Environment differences (OS, browser, profile, headless) are reported but do not change the section relations.
+`compare` reads two `btk-page-observe/1` files and runs no browser. It reuses `evidence_relation`, so a section is `same` only when both sides are complete and their digests match. Shadow-root counts and child-frame and element totals are reported as left, right, and delta. A count is `null` when that side's section was not complete. The result lists changed environment fields in `environment_differences`, including browser version/channel, viewport source, device profile, touch, scale, locale, timezone, color scheme and reduced motion when recorded. Text output lists their names. Two older snapshots can still match on their recorded fields. A field recorded on only one side counts as a difference, including an explicitly recorded default. Section relations are evaluated separately.
 
 ## Touch gestures
 

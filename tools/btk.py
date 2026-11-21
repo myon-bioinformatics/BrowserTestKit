@@ -306,7 +306,11 @@ SCHEMA_INSPECT = "btk-page-inspect/1"
 SCHEMA_OBSERVE = "btk-page-observe/1"
 SCHEMA_COMPARE = "btk-page-compare/1"
 SCHEMA_RUN = "btk-page-observe-run/1"
-COMPARE_ENVIRONMENT_KEYS = ("os", "browser", "profile", "headless", "viewport", "emulation", "has_touch", "real_device")
+COMPARE_ENVIRONMENT_KEYS = (
+    "os", "browser", "version", "channel", "profile", "headless", "viewport", "viewport_source",
+    "emulation", "emulated_device", "device_profile_emulated", "has_touch", "real_device",
+    "color_scheme", "reduced_motion", "locale", "timezone", "device_scale_factor",
+)
 COMPLETE_COVERAGE = {"complete", "complete_within_window"}
 INTERACTIVE_ROLES = {
     "button", "link", "textbox", "searchbox", "checkbox", "radio", "combobox",
@@ -3214,7 +3218,9 @@ def compare_snapshots(left: dict, right: dict) -> dict:
     left_env = left.get("environment") if isinstance(left.get("environment"), dict) else {}
     right_env = right.get("environment") if isinstance(right.get("environment"), dict) else {}
     environment = {key: [left_env.get(key), right_env.get(key)] for key in COMPARE_ENVIRONMENT_KEYS}
-    same_environment = all(pair[0] == pair[1] for pair in environment.values())
+    differences = [key for key, (before, after) in environment.items()
+                   if before != after or (key in left_env) != (key in right_env)]
+    same_environment = not differences
     hints = [
         "same, different, and unknown are section relations; a missing or truncated section is never same",
         "shadow_roots counts are null when that section was not complete on one side",
@@ -3227,6 +3233,7 @@ def compare_snapshots(left: dict, right: dict) -> dict:
         "left_url": strip_userinfo(left["url"]) if isinstance(left.get("url"), str) else None,
         "right_url": strip_userinfo(right["url"]) if isinstance(right.get("url"), str) else None,
         "same_environment": same_environment,
+        "environment_differences": differences,
         "environment": environment,
         "sections": sections,
         "shadow_roots": shadow,
@@ -3350,6 +3357,8 @@ def describe_text(payload: dict) -> str:
 
 def compare_text(payload: dict) -> str:
     lines = [f"btk-page-compare/1 same_environment={str(payload['same_environment']).lower()}"]
+    if payload.get("environment_differences"):
+        lines.append("environment differences: " + ", ".join(payload["environment_differences"]))
     for name, item in payload["sections"].items():
         lines.append(f"section {name}={item['relation']} left={item['left']} right={item['right']}")
     for key in ("open", "closed", "count"):
