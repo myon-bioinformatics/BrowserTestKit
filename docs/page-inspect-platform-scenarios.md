@@ -103,7 +103,7 @@ With `--viewport`, viewport emulation and the requested scale are enabled, and
 the source is `flag`. Phone defaults use `device_descriptor` and retain touch
 emulation even when the viewport is overridden. These are emulated profiles.
 Thus section comparison cannot imply identical environments merely because
-the viewport matches. This does not modify the generic compare command.
+the viewport matches. The offline compare command also lists the individual environment settings that differ.
 
 Exit zero and top-level `ok` mean evidence collection succeeded. They do not
 mean every observed platform expectation matched; inspect `coverage`,

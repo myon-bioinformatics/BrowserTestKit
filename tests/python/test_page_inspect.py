@@ -1268,6 +1268,28 @@ def test_environment_mismatch_is_reported_with_a_hint():
     assert "environments differ" in payload["hint"]
 
 
+@pytest.mark.parametrize(("key", "before", "after"), [
+    ("version", "145", "146"), ("channel", None, "chrome"),
+    ("viewport_source", "flag", "device_descriptor"), ("emulated_device", None, "Pixel"),
+    ("device_scale_factor", 1, 2), ("locale", "ja-JP", "en-US"),
+    ("timezone", "Asia/Tokyo", "UTC"), ("color_scheme", "light", "dark"),
+    ("reduced_motion", "reduce", "no-preference"), ("device_profile_emulated", False, True),
+])
+def test_compare_reports_each_recorded_environment_difference(key, before, after):
+    result = btk.compare_snapshots(snapshot(env={**ENV, key: before}), snapshot(env={**ENV, key: after}))
+    assert result["environment_differences"] == [key]
+    assert result["environment"][key] == [before, after]
+    assert result["same_environment"] is False
+    assert f"environment differences: {key}" in btk.compare_text(result)
+
+
+def test_compare_distinguishes_an_old_omission_from_an_explicit_default():
+    old = snapshot()
+    assert btk.compare_snapshots(old, old)["environment_differences"] == []
+    newer = snapshot(env={**ENV, "channel": None})
+    assert btk.compare_snapshots(old, newer)["environment_differences"] == ["channel"]
+
+
 def test_element_and_frame_counts_report_deltas():
     payload = btk.compare_snapshots(snapshot(total=2, frames=0), snapshot(total=5, frames=1))
     assert payload["elements"] == {"left": 2, "right": 5, "delta": 3}
