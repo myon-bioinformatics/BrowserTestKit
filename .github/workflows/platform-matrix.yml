@@ -76,6 +76,16 @@ jobs:
           echo "::notice title=platform-matrix ${{ matrix.os }}::$(grep -c '^pass' summary.txt) pass, $(grep -c '^fail' summary.txt) fail"
           grep '^fail' summary.txt | sed 's/^/::error title=platform-matrix ${{ matrix.os }}::/' || true
           exit "$status"
+      - name: Loopback offline and recovery (Chromium)
+        if: runner.os == 'Windows' || runner.os == 'macOS'
+        timeout-minutes: 5
+        shell: bash
+        run: |
+          report=platform-results/offline-recovery.xml
+          uv run --locked --no-dev --group browser-test python -m pytest -q \
+            'tests/python/test_page_inspect_scenarios.py::test_offline_is_observed_and_restored_in_each_engine[chromium]' \
+            --junitxml="$report"
+          python -c 'import sys, xml.etree.ElementTree as E; cases = E.parse(sys.argv[1]).findall(".//testcase"); sys.exit(0 if len(cases) == 1 and not any(cases[0].find(tag) is not None for tag in ("skipped", "failure", "error")) else "expected one passing offline/recovery test")' "$report"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
