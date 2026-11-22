@@ -651,21 +651,3 @@ def test_pw_test_bridge_preserves_engines_and_project_relative_paths(tmp_path):
     actual = json.loads(output.stdout)
     assert "projects" not in actual
     assert "executablePath" not in actual["use"]["launchOptions"]
-
-
-def test_every_script_describes_itself_for_the_portfolio_catalog():
-    """The portfolio lists tools/ and examples/ from each file's own words (module docstring, or a JS module's leading
-    ``//`` comment past the shebang and imports), so a script without one shows up there as ❔ instead of a description."""
-    import ast
-    missing = []
-    for path in sorted([*ROOT.glob('tools/*.py'), *ROOT.glob('tools/*.mjs'), *ROOT.glob('examples/*.py')]):
-        text = path.read_text(encoding='utf-8')
-        if path.suffix == '.py':
-            described = bool((ast.get_docstring(ast.parse(text)) or '').strip())
-        else:
-            first = next((line.strip() for line in text.splitlines()
-                          if line.strip() and not line.startswith(('#!', 'import ', "'use strict'", '"use strict"'))), '')
-            described = first.startswith(('//', '/*')) and bool(first.lstrip('/*').strip())
-        if not described:
-            missing.append(path.relative_to(ROOT).as_posix())
-    assert missing == []

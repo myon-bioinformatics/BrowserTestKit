@@ -13,7 +13,7 @@ declaration at all; 2 input error.
 """
 from __future__ import annotations
 
-import json, re, sys
+import argparse, json, re, sys
 from pathlib import Path
 
 SUFFIXES = {".html", ".htm", ".css", ".js", ".json"}
@@ -120,15 +120,16 @@ def files(args: list[str]) -> list[Path]:
     return out
 
 
-def main(argv: list[str]) -> int:
-    if not argv:
-        print("usage: check_font_family.py FILE_OR_DIR [...]", file=sys.stderr)
-        return 2
-    if argv[0] in {"-h", "--help"}:
-        print("usage: check_font_family.py FILE_OR_DIR [...]\n" + __doc__)
-        return 0
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="check_font_family.py", description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("paths", nargs="+", metavar="FILE_OR_DIR", help=".html .css .js .json, or a directory to search")
     try:
-        paths = files(argv)
+        args = parser.parse_args(argv)
+    except SystemExit as stop:          # keep "return the exit code": 0 for --help, 2 for no input
+        return int(stop.code or 0)
+    try:
+        paths = files(args.paths)
         total, found = 0, []
         for path in paths:
             if path.stat().st_size > MAX_BYTES:
