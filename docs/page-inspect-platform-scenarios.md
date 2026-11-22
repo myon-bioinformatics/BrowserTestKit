@@ -108,3 +108,42 @@ the viewport matches. The offline compare command also lists the individual envi
 Exit zero and top-level `ok` mean evidence collection succeeded. They do not
 mean every observed platform expectation matched; inspect `coverage`,
 `verdict` and match fields. Passive `observe` remains separate and untouched.
+
+## Closing record for issue #117 (2026-11-22)
+
+Issue #117 is closed. This section records what was checked and what stays
+undone in this repository, each with a short name saying what it asks.
+
+Checked on main `f974ca0`:
+
+| Question | Evidence |
+| --- | --- |
+| `url-value-leak`: do query and fragment values stay out of saved JSON after the first load and after `goto`? | 16 passed through both the Python and the Node entry point (Node 26.13.1, Chrome for Testing 153, Linux, headless): `pytest tests/python/test_page_inspect.py -k "evidence_url or legacy_urls or navigation_error or initial_goto or act_goto or colon_step or navigation_validation"` |
+| `frame-shadow-listing`: are child frames and shadow roots counted and listed in document order? | 9 passed in the same environment: `pytest tests/python/test_page_inspect.py -k "frame or shadow"`. Their contents are reported as `not_entered` |
+| `fault-permission-file`: HTTP error against connection failure, permission grant and reset, upload, download and cleanup | CI run [44999087770](https://github.com/myon-bioinformatics/BrowserTestKit/actions/runs/44999087770): the Chromium job and the Firefox and WebKit job both succeeded on Linux |
+
+A local rerun of `tests/python/test_page_inspect_scenarios.py` finished 48 passed and
+25 not started. `btk.py scenario` launches Playwright's own build and does not go
+through `find_browser`, so a machine without that build cannot start those cases.
+That is a limit of the machine, not a result for the cases.
+
+Still open:
+
+- `frame-shadow-entry`: enter child frames and open shadow roots as their own
+  address spaces, and fetch the locator again after a redraw. Today the survey
+  counts and lists them and marks the contents `not_entered`.
+
+Not planned until the stated need appears:
+
+| Name | What it asks | Reopen when |
+| --- | --- | --- |
+| `real-os-matrix` | The same faults, permissions and files on Windows and macOS, beyond the Chromium offline and recovery already recorded, with real devices kept apart from emulation | a difference between operating systems is reported, or a release claims support for one |
+| `android-lane` | The same CLI on Android Chrome or WebView | an Android device or emulator is available to the runner |
+| `headed-lane` | A headed survey lane next to the headless default | a finding depends on the real window frame |
+| `stagehand-lane` | An optional Stagehand lane calling the same operations | a consumer asks to drive these operations through Stagehand |
+| `agent-transport` | A protocol transport on top of the CLI envelopes | the envelopes have stayed unchanged across two releases and a caller needs more than one command per process |
+
+`check-png` now reports a missing or invalid file as one line on stderr with exit 1.
+It was the only one of 19 `btk.py` entry points whose bad input ended in a traceback.
+About 53 options across 11 subcommands still have no help text; add it when the
+subcommand is next edited.
