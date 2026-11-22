@@ -6,6 +6,8 @@ Cross-browser testing reference kit for Playwright Node/Python, screenshots, mob
 
 [Artwork and icon usage](docs/assets/brand/README.md) describes the supplied visual marks and their separate roles.
 
+🧰 [Every script, with its own description and `--help` usage](https://myon-bioinformatics.github.io/tools/projects/browsertestkit.html) — generated from the code at a recorded commit, so this README does not list them.
+
 ## Name origin
 
 The name says what it is: a kit of tools for testing and observing with a browser. It was formerly named browser-test-kit, and the `btk` abbreviation is kept for the CLI and environment variables.
