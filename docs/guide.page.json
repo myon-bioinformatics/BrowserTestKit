@@ -1,0 +1,98 @@
+{
+  "schema": "web-ui-page/1",
+  "title": "BrowserTestKit 利用ガイド",
+  "theme": "auto",
+  "description": "Playwright（Node / Python）、スクリーンショット、モバイル Web、GitHub Actions のためのクロスブラウザテスト用リファレンスキット。",
+  "icon": "./icon.png",
+  "favicon": "./favicon.png",
+  "blocks": [
+    {
+      "type": "badges",
+      "items": [
+        "🧪 ブラウザテスト",
+        "📸 証跡の取得と検証",
+        "🐍 Python 3.11+"
+      ]
+    },
+    {
+      "type": "section",
+      "title": "📥 取得",
+      "blocks": [
+        {
+          "type": "text",
+          "text": "Python 3.11+ と git が必要です。以下の例はリポジトリ全体を取得して実行します。"
+        },
+        {
+          "type": "output",
+          "text": "git clone https://github.com/myon-bioinformatics/BrowserTestKit.git\ncd BrowserTestKit"
+        }
+      ]
+    },
+    {
+      "type": "section",
+      "title": "▶️ 実行",
+      "blocks": [
+        {
+          "type": "card",
+          "title": "🧭 入口 btk.py",
+          "text": "観測・操作・比較・証跡の検査を1つの入口から呼びます。",
+          "blocks": [
+            {
+              "type": "output",
+              "text": "$ python -S tools/btk.py --help"
+            }
+          ]
+        },
+        {
+          "type": "card",
+          "title": "🖥️ 環境を記録",
+          "text": "ブラウザとプロファイルごとの実測値を集めます（ブラウザが必要です）。",
+          "blocks": [
+            {
+              "type": "output",
+              "text": "$ python tools/platform_probe.py collect --browser chromium --profile desktop --out /tmp/rec"
+            }
+          ]
+        },
+        {
+          "type": "card",
+          "title": "🔎 共有している JS を探す",
+          "text": "ブラウザを使わずに動きます。",
+          "blocks": [
+            {
+              "type": "output",
+              "text": "$ python -S tools/btk.py js-search project-a --shared-with project-b --shared-with project-c"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "section",
+      "title": "🔗 リンク",
+      "blocks": [
+        {
+          "type": "links",
+          "items": [
+            {
+              "label": "📦 リポジトリ",
+              "href": "https://github.com/myon-bioinformatics/BrowserTestKit"
+            },
+            {
+              "label": "📖 README",
+              "href": "https://github.com/myon-bioinformatics/BrowserTestKit#readme"
+            },
+            {
+              "label": "🧰 全スクリプトの説明",
+              "href": "https://myon-bioinformatics.github.io/tools/projects/browsertestkit.html"
+            },
+            {
+              "label": "📄 tools/btk.py",
+              "href": "https://github.com/myon-bioinformatics/BrowserTestKit/blob/main/tools/btk.py"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
