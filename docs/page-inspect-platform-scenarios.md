@@ -119,13 +119,19 @@ Checked on main `f974ca0`:
 | Question | Evidence |
 | --- | --- |
 | `url-value-leak`: do query and fragment values stay out of saved JSON after the first load and after `goto`? | 16 passed through both the Python and the Node entry point (Node 26.13.1, Chrome for Testing 153, Linux, headless): `pytest tests/python/test_page_inspect.py -k "evidence_url or legacy_urls or navigation_error or initial_goto or act_goto or colon_step or navigation_validation"` |
-| `frame-shadow-address`: are child frames and open shadow roots listed as their own address spaces? | 9 passed in the same environment: `pytest tests/python/test_page_inspect.py -k "frame or shadow"` |
+| `frame-shadow-listing`: are child frames and shadow roots counted and listed in document order? | 9 passed in the same environment: `pytest tests/python/test_page_inspect.py -k "frame or shadow"`. Their contents are reported as `not_entered` |
 | `fault-permission-file`: HTTP error against connection failure, permission grant and reset, upload, download and cleanup | CI run [44999087770](https://github.com/myon-bioinformatics/BrowserTestKit/actions/runs/44999087770): the Chromium job and the Firefox and WebKit job both succeeded on Linux |
 
 A local rerun of `tests/python/test_page_inspect_scenarios.py` finished 48 passed and
 25 not started. `btk.py scenario` launches Playwright's own build and does not go
 through `find_browser`, so a machine without that build cannot start those cases.
 That is a limit of the machine, not a result for the cases.
+
+Still open:
+
+- `frame-shadow-entry`: enter child frames and open shadow roots as their own
+  address spaces, and fetch the locator again after a redraw. Today the survey
+  counts and lists them and marks the contents `not_entered`.
 
 Not planned until the stated need appears:
 
