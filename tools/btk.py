@@ -4021,10 +4021,14 @@ def check_png_cli(argv=None) -> int:
         return 0
     for raw in argv:
         path = Path(raw)
-        data = path.read_bytes()
-        width, height = png_dimensions(data)
-        if width < 1 or height < 1:
-            raise ValueError(f"{path}: invalid dimensions")
+        try:
+            data = path.read_bytes()
+            width, height = png_dimensions(data)
+            if width < 1 or height < 1:
+                raise ValueError("invalid dimensions")
+        except (OSError, ValueError) as exc:                          # one line on stderr, not a traceback
+            print(f"{path}: {getattr(exc, 'strerror', None) or exc}", file=sys.stderr)
+            return 1
         print(f"{path}: png {width}x{height} {len(data)} bytes")
     return 0
 

@@ -181,6 +181,16 @@ def test_check_png_cli_prints_dimensions(tmp_path):
     assert subprocess.run([sys.executable, "-S", str(BTK), "check-png"], capture_output=True).returncode == 2
 
 
+@pytest.mark.parametrize("name,body,reason", [("missing.png", None, ""), ("bad.png", b"not an image", "not a valid PNG header")])
+def test_check_png_cli_reports_unreadable_or_invalid_file_without_traceback(tmp_path, name, body, reason):
+    if body is not None:
+        (tmp_path / name).write_bytes(body)
+    done = subprocess.run([sys.executable, "-S", str(BTK), "check-png", str(tmp_path / name)], capture_output=True, text=True)
+    assert done.returncode == 1 and done.stdout == ""
+    assert done.stderr.startswith(f"{tmp_path / name}: ") and done.stderr.strip().endswith(reason)   # the OS words the missing file
+    assert "Traceback" not in done.stderr and len(done.stderr.splitlines()) == 1
+
+
 # ---- check-evidence: one PNG per project ---------------------------------------------------------------------------
 
 NODE_PROJECTS = ["chromium", "firefox", "webkit", "mobile-chromium", "mobile-webkit"]
