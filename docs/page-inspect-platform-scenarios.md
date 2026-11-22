@@ -111,8 +111,8 @@ mean every observed platform expectation matched; inspect `coverage`,
 
 ## Closing record for issue #117 (2026-11-22)
 
-Issue #117 is closed and its remaining items left the cross-repository roadmap.
-What is still undone lives here, each with a short name saying what it asks.
+Issue #117 is closed. This section records what was checked and what stays
+undone in this repository, each with a short name saying what it asks.
 
 Checked on main `f974ca0`:
 
