@@ -69,14 +69,19 @@ unmerged bundle is silently adopted into this repository's vendor lock.
 | QueRyu | `Cache`, `CacheIntegrityError`, verified body/snapshot | Acquisition/cache integrity; cached success is not fresh UI execution |
 | PythDRagoras | `counts_metrics`, `threshold_curve`, provenance audits | Measured boundary/threshold analysis; no UI click or renderer |
 
-`examples/replay_dom_with_blueprobe_min.py` connects a supplied trusted BlueProbe
-min to the existing `page_text.find_elements` extractor. It verifies the saved
-DOM hash and minpy content digest, records both file identities and uses
+Since 2026-11-23 BlueProbe has no bundle: `blueprobe.py` is one stdlib file and
+is used directly, the way DRAgoWing's `dragowing.py` is. The row above describes
+the same functions in that file.
+
+`examples/replay_dom_with_blueprobe.py` connects a supplied trusted copy of
+`blueprobe.py` (BlueProbe is one stdlib file, so there is no separate bundle) to
+the existing `page_text.find_elements` extractor. It verifies the saved DOM
+hash, records both file identities and uses
 BlueProbe's report/inspection/unknown aggregation. No parser, browser, download or
 new package is added. Empty static matches remain unknown for live presence.
 
 ```sh
-python -S examples/replay_dom_with_blueprobe_min.py saved-dom.json --blueprobe-min /path/to/blueprobe_min.py --find Add
+python -S examples/replay_dom_with_blueprobe.py saved-dom.json --blueprobe /path/to/blueprobe.py --find Add
 ```
 
 The input comes from the existing `examples/capture_browser_dom.py`. Output is
