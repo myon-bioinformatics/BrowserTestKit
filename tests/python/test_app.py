@@ -248,21 +248,21 @@ def test_bad_or_empty_plans_are_errors(tmp_path, options):
         comparison.select_targets(directory, ['ubuntu-24.04'], **options)
 
 
-# ═══ · aoi min replay ════════════════════════════════════════════════════════════════════════════════════
-# Offline replay preflight must reject bad evidence before importing any min.
+# ═══ · blueprobe replay ══════════════════════════════════════════════════════════════════════════════════
+# Offline replay preflight must reject bad evidence before importing the supplied blueprobe.py.
 
-SCRIPT = ROOT / 'examples/replay_dom_with_blueprobe_min.py'
-spec_aoi_min_replay = importlib.util.spec_from_file_location('btk_aoi_min_replay_test', SCRIPT)
-module = importlib.util.module_from_spec(spec_aoi_min_replay)
-spec_aoi_min_replay.loader.exec_module(module)
+SCRIPT = ROOT / 'examples/replay_dom_with_blueprobe.py'
+spec_blueprobe_replay = importlib.util.spec_from_file_location('btk_blueprobe_replay_test', SCRIPT)
+module = importlib.util.module_from_spec(spec_blueprobe_replay)
+spec_blueprobe_replay.loader.exec_module(module)
 
 
-def test_rejects_changed_dom_before_min_import(tmp_path):
+def test_rejects_changed_dom_before_blueprobe_import(tmp_path):
     path = tmp_path / 'dom.json'
     path.write_text(json.dumps({'schema': 'btk-browser-dom/1', 'source_kind': 'dom',
         'html': '<button>Add</button>', 'url': 'https://example.test/', 'html_sha256': '0' * 64}))
     result = subprocess.run([sys.executable, '-S', str(SCRIPT), str(path),
-        '--blueprobe-min', str(tmp_path / 'must-not-be-opened.py')], capture_output=True, text=True, timeout=5)
+        '--blueprobe', str(tmp_path / 'must-not-be-opened.py')], capture_output=True, text=True, timeout=5)
     assert result.returncode == 2
     assert 'hash-verified' in result.stderr
     assert 'No such file' not in result.stderr
@@ -287,8 +287,34 @@ def test_wrong_snapshot_shape_is_not_accepted(tmp_path, value):
         module.read_snapshot(path)
 
 
-def test_changed_min_bundle_is_rejected_before_execution(tmp_path):
-    path = tmp_path / 'bundle.py'
-    path.write_text('# content-sha256: ' + '0' * 64 + '\nraise RuntimeError("must not execute")\n')
-    with pytest.raises(ValueError, match='digest mismatch'):
-        module.load_min(path)
+def test_supplied_file_without_the_blueprobe_api_is_rejected(tmp_path):
+    path = tmp_path / 'other.py'
+    path.write_text('VALUE = 1\n')
+    with pytest.raises(ValueError, match='lacks the BlueProbe report/inspect API'):
+        module.load_blueprobe(path)
+
+
+def test_replay_records_which_blueprobe_copy_produced_the_result(tmp_path):
+    html = '<button>Add</button>'
+    snapshot = tmp_path / 'dom.json'
+    snapshot.write_text(json.dumps({'schema': 'btk-browser-dom/1', 'source_kind': 'dom', 'html': html,
+        'url': 'https://example.test/', 'html_sha256': hashlib.sha256(html.encode()).hexdigest()}))
+    stub = tmp_path / 'blueprobe.py'  # The two functions the example uses, with BlueProbe's signatures.
+    stub.write_text("""def new_report():
+    return {'records': [], 'unknown': []}
+
+
+def inspect(source, pages, records_out=None):
+    rows = []
+    for key, url, group, html in pages:
+        report = source.parse(html, url)
+        if records_out is not None:
+            records_out.extend(report['records'])
+        rows.append({'group': group, 'records': len(report['records']), 'unknown': len(report['unknown'])})
+    return rows
+""")
+    result = module.replay(snapshot, stub, 'Add')
+    assert result['schema'] == 'btk-dom-replay/1'
+    assert result['blueprobe_sha256'] == hashlib.sha256(stub.read_bytes()).hexdigest()
+    assert result['groups'] == [{'group': 'saved-dom', 'records': 1, 'unknown': 0}] and len(result['hits']) == 1
+    assert result['live_page_executed'] is False

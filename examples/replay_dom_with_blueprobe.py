@@ -1,9 +1,9 @@
-"""Reinspect a saved BTK DOM capture with an explicitly supplied BlueProbe min.
+"""Reinspect a saved BTK DOM capture with an explicitly supplied blueprobe.py.
 
-Offline only. The min file is caller-selected trusted Python code, not a sandbox.
-No bundle is downloaded, vendored or imported until the snapshot is verified.
+Offline only. BlueProbe is one stdlib file; the copy passed here is caller-selected trusted Python code, not a sandbox.
+Nothing is downloaded or vendored, and the file is not imported until the snapshot is verified.
 """
-import argparse, hashlib, importlib.util, json, re, sys
+import argparse, hashlib, importlib.util, json, sys
 from pathlib import Path; from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
@@ -22,18 +22,10 @@ def read_snapshot(path):
     return record, hashlib.sha256(raw).hexdigest()
 
 
-def load_min(path):
+def load_blueprobe(path):
     path = Path(path).resolve()
-    data = path.read_bytes()
-    text = data.decode('utf-8')
-    marker = re.search(r'(?m)^# content-sha256: ([0-9a-f]{64})$', text)
-    if not marker:
-        raise ValueError('missing minpy content digest')
-    blanked = text[:marker.start(1)] + '0' * 64 + text[marker.end(1):]
-    if hashlib.sha256(blanked.encode()).hexdigest() != marker[1]:
-        raise ValueError('minpy content digest mismatch')
-    digest = hashlib.sha256(data).hexdigest()
-    name = '_btk_blueprobe_min_' + digest
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()  # Recorded in the result: which copy produced it.
+    name = '_btk_blueprobe_' + digest
     if name not in sys.modules:
         spec = importlib.util.spec_from_file_location(name, path)
         module = importlib.util.module_from_spec(spec)
@@ -45,13 +37,13 @@ def load_min(path):
             raise
     module = sys.modules[name]
     if not all(callable(getattr(module, key, None)) for key in ('new_report', 'inspect')):
-        raise ValueError('the supplied min file lacks the BlueProbe report/inspect API')
+        raise ValueError('the supplied file lacks the BlueProbe report/inspect API')
     return module, digest
 
 
-def replay(snapshot, min_path, query):
+def replay(snapshot, blueprobe_path, query):
     record, snapshot_sha = read_snapshot(snapshot)
-    blueprobe, bundle_sha = load_min(min_path)
+    blueprobe, blueprobe_sha = load_blueprobe(blueprobe_path)
     unknown = []
     def parse(html, url):
         report = blueprobe.new_report()
@@ -70,8 +62,8 @@ def replay(snapshot, min_path, query):
     hits = []
     rows = blueprobe.inspect(SimpleNamespace(parse=parse),
         [(snapshot_sha, record['url'], 'saved-dom', record['html'])], records_out=hits)
-    return {'schema': 'btk-min-dom-replay/1', 'scope': 'historical-static-dom',
-            'snapshot_sha256': snapshot_sha, 'blueprobe_min_sha256': bundle_sha,
+    return {'schema': 'btk-dom-replay/1', 'scope': 'historical-static-dom',
+            'snapshot_sha256': snapshot_sha, 'blueprobe_sha256': blueprobe_sha,
             'html_sha256': record['html_sha256'], 'url': record['url'],
             'captured_at': record.get('captured_at'), 'query': query,
             'live_page_executed': False, 'operability_verified': False,
@@ -81,11 +73,11 @@ def replay(snapshot, min_path, query):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('snapshot', type=Path)
-    parser.add_argument('--blueprobe-min', type=Path, required=True)
+    parser.add_argument('--blueprobe', type=Path, required=True, help='path to a trusted copy of blueprobe.py')
     parser.add_argument('--find', default='')
     args = parser.parse_args(argv)
     try:
-        result = replay(args.snapshot, args.blueprobe_min, args.find)
+        result = replay(args.snapshot, args.blueprobe, args.find)
     except (OSError, ValueError, ImportError) as error:
         parser.exit(2, str(error) + '\n')
     print(json.dumps(result, ensure_ascii=True, indent=2))
