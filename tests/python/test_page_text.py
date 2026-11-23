@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
+import cli_args
 import element_overlay
 
 
@@ -1093,9 +1094,8 @@ def test_page_escapes_title_and_honors_lang() -> None:
 
 # --- CLI ------------------------------------------------------------------
 
-def run_cli_html_builder(*args: str) -> subprocess.CompletedProcess:
-    return subprocess.run([sys.executable, "-S", str(HTML_BUILDER_SCRIPT), *args], capture_output=True, text=True,
-                          encoding="utf-8")
+def run_cli_html_builder(*args: str) -> cli_args.CliResult:
+    return cli_args.run_cli(HTML_BUILDER_SCRIPT, *args, python_options=("-S",))
 
 
 def test_cli_renders_tags_and_folds_consecutive_li_into_one_ul() -> None:

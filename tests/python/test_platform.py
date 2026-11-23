@@ -15,6 +15,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+import cli_args
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -915,8 +917,7 @@ def test_cli_check_is_assert_late(tmp_path):
     bad.write_text(json.dumps([_side(False, requests=["http://x.invalid/"])]), encoding="utf-8")
     junk = tmp_path / "junk.json"
     junk.write_text(json.dumps({"schema": "other"}), encoding="utf-8")
-    run = lambda *a: subprocess.run([sys.executable, "-S", str(ROOT / "tools" / "interaction.py"), "check", *a],
-                                    capture_output=True, text=True)
+    run = lambda *a: cli_args.run_cli(ROOT / "tools" / "interaction.py", "check", *a, python_options=("-S",))
     done = run(str(good))
     assert done.returncode == 0 and "self=False" in done.stdout and "PASS 2 records" in done.stdout
     done = run(str(bad), "--json")
