@@ -20,6 +20,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
 
 import btk
+import fleet_check
 
 
 def test_python_compatibility_lanes_keep_their_executable_support_checks():
@@ -607,8 +608,7 @@ def test_every_script_runs_as_a_module(module: str, tmp_path: Path) -> None:
 
 
 def test_pw_test_bridge_preserves_engines_and_project_relative_paths(tmp_path):
-    import shutil
-    node = shutil.which("node")
+    node = fleet_check.node(minimum=0)  # any Node version runs the CommonJS bridge
     if not node:
         pytest.skip("Node is required to execute the Playwright configuration bridge")
     root = tmp_path / "repo"

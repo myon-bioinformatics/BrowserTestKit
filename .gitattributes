@@ -3,6 +3,8 @@ tests/vendor/xprobe/LICENSE -text
 vendor/pillow_min/pillow_min.py -text
 vendor/pillow_min/Ironmate-LICENSE -text
 vendor/fleet_check.py -text
+vendor/cli_args.py -text
+vendor/cli_args-LICENSE -text
 # js-adopt: SRI hashes the exact bytes; never convert line endings of adopted files (Windows core.autocrlf).
 vendor/js/** -text
 js.lock.json -text

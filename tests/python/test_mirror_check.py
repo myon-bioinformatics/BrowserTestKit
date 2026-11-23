@@ -4,6 +4,8 @@ from pathlib import Path
 
 import pytest
 
+import cli_args
+
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "tools" / "mirror_check.py"
 spec = importlib.util.spec_from_file_location("mirror_check", SCRIPT)
@@ -66,7 +68,7 @@ def test_stdlib_xlsx_reader(tmp_path):
 
 
 def test_cli(tmp_path):
-    run = lambda *a: subprocess.run([sys.executable, "-S", str(SCRIPT), *a], capture_output=True, text=True)
+    run = lambda *a: cli_args.run_cli(SCRIPT, *a, python_options=("-S",))
     (tmp_path / "a.json").write_text(json.dumps(doc("a", links=["x"])))
     (tmp_path / "b.json").write_text(json.dumps(doc("b", links=["x"])))
     (tmp_path / "c.json").write_text(json.dumps(doc("c", links=["y"])))

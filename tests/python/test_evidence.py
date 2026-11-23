@@ -19,6 +19,8 @@ from pathlib import Path
 
 import pytest
 
+import cli_args
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -590,12 +592,7 @@ def test_render_markdown_is_a_table_and_notes_callouts(tmp_path):
 
 
 def _run_cli(args, env=None):
-    return subprocess.run(
-        [sys.executable, str(SCRIPTS / "evidence_board.py"), *args],
-        text=True,
-        capture_output=True,
-        env=env,
-    )
+    return cli_args.run_cli(SCRIPTS / "evidence_board.py", *args, env=env)
 
 
 def test_cli_exit_codes(tmp_path):
@@ -1714,13 +1711,8 @@ assert pm_spec.loader
 pm_spec.loader.exec_module(pillow_min)
 
 
-def run_image_diff(*argv: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        [sys.executable, str(BROWSER_TEST_KIT_IMAGE_DIFF_SCRIPT), *argv],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-    )
+def run_image_diff(*argv: str) -> cli_args.CliResult:
+    return cli_args.run_cli(BROWSER_TEST_KIT_IMAGE_DIFF_SCRIPT, *argv, cwd=ROOT)
 
 
 def test_identical_images_exit_zero() -> None:

@@ -15,6 +15,7 @@ PARENT_WORKFLOW_PIN = "fbf433b296ec047f1c9acdf4d5d12c81ff7f59e8"
 ACCEPTED = {
     "vendor/py_launch.cjs": "384f5dd532076062f7833038764e9a62322c387c",
     "vendor/fleet_check.py": "bc57f08a590ee1cb33a8bb37c1bb3b8f28a2f3c9",
+    "vendor/cli_args.py": "5ae22b1a1b808eca93e3c385a8db867fbeb8ee32",
 }
 
 
@@ -25,7 +26,8 @@ def test_vendor_lock_matches_checked_in_bytes() -> None:
 def test_launcher_pin_uses_canonical_first_parent_source():
     rows = fleet.check_lock(ROOT, commits=ACCEPTED)
     for destination in ACCEPTED:
-        assert (rows[destination]["repository"], rows[destination]["source"]) == (fleet.PARENT, Path(destination).name)
+        owner = "myon-bioinformatics/cli_args" if destination == "vendor/cli_args.py" else fleet.PARENT
+        assert (rows[destination]["repository"], rows[destination]["source"]) == (owner, Path(destination).name)
 
 
 # Local rollout contract; adopted vendor locks are deliberately independent.

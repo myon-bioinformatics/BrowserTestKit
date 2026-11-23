@@ -5,7 +5,6 @@ import importlib.util
 import json
 import os
 import platform
-import shutil
 import subprocess
 import sys
 import threading
@@ -20,6 +19,8 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 import btk
 import btk as page_inspect
+import cli_args
+import fleet_check
 
 
 # ═══ · page inspect ══════════════════════════════════════════════════════════════════════════════════════
@@ -160,7 +161,7 @@ def test_cli_offline_commands_match_the_library(tmp_path: Path):
     script = ROOT / "tools" / "btk.py"
 
     def run(args):
-        return subprocess.run([sys.executable, "-S", str(script), *args], cwd=tmp_path, capture_output=True, text=True, timeout=30)
+        return cli_args.run_cli(script, *args, python_options=("-S",), cwd=tmp_path, timeout=30)
 
     listed = run(["operations"])
     assert listed.returncode == 0 and "locate:" in listed.stdout
@@ -601,10 +602,8 @@ def test_bad_steps_fail_before_a_browser_launch(tmp_path):
     env.pop("BTK_PAGE_SECRET_MISSING", None)
 
     def run(args):
-        return subprocess.run(
-            [sys.executable, "-S", str(SCRIPT), "observe", "http://127.0.0.1:9/missing", *args, "--json"],
-            cwd=tmp_path, capture_output=True, text=True, timeout=30, env=env,
-        )
+        return cli_args.run_cli(SCRIPT, "observe", "http://127.0.0.1:9/missing", *args, "--json",
+                                python_options=("-S",), cwd=tmp_path, timeout=30, env=env)
 
     missing = run(["--step", "type:id:search=env:BTK_PAGE_SECRET_MISSING"])
     assert missing.returncode == 2
@@ -629,10 +628,7 @@ def _serve(directory: Path):
 
 
 def _run(args, env=None):
-    return subprocess.run(
-        [sys.executable, str(SCRIPT), *args],
-        cwd=ROOT, capture_output=True, text=True, timeout=180, env=env,
-    )
+    return cli_args.run_cli(SCRIPT, *args, cwd=ROOT, timeout=180, env=env)
 
 
 @pytest.mark.browser
@@ -1090,7 +1086,7 @@ def notice(capsys, title, text):
 
 
 def run(args):
-    return subprocess.run([sys.executable, str(SCRIPT), *args], cwd=ROOT, capture_output=True, text=True, timeout=120)
+    return cli_args.run_cli(SCRIPT, *args, cwd=ROOT, timeout=120)
 
 
 def loopback():
@@ -1319,7 +1315,7 @@ def test_cli_compare_round_trip_and_input_errors(tmp_path):
     right.write_text(btk.dumps(snapshot(shadow=SHADOW)), encoding="utf-8")
 
     def run(args):
-        return subprocess.run([sys.executable, "-S", str(SCRIPT), *args], cwd=tmp_path, capture_output=True, text=True, timeout=30)
+        return cli_args.run_cli(SCRIPT, *args, python_options=("-S",), cwd=tmp_path, timeout=30)
 
     done = run(["compare", str(left), str(right), "--json"])
     body = json.loads(done.stdout)
@@ -1507,8 +1503,7 @@ RESULT = '<!doctype html><meta charset="utf-8"><title>result</title><button id="
 
 
 def run_btk(args):
-    return subprocess.run([sys.executable, str(SCRIPT), *args], cwd=ROOT,
-                          capture_output=True, text=True, timeout=180)
+    return cli_args.run_cli(SCRIPT, *args, cwd=ROOT, timeout=180)
 
 
 def write_routes(tmp_path, data):
@@ -1691,8 +1686,7 @@ SECOND = """<!doctype html><meta charset="utf-8"><title>second</title>
 
 def run_page_inspect_sequence(args, cwd):
     # observe needs Playwright from site-packages, so it runs without -S (unlike offline commands)
-    return subprocess.run([sys.executable, str(SCRIPT), "observe", *args], cwd=cwd,
-                          capture_output=True, text=True, timeout=180)
+    return cli_args.run_cli(SCRIPT, "observe", *args, cwd=cwd, timeout=180)
 
 
 def test_sequence_arguments_are_checked_before_any_browser_launch(tmp_path):
@@ -1812,8 +1806,8 @@ def serve(directory: Path):
 
 
 def act_settle(url, cwd, timeout_ms="5000"):
-    return subprocess.run([sys.executable, str(SCRIPT), "act", url, "--action", "settle",
-                           "--timeout-ms", timeout_ms, "--json"], cwd=cwd, capture_output=True, text=True, timeout=180)
+    return cli_args.run_cli(SCRIPT, "act", url, "--action", "settle", "--timeout-ms", timeout_ms, "--json",
+                            cwd=cwd, timeout=180)
 
 
 @pytest.mark.browser
@@ -1937,8 +1931,7 @@ PAGE_INSPECT_STEPS_FORM = """<!doctype html><meta charset="utf-8"><title>form</t
 
 
 def observe(args, cwd):
-    return subprocess.run([sys.executable, str(SCRIPT), "observe", *args], cwd=cwd,
-                          capture_output=True, text=True, timeout=180)
+    return cli_args.run_cli(SCRIPT, "observe", *args, cwd=cwd, timeout=180)
 
 
 def test_step_arguments_are_checked_before_any_browser_launch(tmp_path):
@@ -2101,7 +2094,7 @@ def test_navigation_error_call_logs_omit_arbitrary_url_values():
 
 def run_cli(entrypoint, args):
     if entrypoint == "node":
-        node = shutil.which("node")
+        node = fleet_check.node()
         assert node, "Node 26+ is required for the URL privacy parity checks"
         command = [node, str(ROOT / "vendor" / "py_launch.cjs"), "--env-var", "BTK_PYTHON", "--site",
                    str(ROOT / "tools" / "btk.py")]

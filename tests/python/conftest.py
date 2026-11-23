@@ -1,9 +1,19 @@
-"""Select browser engines for the browser lanes with BTK_BROWSER_ENGINES (default: all engines)."""
+"""Select browser engines for the browser lanes with BTK_BROWSER_ENGINES (default: all engines); expose the vendored test helpers."""
+import importlib.util
 import os
+import sys
+from pathlib import Path
 
 import pytest
 
 OPTIONAL_ENGINES = ("firefox", "webkit")
+
+# Shared test helpers from vendor/, importable by name in every test module here:
+# cli_args.run_cli runs this repository's Python scripts, fleet_check.node finds Node.
+for _name in ("cli_args", "fleet_check"):
+    _spec = importlib.util.spec_from_file_location(_name, Path(__file__).resolve().parents[2] / "vendor" / f"{_name}.py")
+    sys.modules[_name] = importlib.util.module_from_spec(_spec)
+    _spec.loader.exec_module(sys.modules[_name])
 
 
 def _selected_engines() -> set[str]:

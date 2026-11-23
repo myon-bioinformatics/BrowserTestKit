@@ -2,7 +2,6 @@
 
 import json
 import os
-import shutil
 import subprocess
 import sys
 import threading
@@ -16,6 +15,8 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
 
 import btk as api
+import cli_args
+import fleet_check
 import page_inspect_scenarios as scenario
 import page_inspect_scenarios as scenarios
 
@@ -117,7 +118,7 @@ def server():
 
 
 def run(url, case, browser="chromium", *extra, host="python"):
-    prefix = [sys.executable, "tools/btk.py"] if host == "python" else [shutil.which("node"), "vendor/py_launch.cjs", "--env-var", "BTK_PYTHON", "--site", "tools/btk.py"]
+    prefix = [sys.executable, "tools/btk.py"] if host == "python" else [fleet_check.node(), "vendor/py_launch.cjs", "--env-var", "BTK_PYTHON", "--site", "tools/btk.py"]
     done = subprocess.run([*prefix, "scenario", url, "--browser", browser, "--case", case, *extra, "--json"],
                           cwd=ROOT, capture_output=True, text=True, timeout=90,
                           env={**os.environ, "PYTHON": sys.executable, "BTK_PYTHON": sys.executable})
@@ -173,12 +174,8 @@ def test_upload_reset_download_cleanup_and_node_bridge(server):
     url, _ = server
     assert run(url, "upload")["sections"]["scenario"]["cleared"] is True
     assert run(url, "download")["sections"]["scenario"]["temporary_artifact"] == "deleted"
-    node = shutil.which("node")
-    if not node:
-        pytest.skip("Node runtime is unavailable; file assertions already ran")
-    version = subprocess.check_output([node, "-p", "process.versions.node"], text=True).strip()
-    if int(version.split(".")[0]) < 26:
-        pytest.skip("Node bridge needs 26+, found " + version)
+    if not fleet_check.node():
+        pytest.skip("Node bridge needs Node 26+; file assertions already ran")
     py = run(url, "offline")
     js = run(url, "offline", host="node")
     for key in ("scenario", "environment_settings", "network"):
@@ -298,9 +295,8 @@ def url():
 
 
 def run_page_inspect_scenarios_browser(url, *flags):
-    proc = subprocess.run([sys.executable, "tools/btk.py", "scenario", url,
-                           "--browser", "chromium", *flags, "--json"],
-                          cwd=ROOT, capture_output=True, text=True, timeout=90)
+    proc = cli_args.run_cli("tools/btk.py", "scenario", url, "--browser", "chromium", *flags, "--json",
+                            cwd=ROOT, timeout=90)
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert "redact-me" not in proc.stdout
     return json.loads(proc.stdout)
