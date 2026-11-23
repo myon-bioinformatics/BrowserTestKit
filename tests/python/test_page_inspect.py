@@ -556,10 +556,15 @@ def test_frame_rows_keep_name_url_origin_in_document_order_without_ids():
     rows, truncated = page_inspect.frame_rows(tree)
     assert truncated is False
     assert rows == [
-        {"name": "outer", "url": "http://127.0.0.1:9/outer", "origin": "http://127.0.0.1:9"},
-        {"name": "inner", "url": "http://127.0.0.1:9/inner", "origin": "http://127.0.0.1:9"},
-        {"name": "sibling", "url": "http://127.0.0.1:9/sibling", "origin": "http://127.0.0.1:9"},
+        {"name": "outer", "url": "http://127.0.0.1:9/outer", "origin": "http://127.0.0.1:9", "address": "frame:1>", "contents": "not_entered"},
+        {"name": "inner", "url": "http://127.0.0.1:9/inner", "origin": "http://127.0.0.1:9", "address": "frame:2>", "contents": "not_entered"},
+        {"name": "sibling", "url": "http://127.0.0.1:9/sibling", "origin": "http://127.0.0.1:9", "address": "frame:3>", "contents": "not_entered"},
     ]
+    # With a reader, a frame whose document is in this process is entered; the others stay not_entered.
+    entered, _ = page_inspect.frame_rows(tree, enter=lambda frame_id, prefix: (
+        {"contents": "entered", "elements": 1, "controls": [{"address": prefix + "id:go"}]} if frame_id == "2" else None))
+    assert [row["contents"] for row in entered] == ["not_entered", "entered", "not_entered"]
+    assert entered[1]["controls"] == [{"address": "frame:2>id:go"}]
     assert "id" not in json.dumps(rows)
     assert "user:pw" not in json.dumps(rows)
 
@@ -989,9 +994,10 @@ def test_chromium_lists_nested_frames_and_writes_step_slices(tmp_path):
     assert [row["name"] for row in rows] == ["outer", "inner"]
     assert rows[0]["url"].endswith("/outer.html")
     assert rows[1]["url"].endswith("/inner.html")
-    assert initial["sections"]["frames"]["contents"] == "not_entered"
-    assert "nested-body" not in json.dumps(initial["elements"])
-    assert all(set(row) == {"name", "url", "origin"} for row in rows)
+    assert initial["sections"]["frames"]["contents"] == "entered"
+    assert "nested-body" not in json.dumps(initial["elements"])  # The page's own elements stay the main document's.
+    assert [row["address"] for row in rows] == ["frame:1>", "frame:2>"]
+    assert all(row["contents"] == "entered" and row["elements"] >= 1 and row["controls"] == [] for row in rows)
     files = payload["files"]
     assert [Path(path).name for path in files] == ["00-initial.json", "01-wait.json"]
     for path, observation in zip(files, payload["observations"]):
@@ -1126,11 +1132,13 @@ def test_chromium_observe_is_passive_and_fingerprints_storage(loopback, capsys):
     assert payload["child_frames"] >= 1
     frames = payload["sections"]["frames"]
     assert frames["coverage"] == "complete"
-    assert frames["contents"] == "not_entered"
+    assert frames["contents"] == "entered"
     assert frames["items"]
     for row in frames["items"]:
-        assert set(row) == {"name", "url", "origin"}
-        assert "Child frame" not in json.dumps(row)
+        assert {"name", "url", "origin", "address", "contents", "elements", "controls"} <= set(row)
+    inside = [control for row in frames["items"] for control in row["controls"]]
+    assert [control["name"] for control in inside] == ["Child frame"]  # Listed under its frame, not among the page's elements.
+    assert inside[0]["address"].startswith("frame:1>")
     assert payload["sections"]["network"]["coverage"] == "attach_limited"
     save = next(element for element in payload["elements"] if element["name"] == "Save draft")
     assert save["address"] == "id:save-draft"
@@ -1407,7 +1415,8 @@ def test_frame_rows_are_document_order_without_userinfo_or_ids():
     rows, truncated = btk.frame_rows(tree)
     assert truncated is False
     assert [row["name"] for row in rows] == ["a", "deep", "b"]
-    assert rows[0] == {"name": "a", "url": "http://127.0.0.1/a", "origin": "http://127.0.0.1"}
+    assert rows[0] == {"name": "a", "url": "http://127.0.0.1/a", "origin": "http://127.0.0.1",
+                       "address": "frame:1>", "contents": "not_entered"}
     assert all("id" not in row for row in rows)
 
 
@@ -1434,8 +1443,11 @@ def test_observe_lists_child_frames_and_same_page_reads_same(tmp_path):
         server.shutdown()
     first = json.loads((tmp_path / "one.json").read_text(encoding="utf-8"))
     section = first["sections"]["frames"]
-    assert section["coverage"] == "complete" and section["contents"] == "not_entered"
+    assert section["coverage"] == "complete" and section["contents"] == "entered"
     assert section["child_frames"] == 3
+    controls = {item["name"]: [(c["address"], c["role"], c["name"]) for c in item["controls"]] for item in section["items"]}
+    assert controls == {"inner": [("frame:1>role:button/inside#0", "button", "inside")], "outer": [],
+                        "deep": [("frame:3>role:link/deep#0", "link", "deep")]}
     assert [item["name"] for item in section["items"]] == ["inner", "outer", "deep"]
     assert section["items"][1]["url"].endswith("/child.html")
     assert all("id" not in item for item in section["items"])
@@ -1873,7 +1885,42 @@ def test_observe_reports_shadow_root_section(tmp_path):
     assert section["coverage"] == "complete"
     # open-host, nested-host and the inner root inside nested-host are open; one closed root.
     assert (section["open"], section["closed"], section["count"]) == (3, 1, 4)
-    assert section["contents"] == "not_entered"
+    assert section["contents"] == "open_entered"
+    # Inside the three open roots: button, div#inner and the link. The closed root's button is not read.
+    assert section["elements"] == 3
+    assert [(c["tag"], c["role"], c["name"]) for c in section["controls"]] == [("button", "button", "open"), ("a", "link", "deep")]
+    assert all(c["address"].startswith("role:") for c in section["controls"])
+
+
+FRAME_ACT_PAGE = """<!doctype html><meta charset="utf-8"><title>frame act</title>
+<button id="go">outside</button>
+<iframe name="panel" srcdoc="&lt;button id='go' onclick=&quot;this.outerHTML='&lt;button id=go&gt;again&lt;/button&gt;&lt;p id=done&gt;clicked&lt;/p&gt;'&quot;&gt;inside&lt;/button&gt;"></iframe>
+"""
+
+
+@pytest.mark.browser
+def test_act_inside_a_child_frame_follows_a_redraw(tmp_path):
+    (tmp_path / "index.html").write_text(FRAME_ACT_PAGE, encoding="utf-8")
+    handler = functools.partial(SimpleHTTPRequestHandler, directory=str(tmp_path))
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        url = f"http://127.0.0.1:{server.server_port}/index.html"
+        # The click replaces the button, so the second step has to find the new one: the address is queried again.
+        run = subprocess.run([sys.executable, str(ROOT / "tools" / "btk.py"), "observe", url, "--json",
+                              "--step", "click:frame:1>id:go", "--step", "wait:frame:1>id:done", "--step", "click:frame:1>id:go"],
+                             capture_output=True, text=True, timeout=180)
+        missing = subprocess.run([sys.executable, str(ROOT / "tools" / "btk.py"), "observe", url, "--json",
+                                  "--step", "click:frame:2>id:go"], capture_output=True, text=True, timeout=180)
+    finally:
+        server.shutdown()
+    assert run.returncode == 0, run.stderr + run.stdout[-600:]
+    observations = json.loads(run.stdout)["observations"]
+    before, after = observations[0]["sections"]["frames"]["items"][0], observations[-1]["sections"]["frames"]["items"][0]
+    assert [c["address"] for c in before["controls"]] == ["frame:1>id:go"] and before["controls"][0]["name"] == "inside"
+    assert [c["name"] for c in after["controls"]] == ["again"] and after["elements"] == before["elements"] + 1
+    assert [e["name"] for e in observations[-1]["elements"]] == ["outside"]  # The page's own button was never the target.
+    assert missing.returncode != 0 and "frame:2 is not on the page" in missing.stdout + missing.stderr
 
 
 # ═══ · page inspect steps ════════════════════════════════════════════════════════════════════════════════

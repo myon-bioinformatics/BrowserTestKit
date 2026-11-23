@@ -1255,8 +1255,17 @@ def _parse_long_press_ms(spec: str | None) -> int:
     return duration
 
 
+FRAME_ADDRESS = re.compile(r"frame:([1-9]\d*)>")  # frame:N>ADDRESS: the Nth child frame of sections.frames.items, then an address inside it
+
+
+def _frame_prefix(text: str) -> tuple[str, str]:
+    """``("frame:2>", "id:save")`` for an address inside a child frame; ``("", text)`` otherwise."""
+    found = FRAME_ADDRESS.match(text or "")
+    return (found.group(0), text[found.end():]) if found else ("", text or "")
+
+
 def _split_locator_value(rest: str) -> tuple[str, str | None]:
-    if rest.startswith("css:"):
+    if _frame_prefix(rest)[1].startswith("css:"):
         index = rest.rfind("=")
     else:
         index = rest.find("=")
@@ -1267,6 +1276,9 @@ def _split_locator_value(rest: str) -> tuple[str, str | None]:
 
 def _require_locator(text: str) -> str:
     locator = (text or "").strip()
+    prefix, inner = _frame_prefix(locator)
+    if prefix:
+        return prefix + _require_locator(inner)
     if not locator:
         raise InspectError("this step needs a locator", "pass id:, testid:, role:, or css:")
     if locator.startswith("h:"):
@@ -1368,7 +1380,7 @@ def parse_step(text: str) -> dict:
             step["locator"] = step["wait"]["locator"]
         return step
     if action in {"press", "shortcut"}:
-        if rest.startswith(("id:", "testid:", "role:", "css:")):
+        if _frame_prefix(rest)[1].startswith(("id:", "testid:", "role:", "css:")):
             locator, key = _split_locator_value(rest)
             step["locator"] = _require_locator(locator)
             if not key:
@@ -1427,7 +1439,7 @@ def _parse_wait(rest: str) -> dict:
         return {"kind": "timeout", "timeout_ms": value}
     if rest in PAGE_LOAD_STATES:
         return {"kind": "load", "state": rest}
-    if rest.startswith(("id:", "testid:", "role:", "css:")):
+    if _frame_prefix(rest)[1].startswith(("id:", "testid:", "role:", "css:")):
         locator, state = _split_locator_value(rest)
         state = state or "visible"
         if state not in LOCATOR_STATES:
@@ -2000,8 +2012,9 @@ def assemble_observe(raw: dict, *, environment: dict, url: str, start: int, limi
         "a missing or not_requested section is not evidence that the page had nothing",
     ]
     if raw.get("child_frames"):
-        hints.append("child frames were counted and their documents were not entered")
-    hints.append("DOM attributes are not read inside shadow roots; accessibility names may still include open-shadow controls")
+        hints.append("controls inside a child frame are in sections.frames.items; act on one with its frame:N>ADDRESS. "
+                     "A frame rendered by another process stays not_entered")
+    hints.append("DOM attributes are not read inside shadow roots; sections.shadow_roots.controls lists the controls inside open roots")
     if normalized["truncated"]:
         hints.append("this snapshot is a page of the observe result; raise --limit or pass --role")
     child_frames = raw.get("child_frames") or 0
@@ -2282,15 +2295,77 @@ def _walk_dom(node, found: list) -> bool:
     return truncated
 
 
+def _is_open_root(shadow: dict) -> bool:
+    return shadow.get("shadowRootType") not in {"user-agent", "closed"}
+
+
+def open_shadow_nodes(root: dict) -> tuple[list, bool]:
+    """Elements inside the open shadow roots of one document, in document order.
+
+    Open roots nested in open roots are entered. Closed and user-agent roots and child frame documents are not.
+    """
+    found: list[dict] = []
+
+    def visit(node: dict, inside: bool) -> bool:
+        if inside and node.get("nodeType") == 1:
+            if len(found) >= HARD_CAP:
+                return True
+            _walk_dom({**node, "children": []}, found)  # One row for this element; its children follow below.
+        for shadow in node.get("shadowRoots") or []:
+            if _is_open_root(shadow) and any(visit(child, True) for child in shadow.get("children") or []):
+                return True
+        return any(visit(child, inside) for child in node.get("children") or [])
+
+    return found, visit(root, False)
+
+
+def frame_documents(root: dict) -> dict:
+    """``frameId`` → the child document a pierced DOM tree carries for that frame owner.
+
+    A frame rendered by another process has no ``contentDocument`` here and stays out of the map.
+    """
+    found: dict = {}
+    stack = [root]
+    while stack:
+        node = stack.pop()
+        document = node.get("contentDocument")
+        if isinstance(document, dict):
+            if node.get("frameId"):
+                found[node["frameId"]] = document
+            stack.append(document)
+        for shadow in node.get("shadowRoots") or []:
+            if _is_open_root(shadow):
+                stack.append(shadow)
+        stack.extend(node.get("children") or [])
+    return found
+
+
+def _control_rows(elements: list, *, prefix: str = "", tags: list | None = None) -> tuple[list, bool]:
+    """Compact rows for controls found inside a frame or an open shadow root: address, tag, role, name, visible, enabled."""
+    page = normalize_elements({"elements": elements}, start=0, limit=SURVEY_LIMIT_MAX)
+    rows = []
+    for index, item in enumerate(page["elements"]):
+        rows.append({
+            "address": prefix + item["address"],
+            "tag": (tags[index] if tags else "") or item["tag"],
+            "role": item["role"],
+            "name": item["name"],
+            "visible": item["visible"],
+            "enabled": item["enabled"],
+        })
+    return rows, page["truncated"]
+
+
 def _frame_count(node) -> int:
     return 1 + sum(_frame_count(child) for child in node.get("childFrames") or [])
 
 
-def frame_rows(frame_tree: dict, *, limit: int = HARD_CAP) -> tuple[list, bool]:
-    """Child frames in document order: name, URL, and origin only.
+def frame_rows(frame_tree: dict, *, limit: int = HARD_CAP, enter=None) -> tuple[list, bool]:
+    """Child frames in document order: name, URL, origin, and what is inside.
 
-    Frame ids change per load, so they are not listed. Child documents are not entered.
-    Ported from the frame list on feat/page-inspect-shadow-roots.
+    Frame ids change per load, so they are not listed; ``frame:N>`` (N from 1, this order) addresses a frame instead.
+    ``enter(frame_id, prefix)`` returns the row fields for a frame whose document could be read
+    (``contents: entered``, ``elements``, ``controls``) or None, which leaves it ``not_entered``.
     """
     rows: list[dict] = []
     stack = list(reversed(frame_tree.get("childFrames") or []))
@@ -2301,10 +2376,14 @@ def frame_rows(frame_tree: dict, *, limit: int = HARD_CAP) -> tuple[list, bool]:
         if len(rows) >= limit:
             return rows, True
         frame = node.get("frame") or {}
+        prefix = f"frame:{len(rows) + 1}>"
+        inside = enter(frame.get("id"), prefix) if enter else None
         rows.append({
             "name": clip(str(frame.get("name") or ""), 120),
             "url": strip_userinfo(str(frame.get("url") or "")),
             "origin": clip(str(frame.get("securityOrigin") or ""), 200),
+            "address": prefix,
+            **(inside or {"contents": "not_entered"}),
         })
         stack.extend(reversed(node.get("childFrames") or []))
     return rows, False
@@ -2347,6 +2426,7 @@ def _controls_from_cdp(dom_nodes, ax_nodes, *, include_hidden: bool, role: str, 
         if node["testid"]:
             testid_counts[node["testid"]] = testid_counts.get(node["testid"], 0) + 1
     elements = []
+    backend_ids = []
     wanted = role.lower()
     for ax in ax_nodes:
         if ax.get("ignored") and not include_hidden:
@@ -2366,6 +2446,7 @@ def _controls_from_cdp(dom_nodes, ax_nodes, *, include_hidden: bool, role: str, 
         element_id = dom.get("id") or ""
         testid = dom.get("testid") or ""
         name = clip(_ax_text(ax.get("name")))
+        backend_ids.append(ax.get("backendDOMNodeId"))
         elements.append({
             "tag": dom.get("tag") or "",
             "role": role_name,
@@ -2396,7 +2477,7 @@ def _controls_from_cdp(dom_nodes, ax_nodes, *, include_hidden: bool, role: str, 
             scripts.append({"kind": "external", "url": strip_userinfo(script_url)})
         elif node["inline_script"]:
             scripts.append({"kind": "inline"})
-    return elements, {"scripts": scripts, "dom_nodes": len(dom_nodes), "ax_nodes": len(ax_nodes)}
+    return elements, {"scripts": scripts, "dom_nodes": len(dom_nodes), "ax_nodes": len(ax_nodes), "backend_ids": backend_ids}
 
 
 def _storage_section(client, origin: str, *, keys: bool, fingerprints: bool, sent: list) -> dict:
@@ -2910,7 +2991,36 @@ def observe_page(*, url: str, browser_name: str, profile: str, headed: bool, cha
                     "url": strip_userinfo(item.get("url") or ""),
                 })
             document_url = strip_userinfo(((frames.get("frameTree") or {}).get("frame") or {}).get("url") or "")
-            frame_items, frame_truncated = frame_rows(frames.get("frameTree") or {})
+            documents = frame_documents(pierced.get("root") or {})
+
+            def enter_frame(frame_id, prefix: str):
+                if frame_id not in documents:
+                    return None  # Rendered by another process: listed, not entered.
+                inner_nodes: list[dict] = []
+                inner_truncated = _walk_dom(documents[frame_id], inner_nodes)
+                inner_ax = _cdp_send(client, "Accessibility.getFullAXTree", {"frameId": frame_id}, sent)
+                inner, _meta = _controls_from_cdp(
+                    inner_nodes, inner_ax.get("nodes") or [], include_hidden=include_hidden, role=role,
+                )
+                controls, cut = _control_rows(inner, prefix=prefix)
+                return {"contents": "entered", "elements": len(inner_nodes), "controls": controls,
+                        "truncated": inner_truncated or cut}
+
+            frame_items, frame_truncated = frame_rows(frames.get("frameTree") or {}, enter=enter_frame)
+            frame_contents = "not_entered"
+            if frame_items:
+                entered = sum(row["contents"] == "entered" for row in frame_items)
+                frame_contents = "entered" if entered == len(frame_items) else "partly_entered" if entered else "not_entered"
+            shadow_nodes, shadow_cut = open_shadow_nodes(pierced.get("root") or {})
+            shadow_tags = {row["backend_id"]: row["tag"] for row in shadow_nodes}
+            inside_shadow = [i for i, backend in enumerate(meta["backend_ids"]) if backend in shadow_tags]
+            addressed = normalize_elements({"elements": elements}, start=0, limit=SURVEY_LIMIT_MAX)["elements"]
+            shadow_controls = [
+                {"address": addressed[i]["address"], "tag": shadow_tags[meta["backend_ids"][i]], "role": addressed[i]["role"],
+                 "name": addressed[i]["name"], "visible": addressed[i]["visible"], "enabled": addressed[i]["enabled"]}
+                for i in inside_shadow if i < len(addressed)
+            ]
+            shadow_cut = shadow_cut or any(i >= len(addressed) for i in inside_shadow)
             controls_digest = _content_digest([
                 [e.get("address"), e.get("role"), e.get("name"), e.get("text")] for e in elements
             ])
@@ -2948,11 +3058,13 @@ def observe_page(*, url: str, browser_name: str, profile: str, headed: bool, cha
                 }),
                 "storage": storage,
                 "frames": _section("cdp:Page.getFrameTree", "truncated" if frame_truncated else "complete", {
-                    "child_frames": child_frames, "contents": "not_entered", "items": frame_items,
+                    "child_frames": child_frames, "contents": frame_contents, "items": frame_items,
                 }),
-                "shadow_roots": _section("cdp:DOM.getDocument pierce", "truncated" if shadow["truncated"] else "complete", {
+                "shadow_roots": _section("cdp:DOM.getDocument pierce", "truncated" if shadow["truncated"] or shadow_cut else "complete", {
                     "open": shadow["open"], "closed": shadow["closed"], "count": shadow["count"],
-                    "user_agent": shadow["user_agent"], "contents": "not_entered",
+                    "user_agent": shadow["user_agent"],
+                    "contents": "open_entered" if shadow["open"] else "not_entered",
+                    "elements": len(shadow_nodes), "controls": shadow_controls,
                 }),
                 "dialogs": _dialog_section(dialogs, dialog_policy),
                 "popups": _popup_section(popups),
@@ -3024,8 +3136,27 @@ def observe_page(*, url: str, browser_name: str, profile: str, headed: bool, cha
 
 
 
+def _child_frames(frame) -> list:
+    """Child frames depth first, the order sections.frames.items lists them in."""
+    found = []
+    for child in frame.child_frames:
+        found.append(child)
+        found.extend(_child_frames(child))
+    return found
+
+
 def _action_locator(page, locator: str):
     text = (locator or "").strip()
+    prefix, inner = _frame_prefix(text)
+    if prefix:
+        number = int(prefix[6:-1])
+        frames = _child_frames(page.main_frame) if hasattr(page, "main_frame") else []
+        if number > len(frames):
+            raise InspectError(
+                f"{prefix[:-1]} is not on the page",
+                "run observe again; sections.frames.items lists the child frames in order",
+            )
+        return _action_locator(frames[number - 1], inner)  # Queried inside that frame each time, so a redraw is followed.
     if text.startswith("h:"):
         raise InspectError(
             "act does not accept a snapshot ordinal",
@@ -3522,7 +3653,7 @@ def parse_after_action(spec: str) -> dict:
         return {"kind": "scroll_into", "locator": _require_locator(text[12:])}
     if lowered.startswith("scroll:"):
         body = text[7:]
-        if body.startswith(("id:", "testid:", "role:", "css:")):
+        if _frame_prefix(body)[1].startswith(("id:", "testid:", "role:", "css:")):
             return {"kind": "scroll_into", "locator": _require_locator(body)}
         step = parse_step(f"scroll:{body}")
         return {"kind": "scroll", "dx": step["dx"], "dy": step["dy"]}
@@ -3558,7 +3689,7 @@ def resolve_observe_after_action(args: argparse.Namespace) -> dict | None:
 
 def _check_action_locator(locator: str | None) -> None:
     """Shared by act and observe --after-click: an address from observe, never a snapshot ordinal."""
-    text = (locator or "").strip()
+    text = _frame_prefix((locator or "").strip())[1]
     if not text or text.startswith("h:"):
         raise InspectError(
             "act does not accept a snapshot ordinal",

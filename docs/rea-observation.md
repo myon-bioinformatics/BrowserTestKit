@@ -78,7 +78,7 @@ Not ported: Stagehand's model tools, its `Runtime.callFunctionOn` scroll, and it
 
 ## Child frames, step files, and settle
 
-`frames.items` lists child frames in document order. Each row is `name`, `url`, and `origin` from `Page.getFrameTree`. Frame ids are omitted because they change per load. `contents` stays `not_entered`: the child document is not read. Nested frames are listed after their parent, still without entering them. The same list was added on `feat/page-inspect-shadow-roots` and copied here.
+`frames.items` lists child frames in document order. Each row is `name`, `url`, and `origin` from `Page.getFrameTree`. Frame ids are omitted because they change per load. Each row also has `address` (`frame:N>`, N from 1 in this order) and `contents`. A frame whose document is in the same process is `entered`: `elements` counts its elements and `controls` lists its controls as `address`, `tag`, `role`, `name`, `visible`, `enabled`, with the address already prefixed (`frame:1>id:go`). `act` and `--step` accept that address and query the control inside the frame each time, so a control that was redrawn is found again. A frame rendered by another process stays `not_entered`. Nested frames are listed after their parent. The same list was added on `feat/page-inspect-shadow-roots` and copied here.
 
 `observe --step --out` remains one `btk-page-observe-run/1` document: `observations` are `btk-page-observe/1`, `comparisons` are `btk-page-compare/1`, and `steps` are the action records. `--out-dir` also writes those observation objects as `00-initial.json` and `NN-action.json`. The files are slices of `observations`, not a second schema. `btk-page-observe-steps/1` is not used: that envelope dropped the comparisons and the step records that this run already keeps. `compare` can read any two slice files because each one is a normal observe snapshot.
 
@@ -92,7 +92,7 @@ Typed `env:NAME` and `file:PATH` values are still removed in full, including per
 
 ## Deferred on issue 117
 
-Child frames and shadow roots as their own address spaces. Observe counts child frames and author open plus closed shadow roots (pierced DOM, `shadow_roots` section, `contents: not_entered`, `user_agent` for Chromium built-in roots); it does not enter either and does not read shadow attributes. macOS, Windows, Linux, and Android Chrome or WebView as a recorded matrix. Branded channels as a matrix. A Stagehand caller. A headed lane in CI. An agent transport after these envelopes stay stable. Screenshot comparison and full scenario diffs.
+Frames rendered by another process and closed shadow roots: both are counted and listed, never entered. Open shadow roots are entered since 2026-11-23 (`shadow_roots.contents: open_entered`, `elements`, `controls`); attribute values inside them are still not published, and their controls keep the page-wide addresses because Playwright locators pierce open roots. macOS, Windows, Linux, and Android Chrome or WebView as a recorded matrix. Branded channels as a matrix. A Stagehand caller. A headed lane in CI. An agent transport after these envelopes stay stable. Screenshot comparison and full scenario diffs.
 
 Stages 3 and 4 of human input stay on issue 117: an OS shortcut behavior matrix beyond `ControlOrMeta`, display settings (`color-scheme`, `reduced-motion`, locale, timezone), and offline, throttling, and permissions.
 
