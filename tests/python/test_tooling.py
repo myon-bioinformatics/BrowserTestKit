@@ -5,7 +5,6 @@ import hashlib
 import importlib.util
 import io
 import json
-import os
 import shlex
 import subprocess
 import sys
@@ -20,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
 
 import btk
+import cli_args
 import fleet_check
 
 
@@ -88,7 +88,7 @@ def test_browser_contract_rejects_missing_pages_or_masked_tests():
 WORKFLOW = ROOT / ".github/workflows/ci.yml"
 COLLECTOR = (
     "myon-bioinformatics/myon-bioinformatics/.github/workflows/"
-    "reusable-junit-identity.yml@fbf433b296ec047f1c9acdf4d5d12c81ff7f59e8"
+    "reusable-junit-identity.yml@dbe7e16be53f9e5b8c9ba29ff6ed8be0899a35ff"
 )
 COMMAND = (
     'uv run --locked python -m pytest tests/python -q -m "not browser" '
@@ -213,7 +213,7 @@ BROWSER_TEST_KIT_VENDOR_AUTOMATION_WORKFLOW = '.github/workflows/ci.yml'
 TEST_JOB = 'python'
 LOCK = json.loads((ROOT / 'vendor.lock.json').read_text())
 SNAPSHOT = ['vendor.lock.json'] + [e['destination'] for e in LOCK['files']]
-PIN = 'fbf433b296ec047f1c9acdf4d5d12c81ff7f59e8'
+PIN = 'dbe7e16be53f9e5b8c9ba29ff6ed8be0899a35ff'
 
 
 def _workflow():
@@ -600,9 +600,8 @@ SCRIPTS = Path(__file__).resolve().parents[2] / "tools"
 @pytest.mark.parametrize("module", sorted(path.stem for path in SCRIPTS.glob("*.py")))
 def test_every_script_runs_as_a_module(module: str, tmp_path: Path) -> None:
     """pyproject.toml installs each tools/*.py as a top-level module; each must support `python -m NAME --help`."""
-    env = dict(os.environ, PYTHONPATH=str(SCRIPTS), PYTHONDONTWRITEBYTECODE="1")
-    done = subprocess.run([sys.executable, "-S", "-m", module, "--help"], cwd=tmp_path, env=env,
-                          capture_output=True, text=True, timeout=60)
+    env = cli_args.build_env({"PYTHONPATH": str(SCRIPTS), "PYTHONDONTWRITEBYTECODE": "1"})
+    done = cli_args.run_cli(module, "--help", python_options=("-S", "-m"), cwd=tmp_path, env=env, timeout=60)
     assert done.returncode == 0, done.stderr
     assert "usage" in done.stdout.lower()
 

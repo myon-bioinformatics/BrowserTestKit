@@ -1,8 +1,6 @@
 """page-inspect platform and fault scenarios: evidence contracts, offline boundaries and real Chromium CLI runs."""
 
 import json
-import os
-import subprocess
 import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -118,12 +116,16 @@ def server():
 
 
 def run(url, case, browser="chromium", *extra, host="python"):
-    prefix = [sys.executable, "tools/btk.py"] if host == "python" else [fleet_check.node(), "vendor/py_launch.cjs", "--env-var", "BTK_PYTHON", "--site", "tools/btk.py"]
-    done = subprocess.run([*prefix, "scenario", url, "--browser", browser, "--case", case, *extra, "--json"],
-                          cwd=ROOT, capture_output=True, text=True, timeout=90,
-                          env={**os.environ, "PYTHON": sys.executable, "BTK_PYTHON": sys.executable})
+    """One passing `btk.py scenario` run as parsed JSON, directly or through the Node launcher; the fixture URL's token stays out of the output."""
+    args = ("scenario", url, "--browser", browser, "--case", case, *extra, "--json")
+    options = {"cwd": ROOT, "timeout": 90, "env": cli_args.build_env({"PYTHON": sys.executable, "BTK_PYTHON": sys.executable})}
+    if host == "python":
+        done = cli_args.run_cli("tools/btk.py", *args, **options)
+    else:
+        done = cli_args.run_node("vendor/py_launch.cjs", "--env-var", "BTK_PYTHON", "--site", "tools/btk.py", *args,
+                                 node=fleet_check.node(), **options)
     assert done.returncode == 0, done.stdout + done.stderr
-    assert "PRIVATE" not in done.stdout + done.stderr
+    assert "PRIVATE" not in done.stdout + done.stderr and "redact-me" not in done.stdout
     return json.loads(done.stdout)
 
 
@@ -186,7 +188,7 @@ def test_upload_reset_download_cleanup_and_node_bridge(server):
 def test_unknown_fixture_state_fails_without_leaking_it(server):
     url, state = server
     state["fixture"] = state["fixture"].replace(b'</script>', b'display.dataset.scheme = "PRIVATE";</script>')
-    done = subprocess.run([sys.executable, "tools/btk.py", "scenario", url, "--case", "display", "--json"], cwd=ROOT, capture_output=True, text=True, timeout=60)
+    done = cli_args.run_cli("tools/btk.py", "scenario", url, "--case", "display", "--json", cwd=ROOT, timeout=60)
     assert done.returncode == 2
     assert "PRIVATE" not in done.stdout + done.stderr
     assert json.loads(done.stdout)["stage"] == "inspect"
@@ -226,9 +228,8 @@ def test_coverage_relations_and_cli_bad_flags():
     assert api.evidence_relation(a, api._section("test", "complete_within_window", {"case": "offline"})) == "same"
     assert api.evidence_relation(a, api._section("test", "complete", {"case": "latency"})) == "different"
     assert api.evidence_relation(a, api._section("test", "truncated", {"case": "offline"})) == "unknown"
-    cmd = [sys.executable, "-S", str(ROOT / "tools/btk.py"), "scenario",
-           "http://127.0.0.1:9/page", "--case", "display", "--viewport", "9999x9999", "--json"]
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    proc = cli_args.run_cli(ROOT / "tools/btk.py", "scenario", "http://127.0.0.1:9/page", "--case", "display",
+                            "--viewport", "9999x9999", "--json", python_options=("-S",))
     assert proc.returncode == 2
     assert json.loads(proc.stdout)["stage"] == "input"
 
@@ -294,14 +295,6 @@ def url():
         server.server_close()
 
 
-def run_page_inspect_scenarios_browser(url, *flags):
-    proc = cli_args.run_cli("tools/btk.py", "scenario", url, "--browser", "chromium", *flags, "--json",
-                            cwd=ROOT, timeout=90)
-    assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert "redact-me" not in proc.stdout
-    return json.loads(proc.stdout)
-
-
 @PAGE_INSPECT_SCENARIOS_BROWSER_MARK
 @pytest.mark.parametrize("case,key,value", [
     ("shortcut", "select_all_replaced", True),
@@ -312,7 +305,7 @@ def run_page_inspect_scenarios_browser(url, *flags):
     ("download", "completed", True),
 ])
 def test_real_chromium_scenarios(url, case, key, value):
-    evidence = run_page_inspect_scenarios_browser(url, "--case", case)
+    evidence = run(url, case)
     assert evidence["schema"] == "btk-page-observe/1"
     assert evidence["sections"]["scenario"][key] == value
     assert evidence["sections"]["network"]["coverage"] == "complete_within_window"
@@ -326,7 +319,7 @@ def test_real_chromium_scenarios(url, case, key, value):
 
 @PAGE_INSPECT_SCENARIOS_BROWSER_MARK
 def test_display_and_permissions(url):
-    evidence = run_page_inspect_scenarios_browser(url, "--case", "display", "--viewport", "390x844",
+    evidence = run(url, "display", "chromium", "--viewport", "390x844",
                    "--color-scheme", "dark", "--reduced-motion", "reduce",
                    "--locale", "ja-JP", "--timezone", "Asia/Tokyo",
                    "--device-scale-factor", "2")
@@ -338,12 +331,12 @@ def test_display_and_permissions(url):
     assert float(observed["dpr"]) == 2
     assert evidence["environment"]["viewport"] == {"width": 390, "height": 844}
     assert evidence["environment"]["device_claim"] == "emulation_only"
-    granted = run_page_inspect_scenarios_browser(url, "--case", "permission", "--permission", "notifications", "--permission-state", "grant")
+    granted = run(url, "permission", "chromium", "--permission", "notifications", "--permission-state", "grant")
     section = granted["sections"]["scenario"]
     assert section["reported_state"] in ("granted", "denied", "prompt", "unsupported")
     assert section["configured_state"] == "grant"
     assert section["matches_requested"] == (None if section["coverage"] == "unavailable" else section["reported_state"] == "granted")
-    geo = run_page_inspect_scenarios_browser(url, "--case", "permission", "--permission", "geolocation", "--permission-state", "grant")
+    geo = run(url, "permission", "chromium", "--permission", "geolocation", "--permission-state", "grant")
     assert geo["sections"]["scenario"]["reported_state"] == "granted"
     assert geo["sections"]["scenario"]["matches_requested"] is True
     assert geo["sections"]["scenario"]["reset_matches_baseline"] is True
@@ -354,10 +347,10 @@ def test_display_and_permissions(url):
 @pytest.mark.parametrize("profile", ["desktop", "iphone", "pixel"])
 @pytest.mark.parametrize("explicit", [False, True])
 def test_profile_environment_matches_context(url, profile, explicit):
-    flags = ["--profile", profile, "--case", "display"]
+    flags = ["--profile", profile]
     if explicit:
         flags += ["--viewport", "800x600"]
-    evidence = run_page_inspect_scenarios_browser(url, *flags)
+    evidence = run(url, "display", "chromium", *flags)
     environment = evidence["environment"]
     settings = evidence["sections"]["environment_settings"]
     expected_source = "flag" if explicit else ("desktop_default" if profile == "desktop" else "device_descriptor")

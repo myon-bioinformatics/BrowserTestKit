@@ -71,7 +71,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: myon-bioinformatics/myon-bioinformatics
-          ref: fbf433b296ec047f1c9acdf4d5d12c81ff7f59e8
+          ref: dbe7e16be53f9e5b8c9ba29ff6ed8be0899a35ff
           path: .vendor-sync-tools
           persist-credentials: false
       - name: Resolve all supported groups from the lock

@@ -5,7 +5,6 @@ import importlib.util
 import json
 import os
 import platform
-import subprocess
 import sys
 import threading
 import time
@@ -158,26 +157,22 @@ def test_cli_offline_commands_match_the_library(tmp_path: Path):
     )
     path = tmp_path / "survey.json"
     path.write_text(btk_page_inspect.dumps(survey), encoding="utf-8")
-    script = ROOT / "tools" / "btk.py"
-
-    def run(args):
-        return cli_args.run_cli(script, *args, python_options=("-S",), cwd=tmp_path, timeout=30)
-
-    listed = run(["operations"])
+    offline = {"python_options": ("-S",), "cwd": tmp_path, "timeout": 30}
+    listed = run_btk(["operations"], **offline)
     assert listed.returncode == 0 and "locate:" in listed.stdout
-    found = run(["locate", str(path), "--query", "Save draft", "--unique", "--json"])
+    found = run_btk(["locate", str(path), "--query", "Save draft", "--unique", "--json"], **offline)
     assert found.returncode == 0
     assert json.loads(found.stdout)["items"][0]["address"] == "id:save-draft"
-    shared = run(["locate", str(path), "--query", "Save", "--unique"])
+    shared = run_btk(["locate", str(path), "--query", "Save", "--unique"], **offline)
     assert shared.returncode == 1 and "suggest:" in shared.stderr and shared.stdout == ""
-    described = run(["describe", str(path), "--target", "id:save-draft", "--json"])
+    described = run_btk(["describe", str(path), "--target", "id:save-draft", "--json"], **offline)
     body = json.loads(described.stdout)
     assert described.returncode == 0 and body["resolved_as"] == "id" and body["context"][0].startswith("* ")
-    memory = run(["describe", str(path), "--target", "0x10", "--json"])
+    memory = run_btk(["describe", str(path), "--target", "0x10", "--json"], **offline)
     assert memory.returncode == 2 and json.loads(memory.stdout)["stage"] == "input"
-    missing = run(["locate", str(tmp_path / "missing.json"), "--query", "Save"])
+    missing = run_btk(["locate", str(tmp_path / "missing.json"), "--query", "Save"], **offline)
     assert missing.returncode == 2 and "observe --out" in missing.stderr
-    help_text = run(["--help"])
+    help_text = run_btk(["--help"], **offline)
     assert help_text.returncode == 0 and "usage" in help_text.stdout.lower()
 
 
@@ -306,6 +301,22 @@ def test_observe_cdp_never_sends_runtime_evaluate_with_after_action(tmp_path, mo
 
 SCRIPT = ROOT / "tools" / "btk.py"
 BROWSERS = ("chromium", "firefox", "webkit")
+
+
+def run_btk(args, entrypoint="python", **options):
+    """tools/btk.py once, from the repository root within 180 s unless options say otherwise.
+
+    No -S by default: observe and act need Playwright from site-packages. entrypoint "node" starts
+    the same script through vendor/py_launch.cjs, which reads the interpreter from BTK_PYTHON.
+    """
+    options = {"cwd": ROOT, "timeout": 180, **options}
+    if entrypoint == "python":
+        return cli_args.run_cli(SCRIPT, *args, **options)
+    node = fleet_check.node()
+    assert node, "Node 26+ is required for the Node entry point"
+    options["env"] = cli_args.build_env({"PYTHON": sys.executable, "BTK_PYTHON": sys.executable}, base=options.get("env"))
+    return cli_args.run_node(ROOT / "vendor" / "py_launch.cjs", "--env-var", "BTK_PYTHON", "--site", SCRIPT, *args,
+                             node=node, **options)
 
 PAGE = """<!doctype html>
 <meta charset="utf-8">
@@ -601,21 +612,20 @@ def test_bad_steps_fail_before_a_browser_launch(tmp_path):
     env = os.environ.copy()
     env.pop("BTK_PAGE_SECRET_MISSING", None)
 
-    def run(args):
-        return cli_args.run_cli(SCRIPT, "observe", "http://127.0.0.1:9/missing", *args, "--json",
-                                python_options=("-S",), cwd=tmp_path, timeout=30, env=env)
-
-    missing = run(["--step", "type:id:search=env:BTK_PAGE_SECRET_MISSING"])
+    observe = ["observe", "http://127.0.0.1:9/missing", "--json"]
+    offline = {"python_options": ("-S",), "cwd": tmp_path, "timeout": 30, "env": env}
+    missing = run_btk([*observe, "--step", "type:id:search=env:BTK_PAGE_SECRET_MISSING"], **offline)
     assert missing.returncode == 2
     body = json.loads(missing.stdout)
     assert body["ok"] is False and "not set" in body["error"]
-    ordinal = run(["--step", "click:h:1"])
+    ordinal = run_btk([*observe, "--step", "click:h:1"], **offline)
     assert ordinal.returncode == 2 and "ordinal" in json.loads(ordinal.stdout)["error"]
-    both = run(["--step", "click:id:save", "--after-click", "id:save", "--after-out", str(tmp_path / "b.json"), "--out", str(tmp_path / "a.json")])
+    both = run_btk([*observe, "--step", "click:id:save", "--after-click", "id:save", "--after-out", str(tmp_path / "b.json"),
+                    "--out", str(tmp_path / "a.json")], **offline)
     assert both.returncode == 2 and "--step" in json.loads(both.stdout)["error"]
     out_dir = tmp_path / "slices"
     out_dir.mkdir()
-    bare = run(["--out-dir", str(out_dir)])
+    bare = run_btk([*observe, "--out-dir", str(out_dir)], **offline)
     assert bare.returncode == 2 and "out-dir" in json.loads(bare.stdout)["error"]
 
 
@@ -625,10 +635,6 @@ def _serve(directory: Path):
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     return server
-
-
-def _run(args, env=None):
-    return cli_args.run_cli(SCRIPT, *args, cwd=ROOT, timeout=180, env=env)
 
 
 @pytest.mark.browser
@@ -686,7 +692,7 @@ def test_steps_record_observations_and_redact_values(tmp_path):
     for step in steps:
         command.extend(["--step", step])
     try:
-        done = _run(command, env=env)
+        done = run_btk(command, env=env)
     finally:
         server.shutdown()
     assert done.returncode == 0, done.stderr + done.stdout[:2000]
@@ -788,9 +794,9 @@ def test_touch_requires_a_touch_context_and_phones_are_emulation(tmp_path):
     server = _serve(tmp_path)
     url = f"http://127.0.0.1:{server.server_address[1]}/index.html"
     try:
-        desktop = _run(["observe", url, "--touch", "--viewport", "390x844", "--step", "tap:id:touch", "--json"])
-        phone = _run(["observe", url, "--profile", "iphone", "--browser", "chromium", "--step", "tap:id:touch", "--json"])
-        accepted = _run([
+        desktop = run_btk(["observe", url, "--touch", "--viewport", "390x844", "--step", "tap:id:touch", "--json"])
+        phone = run_btk(["observe", url, "--profile", "iphone", "--browser", "chromium", "--step", "tap:id:touch", "--json"])
+        accepted = run_btk([
             "observe", url, "--dialog-policy", "accept", "--step", "click:id:ask", "--json",
         ])
     finally:
@@ -857,7 +863,7 @@ def test_chromium_touch_gestures_use_touch_input(tmp_path):
     server = _serve(tmp_path)
     url = f"http://127.0.0.1:{server.server_address[1]}/index.html"
     try:
-        done = _run([
+        done = run_btk([
             "observe", url, "--touch", "--viewport", "390x700",
             "--step", "long-press:id:pad=700",
             "--step", "swipe:id:pad=160,0",
@@ -902,7 +908,7 @@ def test_other_engines_keep_gestures_unsupported_with_touch(tmp_path, browser_na
     server = _serve(tmp_path)
     url = f"http://127.0.0.1:{server.server_address[1]}/index.html"
     try:
-        done = _run([
+        done = run_btk([
             "observe", url, "--browser", browser_name, "--touch", "--viewport", "390x700",
             "--step", "tap:id:touch",
             "--step", "long-press:id:touch",
@@ -932,7 +938,7 @@ def test_other_browsers_run_click_and_mark_swipe_unsupported(tmp_path, browser_n
     server = _serve(tmp_path)
     url = f"http://127.0.0.1:{server.server_address[1]}/index.html"
     try:
-        done = _run([
+        done = run_btk([
             "observe", url, "--browser", browser_name, "--step", "click:id:result-1",
             "--step", "swipe:id:source", "--json",
         ])
@@ -976,7 +982,7 @@ def test_chromium_lists_nested_frames_and_writes_step_slices(tmp_path):
     server = _serve(tmp_path)
     url = f"http://127.0.0.1:{server.server_address[1]}/index.html"
     try:
-        done = _run([
+        done = run_btk([
             "observe", url, "--step", "wait:timeout:1", "--out", str(out), "--out-dir", str(out_dir), "--json",
         ])
     finally:
@@ -1011,11 +1017,11 @@ def test_chromium_settle_is_quiet_without_page_script_and_busy_pages_time_out(tm
     base = f"http://127.0.0.1:{server.server_address[1]}"
     try:
         started = time.monotonic()
-        quiet = _run([
+        quiet = run_btk([
             "observe", f"{base}/quiet.html", "--timeout-ms", "8000", "--step", "settle", "--json",
         ])
         elapsed = time.monotonic() - started
-        busy = _run([
+        busy = run_btk([
             "observe", f"{base}/busy.html", "--timeout-ms", "900", "--step", "settle", "--json",
         ])
     finally:
@@ -1048,7 +1054,7 @@ def test_other_engines_report_settle_unsupported(tmp_path, browser_name):
     server = _serve(tmp_path)
     url = f"http://127.0.0.1:{server.server_address[1]}/quiet.html"
     try:
-        done = _run(["observe", url, "--browser", browser_name, "--step", "settle", "--json"])
+        done = run_btk(["observe", url, "--browser", browser_name, "--step", "settle", "--json"])
     finally:
         server.shutdown()
     assert done.returncode == 0, done.stderr
@@ -1085,10 +1091,6 @@ def notice(capsys, title, text):
             print(f"\n::notice title={title}::{text[:900]}", flush=True)
 
 
-def run(args):
-    return cli_args.run_cli(SCRIPT, *args, cwd=ROOT, timeout=120)
-
-
 def loopback():
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -1107,7 +1109,7 @@ def names(survey):
 def test_chromium_observe_is_passive_and_fingerprints_storage(loopback, capsys):
     RESULTS.mkdir(parents=True, exist_ok=True)
     out = RESULTS / "chromium-observe.json"
-    done = run([
+    done = run_btk([
         "observe", loopback, "--browser", "chromium", "--json", "--out", str(out),
         "--include-storage-keys", "--include-storage-fingerprints",
     ])
@@ -1146,14 +1148,14 @@ def test_chromium_observe_is_passive_and_fingerprints_storage(loopback, capsys):
     local = next(area for area in areas if area["area"] == "local")
     assert local["items"][0]["key"] == "draft-token"
     assert "sha256" in local["items"][0] and "value" not in local["items"][0]
-    hidden = run(["observe", loopback, "--browser", "chromium", "--include-hidden", "--json"])
+    hidden = run_btk(["observe", loopback, "--browser", "chromium", "--include-hidden", "--json"])
     assert hidden.returncode == 0, hidden.stderr
     assert "Secret" in names(json.loads(hidden.stdout))
     notice(capsys, "page-observe chromium", f"elements={payload['total']} save={save['address']}")
 
 
 def test_firefox_and_webkit_observe_do_not_invent_a_page(loopback, browser_name, capsys):
-    done = run(["observe", loopback, "--browser", browser_name, "--profile", "iphone", "--json"])
+    done = run_btk(["observe", loopback, "--browser", browser_name, "--profile", "iphone", "--json"])
     assert done.returncode == 0, done.stderr
     payload = json.loads(done.stdout)
     assert payload["limits"]["page_js_called"] is False
@@ -1165,7 +1167,7 @@ def test_firefox_and_webkit_observe_do_not_invent_a_page(loopback, browser_name,
 
 
 def test_act_requeries_and_records_the_click(loopback, capsys):
-    clicked = run([
+    clicked = run_btk([
         "act", loopback, "--browser", "chromium", "--action", "click", "--locator", "id:save-draft", "--json",
     ])
     assert clicked.returncode == 0, clicked.stderr
@@ -1174,7 +1176,7 @@ def test_act_requeries_and_records_the_click(loopback, capsys):
     assert payload["limits"]["bounded_to"] == ["click"]
     assert payload["sections"]["dom"]["coverage"] == "not_requested"
     assert "Saved" in payload["sections"]["accessibility"]["names"]
-    ordinal = run(["act", loopback, "--action", "click", "--locator", "h:0", "--json"])
+    ordinal = run_btk(["act", loopback, "--action", "click", "--locator", "h:0", "--json"])
     assert ordinal.returncode == 2
     assert json.loads(ordinal.stdout)["ok"] is False
     notice(capsys, "page-act", "click re-queried id:save-draft")
@@ -1184,7 +1186,7 @@ def test_act_requeries_and_records_the_click(loopback, capsys):
 # whenever BTK_BROWSER_ENGINES included firefox, so a host without Firefox failed the
 # Chromium test. As a browser_name parameter, conftest's engine selection applies.
 def test_act_wait_does_not_call_page_js(loopback, browser_name, capsys):
-    waited = run(["act", loopback, "--browser", browser_name, "--action", "wait_for_timeout", "--timeout-ms", "50", "--json"])
+    waited = run_btk(["act", loopback, "--browser", browser_name, "--action", "wait_for_timeout", "--timeout-ms", "50", "--json"])
     assert waited.returncode == 0, waited.stderr
     body = json.loads(waited.stdout)
     assert body["limits"]["page_js_called"] is False
@@ -1314,23 +1316,21 @@ def test_cli_compare_round_trip_and_input_errors(tmp_path):
     left.write_text(btk.dumps(snapshot(shadow=SHADOW)), encoding="utf-8")
     right.write_text(btk.dumps(snapshot(shadow=SHADOW)), encoding="utf-8")
 
-    def run(args):
-        return cli_args.run_cli(SCRIPT, *args, python_options=("-S",), cwd=tmp_path, timeout=30)
-
-    done = run(["compare", str(left), str(right), "--json"])
+    offline = {"python_options": ("-S",), "cwd": tmp_path, "timeout": 30}
+    done = run_btk(["compare", str(left), str(right), "--json"], **offline)
     body = json.loads(done.stdout)
     assert done.returncode == 0 and body["schema"] == "btk-page-compare/1"
     assert body["sections"]["shadow_roots"]["relation"] == "same"
 
-    text = run(["compare", str(left), str(right)])
+    text = run_btk(["compare", str(left), str(right)], **offline)
     assert text.returncode == 0 and text.stdout.startswith("btk-page-compare/1 same_environment=true")
 
     not_observe = tmp_path / "locate.json"
     not_observe.write_text(json.dumps({"schema": "btk-page-inspect/1", "elements": []}), encoding="utf-8")
-    bad = run(["compare", str(left), str(not_observe), "--json"])
+    bad = run_btk(["compare", str(left), str(not_observe), "--json"], **offline)
     assert bad.returncode == 2 and json.loads(bad.stdout)["ok"] is False
 
-    missing = run(["compare", str(left), str(tmp_path / "missing.json")])
+    missing = run_btk(["compare", str(left), str(tmp_path / "missing.json")], **offline)
     assert missing.returncode == 2 and "observe --out" in missing.stderr
 
 
@@ -1370,8 +1370,7 @@ def test_network_and_console_come_from_playwright_events(tmp_path):
     threading.Thread(target=server.serve_forever, daemon=True).start()
     try:
         url = f"http://127.0.0.1:{server.server_port}/index.html"
-        done = subprocess.run([sys.executable, str(SCRIPT), "observe", url, "--json"],
-                              capture_output=True, text=True, timeout=180)
+        done = run_btk(["observe", url, "--json"])
     finally:
         server.shutdown()
     assert done.returncode == 0, done.stderr
@@ -1432,8 +1431,7 @@ def test_observe_lists_child_frames_and_same_page_reads_same(tmp_path):
     try:
         url = f"http://127.0.0.1:{server.server_port}/index.html"
         for name in ("one.json", "two.json"):
-            done = subprocess.run([sys.executable, str(SCRIPT), "observe", url, "--out", str(tmp_path / name), "--json"],
-                                  cwd=tmp_path, capture_output=True, text=True, timeout=180)
+            done = run_btk(["observe", url, "--out", str(tmp_path / name), "--json"], cwd=tmp_path)
             assert done.returncode == 0, done.stderr
     finally:
         server.shutdown()
@@ -1448,9 +1446,8 @@ def test_observe_lists_child_frames_and_same_page_reads_same(tmp_path):
     assert section["items"][1]["url"].endswith("/child.html")
     assert all("id" not in item for item in section["items"])
 
-    compared = subprocess.run([sys.executable, "-S", str(SCRIPT), "compare", str(tmp_path / "one.json"),
-                               str(tmp_path / "two.json"), "--json"], cwd=tmp_path,
-                              capture_output=True, text=True, timeout=60)
+    compared = run_btk(["compare", str(tmp_path / "one.json"), str(tmp_path / "two.json"), "--json"],
+                       python_options=("-S",), cwd=tmp_path, timeout=60)
     assert json.loads(compared.stdout)["sections"]["frames"]["relation"] == "same"
 
 
@@ -1500,10 +1497,6 @@ INDEX = ('<!doctype html><meta charset="utf-8"><title>home</title>'
          '<a href="form.html">Form</a> <a href="result.html">Result</a> <a href="https://example.com/">away</a>\n')
 FORM = '<!doctype html><meta charset="utf-8"><title>form</title><a id="go" href="result.html">Go</a>\n'
 RESULT = '<!doctype html><meta charset="utf-8"><title>result</title><button id="back">Back</button>\n'
-
-
-def run_btk(args):
-    return cli_args.run_cli(SCRIPT, *args, cwd=ROOT, timeout=180)
 
 
 def write_routes(tmp_path, data):
@@ -1684,25 +1677,20 @@ SECOND = """<!doctype html><meta charset="utf-8"><title>second</title>
 """
 
 
-def run_page_inspect_sequence(args, cwd):
-    # observe needs Playwright from site-packages, so it runs without -S (unlike offline commands)
-    return cli_args.run_cli(SCRIPT, "observe", *args, cwd=cwd, timeout=180)
-
-
 def test_sequence_arguments_are_checked_before_any_browser_launch(tmp_path):
     url = "http://127.0.0.1:9/index.html"
-    missing_after = run_page_inspect_sequence([url, "--after-click", "id:next", "--out", str(tmp_path / "a.json")], tmp_path)
+    missing_after = run_btk(["observe", url, "--after-click", "id:next", "--out", str(tmp_path / "a.json")], cwd=tmp_path)
     assert missing_after.returncode == 2 and "--after-out" in missing_after.stderr
-    missing_out = run_page_inspect_sequence([url, "--after-click", "id:next", "--after-out", str(tmp_path / "b.json")], tmp_path)
+    missing_out = run_btk(["observe", url, "--after-click", "id:next", "--after-out", str(tmp_path / "b.json")], cwd=tmp_path)
     assert missing_out.returncode == 2 and "--out" in missing_out.stderr
-    ordinal = run_page_inspect_sequence([url, "--after-click", "h:2", "--out", str(tmp_path / "a.json"),
-                   "--after-out", str(tmp_path / "b.json")], tmp_path)
+    ordinal = run_btk(["observe", url, "--after-click", "h:2", "--out", str(tmp_path / "a.json"),
+                   "--after-out", str(tmp_path / "b.json")], cwd=tmp_path)
     assert ordinal.returncode == 2 and "ordinal" in ordinal.stderr
-    same = run_page_inspect_sequence([url, "--after-click", "id:next", "--out", str(tmp_path / "a.json"),
-                "--after-out", str(tmp_path / "a.json")], tmp_path)
+    same = run_btk(["observe", url, "--after-click", "id:next", "--out", str(tmp_path / "a.json"),
+                "--after-out", str(tmp_path / "a.json")], cwd=tmp_path)
     assert same.returncode == 2 and "different files" in same.stderr
-    no_dir = run_page_inspect_sequence([url, "--after-click", "id:next", "--out", str(tmp_path / "missing" / "a.json"),
-                  "--after-out", str(tmp_path / "b.json")], tmp_path)
+    no_dir = run_btk(["observe", url, "--after-click", "id:next", "--out", str(tmp_path / "missing" / "a.json"),
+                  "--after-out", str(tmp_path / "b.json")], cwd=tmp_path)
     assert no_dir.returncode == 2 and "directory does not exist" in no_dir.stderr
     # observe writes an error envelope to --out, as every command does; the second file is never written
     assert json.loads((tmp_path / "a.json").read_text(encoding="utf-8"))["ok"] is False
@@ -1718,8 +1706,8 @@ def test_click_then_second_snapshot_in_its_own_file(tmp_path):
     threading.Thread(target=server.serve_forever, daemon=True).start()
     try:
         url = f"http://127.0.0.1:{server.server_port}/first.html"
-        done = run_page_inspect_sequence([url, "--after-click", "id:next", "--out", str(tmp_path / "before.json"),
-                    "--after-out", str(tmp_path / "after.json"), "--json"], tmp_path)
+        done = run_btk(["observe", url, "--after-click", "id:next", "--out", str(tmp_path / "before.json"),
+                    "--after-out", str(tmp_path / "after.json"), "--json"], cwd=tmp_path)
     finally:
         server.shutdown()
     assert done.returncode == 0, done.stderr
@@ -1732,9 +1720,8 @@ def test_click_then_second_snapshot_in_its_own_file(tmp_path):
     assert after["limits"]["click_runs_page_scripts"] is True
     assert json.loads(done.stdout)["url"] == before["url"]
 
-    compared = subprocess.run([sys.executable, "-S", str(SCRIPT), "compare", str(tmp_path / "before.json"),
-                               str(tmp_path / "after.json"), "--json"], cwd=tmp_path,
-                              capture_output=True, text=True, timeout=60)
+    compared = run_btk(["compare", str(tmp_path / "before.json"), str(tmp_path / "after.json"), "--json"],
+                       python_options=("-S",), cwd=tmp_path, timeout=60)
     assert compared.returncode == 0
     sections = json.loads(compared.stdout)["sections"]
     for name in ("dom", "accessibility", "resources"):
@@ -1752,13 +1739,12 @@ def test_same_page_observed_twice_reads_same_for_identity_sections(tmp_path):
     try:
         url = f"http://127.0.0.1:{server.server_port}/first.html"
         for name in ("one.json", "two.json"):
-            done = run_page_inspect_sequence([url, "--out", str(tmp_path / name), "--json"], tmp_path)
+            done = run_btk(["observe", url, "--out", str(tmp_path / name), "--json"], cwd=tmp_path)
             assert done.returncode == 0, done.stderr
     finally:
         server.shutdown()
-    compared = subprocess.run([sys.executable, "-S", str(SCRIPT), "compare", str(tmp_path / "one.json"),
-                               str(tmp_path / "two.json"), "--json"], cwd=tmp_path,
-                              capture_output=True, text=True, timeout=60)
+    compared = run_btk(["compare", str(tmp_path / "one.json"), str(tmp_path / "two.json"), "--json"],
+                       python_options=("-S",), cwd=tmp_path, timeout=60)
     sections = json.loads(compared.stdout)["sections"]
     for name in ("dom", "accessibility", "resources"):
         assert sections[name]["relation"] == "same", name
@@ -1805,11 +1791,6 @@ def serve(directory: Path):
     return server
 
 
-def act_settle(url, cwd, timeout_ms="5000"):
-    return cli_args.run_cli(SCRIPT, "act", url, "--action", "settle", "--timeout-ms", timeout_ms, "--json",
-                            cwd=cwd, timeout=180)
-
-
 @pytest.mark.browser
 def test_settle_reports_quiet_when_mutations_stop_and_not_quiet_on_timeout(tmp_path):
     (tmp_path / "settles.html").write_text(SETTLES, encoding="utf-8")
@@ -1817,8 +1798,8 @@ def test_settle_reports_quiet_when_mutations_stop_and_not_quiet_on_timeout(tmp_p
     server = serve(tmp_path)
     try:
         base = f"http://127.0.0.1:{server.server_port}"
-        quiet = act_settle(f"{base}/settles.html", tmp_path)
-        busy = act_settle(f"{base}/never.html", tmp_path, timeout_ms="1500")
+        quiet = run_btk(["act", f"{base}/settles.html", "--action", "settle", "--timeout-ms", "5000", "--json"], cwd=tmp_path)
+        busy = run_btk(["act", f"{base}/never.html", "--action", "settle", "--timeout-ms", "1500", "--json"], cwd=tmp_path)
     finally:
         server.shutdown()
     assert quiet.returncode == 0, quiet.stderr
@@ -1870,8 +1851,7 @@ def test_observe_reports_shadow_root_section(tmp_path):
     threading.Thread(target=server.serve_forever, daemon=True).start()
     try:
         url = f"http://127.0.0.1:{server.server_port}/index.html"
-        run = subprocess.run([sys.executable, str(ROOT / "tools" / "btk.py"), "observe", url, "--json"],
-                             capture_output=True, text=True, timeout=180)
+        run = run_btk(["observe", url, "--json"])
     finally:
         server.shutdown()
     assert run.returncode == 0, run.stderr
@@ -1901,11 +1881,9 @@ def test_act_inside_a_child_frame_follows_a_redraw(tmp_path):
     try:
         url = f"http://127.0.0.1:{server.server_port}/index.html"
         # The click replaces the button, so the second step has to find the new one: the address is queried again.
-        run = subprocess.run([sys.executable, str(ROOT / "tools" / "btk.py"), "observe", url, "--json",
-                              "--step", "click:frame:1>id:go", "--step", "wait:frame:1>id:done", "--step", "click:frame:1>id:go"],
-                             capture_output=True, text=True, timeout=180)
-        missing = subprocess.run([sys.executable, str(ROOT / "tools" / "btk.py"), "observe", url, "--json",
-                                  "--step", "click:frame:2>id:go"], capture_output=True, text=True, timeout=180)
+        run = run_btk(["observe", url, "--json",
+                       "--step", "click:frame:1>id:go", "--step", "wait:frame:1>id:done", "--step", "click:frame:1>id:go"])
+        missing = run_btk(["observe", url, "--json", "--step", "click:frame:2>id:go"])
     finally:
         server.shutdown()
     assert run.returncode == 0, run.stderr + run.stdout[-600:]
@@ -1930,24 +1908,20 @@ PAGE_INSPECT_STEPS_FORM = """<!doctype html><meta charset="utf-8"><title>form</t
 """
 
 
-def observe(args, cwd):
-    return cli_args.run_cli(SCRIPT, "observe", *args, cwd=cwd, timeout=180)
-
-
 def test_step_arguments_are_checked_before_any_browser_launch(tmp_path):
     url = "http://127.0.0.1:9/form.html"
-    no_dir = observe([url, "--step", "click id:go"], tmp_path)
+    no_dir = run_btk(["observe", url, "--step", "click id:go"], cwd=tmp_path)
     assert no_dir.returncode == 2 and "--out-dir" in no_dir.stderr
-    both = observe([url, "--step", "click id:go", "--out-dir", str(tmp_path), "--after-click", "id:go",
-                    "--after-out", str(tmp_path / "x.json"), "--out", str(tmp_path / "y.json")], tmp_path)
+    both = run_btk(["observe", url, "--step", "click id:go", "--out-dir", str(tmp_path), "--after-click", "id:go",
+                    "--after-out", str(tmp_path / "x.json"), "--out", str(tmp_path / "y.json")], cwd=tmp_path)
     assert both.returncode == 2 and "cannot be combined" in both.stderr
-    unknown = observe([url, "--step", "drag id:go", "--out-dir", str(tmp_path)], tmp_path)
+    unknown = run_btk(["observe", url, "--step", "drag id:go", "--out-dir", str(tmp_path)], cwd=tmp_path)
     assert unknown.returncode == 2 and "unknown action drag" in unknown.stderr
-    no_text = observe([url, "--step", "fill id:q", "--out-dir", str(tmp_path)], tmp_path)
+    no_text = run_btk(["observe", url, "--step", "fill id:q", "--out-dir", str(tmp_path)], cwd=tmp_path)
     assert no_text.returncode == 2 and "needs TEXT" in no_text.stderr
-    bad_wait = observe([url, "--step", "wait_for_timeout - soon", "--out-dir", str(tmp_path)], tmp_path)
+    bad_wait = run_btk(["observe", url, "--step", "wait_for_timeout - soon", "--out-dir", str(tmp_path)], cwd=tmp_path)
     assert bad_wait.returncode == 2 and "milliseconds" in bad_wait.stderr
-    many = observe([url, "--out-dir", str(tmp_path)] + sum((["--step", "press - Enter"] for _ in range(21)), []), tmp_path)
+    many = run_btk(["observe", url, "--out-dir", str(tmp_path)] + sum((["--step", "press - Enter"] for _ in range(21)), []), cwd=tmp_path)
     assert many.returncode == 2 and "at most 20" in many.stderr
 
 
@@ -1962,8 +1936,8 @@ def test_fill_then_click_writes_one_snapshot_per_step_and_hides_the_text(tmp_pat
     threading.Thread(target=server.serve_forever, daemon=True).start()
     try:
         url = f"http://127.0.0.1:{server.server_port}/form.html"
-        done = observe([url, "--step", "fill id:q secret-value-42", "--step", "click id:go",
-                        "--out-dir", str(out), "--json"], tmp_path)
+        done = run_btk(["observe", url, "--step", "fill id:q secret-value-42", "--step", "click id:go",
+                        "--out-dir", str(out), "--json"], cwd=tmp_path)
     finally:
         server.shutdown()
     assert done.returncode == 0, done.stderr
@@ -1982,12 +1956,11 @@ def test_fill_then_click_writes_one_snapshot_per_step_and_hides_the_text(tmp_pat
 
 def test_goto_step_needs_a_loopback_url_and_no_locator(tmp_path):
     url = "http://127.0.0.1:9/form.html"
-    no_url = observe([url, "--step", "goto -", "--out-dir", str(tmp_path)], tmp_path)
+    no_url = run_btk(["observe", url, "--step", "goto -", "--out-dir", str(tmp_path)], cwd=tmp_path)
     assert no_url.returncode == 2 and "needs TEXT" in no_url.stderr
-    remote = observe([url, "--step", "goto - http://example.com:80/", "--out-dir", str(tmp_path)], tmp_path)
+    remote = run_btk(["observe", url, "--step", "goto - http://example.com:80/", "--out-dir", str(tmp_path)], cwd=tmp_path)
     assert remote.returncode == 2 and "loopback" in remote.stderr
-    direct = subprocess.run([sys.executable, str(SCRIPT), "act", url, "--action", "goto", "--text", "http://example.com:80/", "--json"],
-                            cwd=tmp_path, capture_output=True, text=True, timeout=60)
+    direct = run_btk(["act", url, "--action", "goto", "--text", "http://example.com:80/", "--json"], cwd=tmp_path, timeout=60)
     assert direct.returncode == 2 and "loopback" in direct.stdout + direct.stderr
 
 
@@ -2002,8 +1975,8 @@ def test_goto_step_navigates_within_loopback(tmp_path):
     threading.Thread(target=server.serve_forever, daemon=True).start()
     try:
         base = f"http://127.0.0.1:{server.server_port}"
-        done = observe([f"{base}/form.html", "--step", f"goto - {base}/result.html",
-                        "--out-dir", str(out), "--json"], tmp_path)
+        done = run_btk(["observe", f"{base}/form.html", "--step", f"goto - {base}/result.html",
+                        "--out-dir", str(out), "--json"], cwd=tmp_path)
     finally:
         server.shutdown()
     assert done.returncode == 0, done.stderr
@@ -2028,7 +2001,7 @@ def test_emoji_trail_drives_goto_steps(tmp_path):
         trail = route_trail_page_inspect_steps.resolve("🏠 → 🗺", ROUTES, base=base, hash_routing=False)
         start, *rest = trail
         steps = [f"goto - {row['url']}" for row in rest]
-        done = observe([start["url"], "--step", *steps, "--out-dir", str(out), "--json"], tmp_path)
+        done = run_btk(["observe", start["url"], "--step", *steps, "--out-dir", str(out), "--json"], cwd=tmp_path)
     finally:
         server.shutdown()
     assert done.returncode == 0, done.stderr
@@ -2077,7 +2050,7 @@ def test_compare_legacy_urls_does_not_republish_values(tmp_path, entrypoint):
     right = dict(left, url="http://127.0.0.1:8765/result" + SUFFIX)
     for name, body in (("left", left), ("right", right)):
         (tmp_path / f"{name}.json").write_text(json.dumps(body), encoding="utf-8")
-    done = run_cli(entrypoint, ["compare", str(tmp_path / "left.json"), str(tmp_path / "right.json"), "--json"])
+    done = run_btk(["compare", str(tmp_path / "left.json"), str(tmp_path / "right.json"), "--json"], entrypoint)
     assert done.returncode == 0, done.stdout + done.stderr
     assert_private_absent(done.stdout + done.stderr)
     payload = json.loads(done.stdout)
@@ -2090,18 +2063,6 @@ def test_navigation_error_call_logs_omit_arbitrary_url_values():
     payload = btk.error_envelope("observe", exc)
     assert_private_absent(btk.dumps(payload) + btk.error_text(payload))
     assert "http://127.0.0.1:8765/path" in payload["error"]
-
-
-def run_cli(entrypoint, args):
-    if entrypoint == "node":
-        node = fleet_check.node()
-        assert node, "Node 26+ is required for the URL privacy parity checks"
-        command = [node, str(ROOT / "vendor" / "py_launch.cjs"), "--env-var", "BTK_PYTHON", "--site",
-                   str(ROOT / "tools" / "btk.py")]
-    else:
-        command = [sys.executable, str(ROOT / "tools" / "btk.py")]
-    return subprocess.run(command + args, capture_output=True, text=True, timeout=120,
-                          env={**os.environ, "PYTHON": sys.executable, "BTK_PYTHON": sys.executable})
 
 
 @pytest.fixture
@@ -2145,9 +2106,9 @@ def test_initial_goto_network_steps_and_compare_hide_values(tmp_path, private_si
     base, received = private_site
     out = tmp_path / "snapshots"
     out.mkdir()
-    done = run_cli(entrypoint, ["observe", base + "/start.html" + SUFFIX,
-                              "--step", "goto - " + base + "/result.html" + SUFFIX,
-                              "--out-dir", str(out), "--json"])
+    done = run_btk(["observe", base + "/start.html" + SUFFIX,
+                    "--step", "goto - " + base + "/result.html" + SUFFIX,
+                    "--out-dir", str(out), "--json"], entrypoint)
     assert done.returncode == 0, done.stdout + done.stderr
     assert_private_absent(done.stdout + done.stderr)
     summary = json.loads(done.stdout)
@@ -2169,7 +2130,7 @@ def test_initial_goto_network_steps_and_compare_hide_values(tmp_path, private_si
     assert final["step"]["url_after"] == base + "/result.html"
     assert "/start.html?q=" + QUERY in received
     assert "/result.html?q=" + QUERY in received
-    compared = run_cli(entrypoint, ["compare", *summary["files"], "--json"])
+    compared = run_btk(["compare", *summary["files"], "--json"], entrypoint)
     assert compared.returncode == 0, compared.stdout + compared.stderr
     assert_private_absent(compared.stdout + compared.stderr)
     payload = json.loads(compared.stdout)
@@ -2182,8 +2143,8 @@ def test_initial_goto_network_steps_and_compare_hide_values(tmp_path, private_si
 def test_act_goto_url_section_hides_values(tmp_path, private_site, entrypoint):
     base, received = private_site
     artifact = tmp_path / "act.json"
-    done = run_cli(entrypoint, ["act", base + "/start.html" + SUFFIX, "--action", "goto",
-                              "--text", base + "/result.html" + SUFFIX, "--json", "--out", str(artifact)])
+    done = run_btk(["act", base + "/start.html" + SUFFIX, "--action", "goto",
+                    "--text", base + "/result.html" + SUFFIX, "--json", "--out", str(artifact)], entrypoint)
     assert done.returncode == 0, done.stdout + done.stderr
     assert_private_absent(done.stdout + done.stderr + artifact.read_text(encoding="utf-8"))
     payload = json.loads(done.stdout)

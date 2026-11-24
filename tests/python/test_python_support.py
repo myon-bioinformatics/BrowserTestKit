@@ -1,9 +1,12 @@
 """Keep runtime, distribution, and development on the same Python floor, and installed modules working for consumers."""
-import importlib.util, json, os, subprocess, sys, zipfile
+import importlib.util, json, subprocess, sys, zipfile
 from pathlib import Path
 import tomllib
 
 import pytest
+
+import cli_args
+import fleet_check
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -61,7 +64,6 @@ def test_built_wheel_metadata_when_present():
 @pytest.mark.parametrize('layout', ['target', 'prefix'])
 def test_built_wheel_image_diff_outside_checkout(tmp_path, layout):
     """Install the actual wheel and exercise PNGs, not just --help, without PIL."""
-    import os
     import subprocess
     import sys
     import sysconfig
@@ -77,16 +79,14 @@ def test_built_wheel_image_diff_outside_checkout(tmp_path, layout):
         module_path = target if layout == 'target' else sysconfig.get_path(
             'purelib', vars={'base': str(target), 'platbase': str(target)})
         # -S bypasses site packages; only the distribution just installed is visible.
-        env = {**os.environ, 'PYTHONPATH': str(module_path)}
+        env = cli_args.build_env({'PYTHONPATH': str(module_path)})
         fixtures = ROOT / 'tests/fixtures/image_diff'
         import json
         golden = json.loads((fixtures / 'golden.json').read_text())
         for name, left, right in [('identical', 'identical_a.png', 'identical_b.png'),
                                   ('red_rect', 'red_rect_a.png', 'red_rect_b.png')]:
-            result = subprocess.run(
-                [sys.executable, '-S', '-m', 'image_diff', str(fixtures / left), str(fixtures / right)],
-                cwd=tmp_path, env=env, capture_output=True, text=True, timeout=30,
-            )
+            result = cli_args.run_cli('image_diff', fixtures / left, fixtures / right,
+                                      python_options=('-S', '-m'), cwd=tmp_path, env=env, timeout=30)
             assert result.returncode == golden[name]['returncode'], result.stderr
             assert result.stdout.strip() == golden[name]['stdout']
             assert result.stderr == ''
@@ -125,25 +125,24 @@ def test_legacy_modules_remain_distributed():
 @pytest.mark.parametrize('runtime', ['python', 'node'])
 def test_inspection_runs_current_privacy_and_error_contract(tmp_path, runtime):
     # Node runs btk.py through vendor/py_launch.cjs (page_inspect.py/.cjs and btk.cjs are gone).
-    def command():
-        if runtime == 'python':
-            return [sys.executable, str(ROOT / 'tools' / 'btk.py')]
-        return ['node', str(ROOT / 'vendor' / 'py_launch.cjs'), '--env-var', 'BTK_PYTHON', '--site',
-                str(ROOT / 'tools' / 'btk.py')]
-    def run(args):
-        return subprocess.run([*command(), *args],
-                              env={**os.environ, 'PYTHON': sys.executable, 'BTK_PYTHON': sys.executable},
-                              capture_output=True, text=True, timeout=60)
+    script = ROOT / 'tools' / 'btk.py'
+    options = {'env': cli_args.build_env({'PYTHON': sys.executable, 'BTK_PYTHON': sys.executable}), 'timeout': 60}
+    if runtime == 'python':
+        run = lambda *args: cli_args.run_cli(script, *args, **options)
+    else:
+        node = fleet_check.node()
+        assert node, 'Node 26+ is required for the launcher entry'
+        run = lambda *args: cli_args.run_node(ROOT / 'vendor' / 'py_launch.cjs', '--env-var', 'BTK_PYTHON', '--site',
+                                              script, *args, node=node, **options)
     snapshot = {'schema': 'btk-page-observe/1', 'elements': [],
                 'url': 'http://127.0.0.1:8765/a?token=private-value#private-fragment'}
     path = tmp_path / 'old.json'
     path.write_text(json.dumps(snapshot))
-    args = ['compare', str(path), str(path), '--json']
-    done = run(args)
+    done = run('compare', path, path, '--json')
     assert done.returncode == 0 and json.loads(done.stdout)['left_url'] == 'http://127.0.0.1:8765/a'
     assert 'private-value' not in done.stdout + done.stderr
     assert 'private-fragment' not in done.stdout + done.stderr
-    assert run(['unknown', '--json']).returncode == 2
+    assert run('unknown', '--json').returncode == 2
 
 
 def test_python_api_including_private_helpers():
@@ -165,17 +164,15 @@ def test_installed_legacy_modules_outside_checkout(tmp_path):
     subprocess.run([sys.executable, '-m', 'pip', 'install', '--no-deps', '--no-index',
                     '--target', str(target), str(wheels[-1])], check=True,
                    capture_output=True, timeout=60)
-    env = {**os.environ, 'PYTHONPATH': str(target)}
+    env = cli_args.build_env({'PYTHONPATH': str(target)})
     for name in LEGACY:
-        done = subprocess.run([sys.executable, '-S', '-m', name, '--help'], cwd=tmp_path,
-                              env=env, capture_output=True, text=True, timeout=60)
+        done = cli_args.run_cli(name, '--help', python_options=('-S', '-m'), cwd=tmp_path, env=env, timeout=60)
         assert done.returncode == 0, (name, done.stderr)
     snapshot = tmp_path / 'snapshot.json'
     snapshot.write_text(json.dumps({'schema': 'btk-page-observe/1', 'elements': [],
                                    'url': 'http://127.0.0.1:8765/?q=private-value'}))
-    done = subprocess.run([sys.executable, '-S', '-m', 'btk', 'compare',
-                           str(snapshot), str(snapshot), '--json'], cwd=tmp_path,
-                          env=env, capture_output=True, text=True, timeout=60)
+    done = cli_args.run_cli('btk', 'compare', snapshot, snapshot, '--json',
+                            python_options=('-S', '-m'), cwd=tmp_path, env=env, timeout=60)
     assert done.returncode == 0, done.stderr
     assert json.loads(done.stdout)['left_url'] == 'http://127.0.0.1:8765/'
     assert 'private-value' not in done.stdout

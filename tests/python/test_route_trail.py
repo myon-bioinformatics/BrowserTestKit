@@ -4,8 +4,6 @@ import asyncio
 import copy
 import importlib.util
 import json
-import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -13,10 +11,14 @@ from types import SimpleNamespace
 
 import pytest
 
+import cli_args
+import fleet_check
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
-@pytest.mark.skipif(shutil.which("node") is None, reason="node unavailable")
+# minimum=0: any Node starts vendor/py_launch.cjs, which enforces its own Node floor.
+@pytest.mark.skipif(not fleet_check.node(minimum=0), reason="node unavailable")
 @pytest.mark.parametrize("tool,invalid", [("route_trail", False), ("route_trail", True),
                                          ("hit_probe", False), ("hit_probe", True)])
 def test_node_launcher_preserves_python_cli(tool, invalid, tmp_path):
@@ -28,13 +30,11 @@ def test_node_launcher_preserves_python_cli(tool, invalid, tmp_path):
         saved = tmp_path / "map.json"
         saved.write_text(json.dumps({"map": ["110", "110"]}), encoding="utf-8")
         args = ["factorize", str(saved), "--rank", "0" if invalid else "2"]
-    script = str(ROOT / "tools" / f"{tool}.py")
-    env = {**os.environ, "BTK_PYTHON": sys.executable}
-    direct = subprocess.run([sys.executable, "-S", script, *args], env=env,
-                            capture_output=True, timeout=30)
-    bridged = subprocess.run([shutil.which("node"), str(ROOT / "vendor/py_launch.cjs"),
-                              "--env-var", "BTK_PYTHON", script, *args], env=env,
-                             capture_output=True, timeout=30)
+    script = ROOT / "tools" / f"{tool}.py"
+    env = cli_args.build_env({"BTK_PYTHON": sys.executable})
+    direct = cli_args.run_cli(script, *args, python_options=("-S",), env=env, timeout=30)
+    bridged = cli_args.run_command(cli_args.node_command(ROOT / "vendor/py_launch.cjs", "--env-var", "BTK_PYTHON", script, *args,
+                                                         node=fleet_check.node(minimum=0), probe=False), env=env, timeout=30)
     assert direct.returncode == (2 if invalid else 0)
     assert (bridged.returncode, bridged.stdout, bridged.stderr) == (
         direct.returncode, direct.stdout, direct.stderr)
@@ -229,10 +229,9 @@ def test_async_walk(browser_name, device_name, tmp_path):
 @pytest.mark.browser
 @pytest.mark.parametrize("backend", ("python", "python-async"))
 def test_cli_run_from_stdlib_parent(backend):
-    args = [sys.executable, "-S", str(ROOT / "tools/route_trail.py"), "🏠 ↔ 🌍",
-            "--registry", str(ROOT / "fixtures/route_trail_execution.json"), "--base", BASE,
-            "--run", "--backend", backend, "--json"]
-    child = subprocess.run(args, capture_output=True, text=True, timeout=30)
+    child = cli_args.run_cli(ROOT / "tools/route_trail.py", "🏠 ↔ 🌍",
+                             "--registry", ROOT / "fixtures/route_trail_execution.json", "--base", BASE,
+                             "--run", "--backend", backend, "--json", python_options=("-S",), timeout=30)
     assert child.returncode == 0, child.stdout + child.stderr
     result = json.loads(child.stdout)
     assert result["ok"] and result["completed"] == 3
