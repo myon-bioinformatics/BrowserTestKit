@@ -6,8 +6,6 @@ import importlib.util
 import json
 import os
 import socket
-import subprocess
-import sys
 import threading
 from http.server import BaseHTTPRequestHandler, SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -35,10 +33,9 @@ def text_of(html: str) -> str:
     return page_text.page_text(html)["text"]
 
 
-def run_cli(*args: str, stdin: bytes = b"") -> subprocess.CompletedProcess:
-    env = dict(os.environ, PYTHONIOENCODING="utf-8")
-    return subprocess.run([sys.executable, "-S", str(SCRIPT), *args], input=stdin, capture_output=True,
-                          env=env, timeout=60)
+def run_page_text(*args: str, stdin: str = "") -> cli_args.CliResult:
+    return cli_args.run_cli(SCRIPT, *args, python_options=("-S",), stdin=stdin, timeout=60,
+                            env=cli_args.build_env({"PYTHONIOENCODING": "utf-8"}))
 
 
 # -- golden fixture -----------------------------------------------------------
@@ -51,9 +48,9 @@ def test_golden_sample_in_process(capsys) -> None:
 
 
 def test_golden_sample_runs_without_site_packages() -> None:
-    result = run_cli(str(SAMPLE), "--url", SAMPLE_URL)
-    assert result.returncode == 0, result.stderr.decode()
-    assert result.stdout.decode("utf-8") == GOLDEN.read_text(encoding="utf-8")
+    result = run_page_text(str(SAMPLE), "--url", SAMPLE_URL)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == GOLDEN.read_text(encoding="utf-8")
 
 
 def test_golden_sample_prefers_main_and_drops_hidden_content() -> None:
@@ -67,8 +64,8 @@ def test_golden_sample_prefers_main_and_drops_hidden_content() -> None:
 
 
 def test_file_output_reports_the_file_url() -> None:
-    result = run_cli(str(SAMPLE))
-    assert f"URL: {SAMPLE.resolve().as_uri()}\n" in result.stdout.decode("utf-8")
+    result = run_page_text(str(SAMPLE))
+    assert f"URL: {SAMPLE.resolve().as_uri()}\n" in result.stdout
 
 
 # -- line-break and whitespace rules (innerText for default display) ----------
@@ -126,9 +123,9 @@ def test_body_fallback_when_there_is_no_main_or_article() -> None:
 
 
 def test_body_fallback_cli_line() -> None:
-    result = run_cli("-", stdin=b"<title>T</title><p>Hi</p>")
+    result = run_page_text("-", stdin="<title>T</title><p>Hi</p>")
     assert result.returncode == 0
-    assert result.stdout.decode("utf-8") == "Title: T\nURL: -\nSource element: body\n---\nHi\n"
+    assert result.stdout == "Title: T\nURL: -\nSource element: body\n---\nHi\n"
 
 
 def test_text_in_head_without_body_tag_starts_the_body() -> None:
@@ -150,10 +147,10 @@ def test_nested_main_does_not_end_the_outer_main_early() -> None:
 
 
 def test_empty_main_prints_a_static_extraction_note() -> None:
-    result = run_cli("-", stdin=b'<main id="app"></main><script>render()</script>')
+    result = run_page_text("-", stdin='<main id="app"></main><script>render()</script>')
     assert result.returncode == 0
-    assert result.stdout.decode("utf-8").endswith("Source element: main\n---\n")
-    assert "PAGE_TEXT_AS_RENDERED_TEXT" in result.stderr.decode("utf-8")
+    assert result.stdout.endswith("Source element: main\n---\n")
+    assert "PAGE_TEXT_AS_RENDERED_TEXT" in result.stderr
 
 
 # -- limits and JSON ----------------------------------------------------------
@@ -165,14 +162,14 @@ def test_max_chars_truncates_and_flags_it() -> None:
 
 
 def test_cli_json_fields_and_truncation() -> None:
-    result = run_cli(str(SAMPLE), "--json", "--max-chars", "12")
+    result = run_page_text(str(SAMPLE), "--json", "--max-chars", "12")
     assert result.returncode == 0
-    data = json.loads(result.stdout.decode("utf-8"))
+    data = json.loads(result.stdout)
     for key in ("title", "url", "source_element", "text", "truncated", "bytes", "fetched_at"):
         assert key in data
     assert data["text"] == "Main heading" and data["truncated"] is True
     assert data["bytes"] == SAMPLE.stat().st_size and data["byte_limit_hit"] is False
-    assert "truncated to 12 of" in result.stderr.decode("utf-8")
+    assert "truncated to 12 of" in result.stderr
 
 
 def test_max_bytes_limit_is_reported(tmp_path: Path) -> None:
@@ -269,24 +266,24 @@ def test_find_limit_and_index_order() -> None:
 
 
 def test_find_cli_output_and_exit_codes() -> None:
-    found = run_cli(str(SAMPLE), "--url", SAMPLE_URL, "--find", "status page")
+    found = run_page_text(str(SAMPLE), "--url", SAMPLE_URL, "--find", "status page")
     assert found.returncode == 0
-    assert found.stdout.decode("utf-8") == (
+    assert found.stdout == (
         'Found 1 match(es) for "status page":\n'
         '- link "status page" href=https://example.test/docs/status.html\n')
-    labelled = run_cli(str(SAMPLE), "--find", "close")
-    assert labelled.stdout.decode("utf-8").endswith('- button "×" aria-label="Close dialog"\n')
-    missing = run_cli(str(SAMPLE), "--find", "script link")
+    labelled = run_page_text(str(SAMPLE), "--find", "close")
+    assert labelled.stdout.endswith('- button "×" aria-label="Close dialog"\n')
+    missing = run_page_text(str(SAMPLE), "--find", "script link")
     assert missing.returncode == 1
-    assert missing.stdout.decode("utf-8") == 'No matches for "script link".\n'
-    as_json = run_cli(str(SAMPLE), "--find", "nothing here", "--json")
+    assert missing.stdout == 'No matches for "script link".\n'
+    as_json = run_page_text(str(SAMPLE), "--find", "nothing here", "--json")
     assert (as_json.returncode, json.loads(as_json.stdout)) == (1, [])
 
 
 def test_existing_browser_fixture_is_readable() -> None:
-    result = run_cli(str(ROOT / "fixtures" / "index.html"), "--find", "反映")
+    result = run_page_text(str(ROOT / "fixtures" / "index.html"), "--find", "反映")
     assert result.returncode == 0
-    assert result.stdout.decode("utf-8").endswith('- button "反映"\n')
+    assert result.stdout.endswith('- button "反映"\n')
     text = page_text.page_text((ROOT / "fixtures" / "index.html").read_text(encoding="utf-8"))["text"]
     assert "addEventListener" not in text and "日本語 / Unicode ✓ / 🧪" in text
 
@@ -416,38 +413,38 @@ def test_compare_rendered_cli_equal(tmp_path: Path) -> None:
     static_text = page_text.page_text(SAMPLE.read_text(encoding="utf-8"))["text"]
     rendered_file = tmp_path / "rendered.txt"
     rendered_file.write_text(static_text, encoding="utf-8")
-    result = run_cli(str(SAMPLE), "--compare-rendered", str(rendered_file))
+    result = run_page_text(str(SAMPLE), "--compare-rendered", str(rendered_file))
     assert result.returncode == 0
-    assert "Classification: EQUAL" in result.stdout.decode("utf-8")
+    assert "Classification: EQUAL" in result.stdout
 
 
 def test_compare_rendered_cli_diff_and_json(tmp_path: Path) -> None:
     static_text = page_text.page_text(SAMPLE.read_text(encoding="utf-8"))["text"]
     rendered_file = tmp_path / "rendered.txt"
     rendered_file.write_text(static_text + "\nExtra dynamic line", encoding="utf-8")
-    result = run_cli(str(SAMPLE), "--compare-rendered", str(rendered_file))
+    result = run_page_text(str(SAMPLE), "--compare-rendered", str(rendered_file))
     assert result.returncode == 1
-    out = result.stdout.decode("utf-8")
+    out = result.stdout
     assert "Classification: JS_RENDERED_ADDED" in out
     assert "+ Extra dynamic line" in out
 
-    json_result = run_cli(str(SAMPLE), "--compare-rendered", str(rendered_file), "--json")
+    json_result = run_page_text(str(SAMPLE), "--compare-rendered", str(rendered_file), "--json")
     assert json_result.returncode == 1
-    data = json.loads(json_result.stdout.decode("utf-8"))
+    data = json.loads(json_result.stdout)
     assert data["comparison"]["classification"] == "JS_RENDERED_ADDED"
     assert "Extra dynamic line" in data["comparison"]["only_rendered"]
 
 
 def test_compare_rendered_cli_stdin_conflict() -> None:
-    result = run_cli("-", "--compare-rendered", "-", stdin=b"<p>test</p>")
+    result = run_page_text("-", "--compare-rendered", "-", stdin="<p>test</p>")
     assert result.returncode == 2
-    assert "cannot use stdin (-) for both" in result.stderr.decode("utf-8")
+    assert "cannot use stdin (-) for both" in result.stderr
 
 
 def test_compare_rendered_cli_missing_file() -> None:
-    result = run_cli(str(SAMPLE), "--compare-rendered", "nonexistent/file.txt")
+    result = run_page_text(str(SAMPLE), "--compare-rendered", "nonexistent/file.txt")
     assert result.returncode == 2
-    assert "no such file" in result.stderr.decode("utf-8")
+    assert "no such file" in result.stderr
 
 
 def test_rendered_input_reads_dom_capture_visible_only() -> None:
@@ -472,40 +469,40 @@ def test_compare_rendered_cli_dom_json(tmp_path: Path) -> None:
     capture = tmp_path / "page.json"
     capture.write_text(json.dumps({"schema": "btk-browser-dom/1", "selector": "body",
                                    "visible": "Title\nStatic body\nDynamic JS badge"}), encoding="utf-8")
-    result = run_cli(str(html_file), "--compare-rendered", str(capture), "--json")
+    result = run_page_text(str(html_file), "--compare-rendered", str(capture), "--json")
     assert result.returncode == 1
-    data = json.loads(result.stdout.decode("utf-8"))
+    data = json.loads(result.stdout)
     assert data["comparison"]["classification"] == "JS_RENDERED_ADDED"
     assert data["comparison"]["only_rendered"] == ["Dynamic JS badge"]
     assert data["rendered_input"]["kind"] == "dom-json"
-    assert "captured from selector 'body'" in result.stderr.decode("utf-8")
+    assert "captured from selector 'body'" in result.stderr
 
     capture.write_text(json.dumps({"visible": None}), encoding="utf-8")
-    assert run_cli(str(html_file), "--compare-rendered", str(capture)).returncode == 2
+    assert run_page_text(str(html_file), "--compare-rendered", str(capture)).returncode == 2
 
 
 def test_compare_rendered_cli_refuses_truncated_or_oversized(tmp_path: Path) -> None:
     rendered = tmp_path / "rendered.txt"
     rendered.write_text("x" * 50, encoding="utf-8")
-    truncated = run_cli(str(SAMPLE), "--compare-rendered", str(rendered), "--max-chars", "5")
-    assert truncated.returncode == 2 and "raise --max-chars" in truncated.stderr.decode("utf-8")
+    truncated = run_page_text(str(SAMPLE), "--compare-rendered", str(rendered), "--max-chars", "5")
+    assert truncated.returncode == 2 and "raise --max-chars" in truncated.stderr
     big = tmp_path / "big.txt"
     big.write_text("y" * (SAMPLE.stat().st_size + 10), encoding="utf-8")
-    oversized = run_cli(str(SAMPLE), "--compare-rendered", str(big), "--max-bytes", str(SAMPLE.stat().st_size + 1))
-    assert oversized.returncode == 2 and "exceeds --max-bytes" in oversized.stderr.decode("utf-8")
+    oversized = run_page_text(str(SAMPLE), "--compare-rendered", str(big), "--max-bytes", str(SAMPLE.stat().st_size + 1))
+    assert oversized.returncode == 2 and "exceeds --max-bytes" in oversized.stderr
 
 
 def test_compare_rendered_cli_reads_stdin_and_reports_os_error(tmp_path: Path) -> None:
     static_text = page_text.page_text(SAMPLE.read_text(encoding="utf-8"))["text"]
-    ok = run_cli(str(SAMPLE), "--compare-rendered", "-", stdin=static_text.encode("utf-8"))
-    assert ok.returncode == 0 and "Classification: EQUAL" in ok.stdout.decode("utf-8")
+    ok = run_page_text(str(SAMPLE), "--compare-rendered", "-", stdin=static_text)
+    assert ok.returncode == 0 and "Classification: EQUAL" in ok.stdout
     bad = tmp_path / "bad.txt"
     bad.write_text("x", encoding="utf-8")
     bad.chmod(0)
     if os.access(bad, os.R_OK):
         pytest.skip("running as a user that can read mode-0 files")
-    denied = run_cli(str(SAMPLE), "--compare-rendered", str(bad))
-    assert denied.returncode == 2 and "error reading --compare-rendered input" in denied.stderr.decode("utf-8")
+    denied = run_page_text(str(SAMPLE), "--compare-rendered", str(bad))
+    assert denied.returncode == 2 and "error reading --compare-rendered input" in denied.stderr
 
 
 @pytest.mark.parametrize('source', ['file', 'stdin'])
@@ -542,9 +539,9 @@ def test_rendered_byte_limit_counts_raw_bytes_not_replacement_encoding(tmp_path)
     html_file.write_text('<p>x</p>', encoding='utf-8')
     rendered = tmp_path / 'rendered.txt'
     rendered.write_bytes(b'\xff' * 9)
-    result = run_cli(str(html_file), '--compare-rendered', str(rendered), '--max-bytes', '10')
+    result = run_page_text(str(html_file), '--compare-rendered', str(rendered), '--max-bytes', '10')
     assert result.returncode == 1
-    assert b'exceeds --max-bytes' not in result.stderr
+    assert 'exceeds --max-bytes' not in result.stderr
 
 
 def test_compare_rendered_refuses_byte_truncated_static_html(tmp_path):
@@ -552,8 +549,8 @@ def test_compare_rendered_refuses_byte_truncated_static_html(tmp_path):
     html_file.write_text('<p>x</p>' + ' ' * 100, encoding='utf-8')
     rendered = tmp_path / 'rendered.txt'
     rendered.write_text('x', encoding='utf-8')
-    result = run_cli(str(html_file), '--compare-rendered', str(rendered), '--max-bytes', '10')
-    assert result.returncode == 2 and b'static HTML was truncated by --max-bytes' in result.stderr
+    result = run_page_text(str(html_file), '--compare-rendered', str(rendered), '--max-bytes', '10')
+    assert result.returncode == 2 and 'static HTML was truncated by --max-bytes' in result.stderr
 
 
 # ═══ · page text live regressions ════════════════════════════════════════════════════════════════════════
@@ -662,9 +659,8 @@ def test_dom_capture_local_page(tmp_path):
     try:
         script=Path(__file__).resolve().parents[2]/'examples/capture_browser_dom.py'
         output=tmp_path/'capture.json'
-        args=[sys.executable,str(script),f'http://127.0.0.1:{server.server_port}/index.html',
-              '--selector','#body','--output',str(output)]
-        run=subprocess.run(args,capture_output=True,text=True,timeout=90)
+        args=[script,f'http://127.0.0.1:{server.server_port}/index.html','--selector','#body','--output',output]
+        run=cli_args.run_cli(*args,timeout=90)
         assert run.returncode==0,run.stderr
         result=json.loads(output.read_text())
         assert result['schema']=='btk-browser-dom/1'
@@ -673,7 +669,7 @@ def test_dom_capture_local_page(tmp_path):
         assert result['content_verified'] is False
         # A repeated capture must preserve the original evidence byte for byte.
         original = output.read_bytes()
-        repeat = subprocess.run(args, capture_output=True, text=True, timeout=10)
+        repeat = cli_args.run_cli(*args, timeout=10)
         assert repeat.returncode == 2
         assert 'output already exists' in repeat.stderr
         assert output.read_bytes() == original
@@ -695,10 +691,8 @@ def test_selector_mismatch_does_not_save(tmp_path, selector, code, error):
     try:
         script = Path(__file__).resolve().parents[2] / 'examples/capture_browser_dom.py'
         output = tmp_path / 'capture.json'
-        run = subprocess.run(
-            [sys.executable, str(script), f'http://127.0.0.1:{server.server_port}/index.html',
-             '--selector', selector, '--output', str(output), '--timeout-ms', '3000'],
-            capture_output=True, text=True, timeout=30)
+        run = cli_args.run_cli(script, f'http://127.0.0.1:{server.server_port}/index.html',
+                               '--selector', selector, '--output', output, '--timeout-ms', '3000', timeout=30)
         assert run.returncode == code, run.stderr
         assert error in run.stderr
         assert not output.exists()
@@ -720,9 +714,8 @@ def test_aria_snapshot_and_same_origin_only(tmp_path):
     try:
         script=Path(__file__).resolve().parents[2]/'examples/capture_browser_dom.py'
         output=tmp_path/'capture.json'
-        run=subprocess.run([sys.executable,str(script),f'http://127.0.0.1:{server.server_port}/index.html',
-                            '--selector','#body','--output',str(output),'--aria-snapshot','--same-origin-only'],
-                           capture_output=True,text=True,timeout=90)
+        run=cli_args.run_cli(script,f'http://127.0.0.1:{server.server_port}/index.html',
+                             '--selector','#body','--output',output,'--aria-snapshot','--same-origin-only',timeout=90)
         assert run.returncode==0,run.stderr
         result=json.loads(output.read_text(encoding='utf-8'))
         # CSS generated content is part of the browser's accessible name, not of the HTML.
@@ -771,14 +764,13 @@ BROWSER_CAPTURE_CLI_SCRIPT=Path(__file__).resolve().parents[2]/'examples/capture
 
 @pytest.mark.parametrize('args,code',[(['--help'],0),(['file:///etc/passwd','--output','unused.json'],2),(['https://example.com','--output','unused.json','--timeout-ms','0'],2)])
 def test_cli_preflight_without_browser(args,code,tmp_path):
-    run=subprocess.run([sys.executable,str(BROWSER_CAPTURE_CLI_SCRIPT),*args],cwd=tmp_path,capture_output=True,text=True)
+    run=cli_args.run_cli(BROWSER_CAPTURE_CLI_SCRIPT,*args,cwd=tmp_path)
     assert run.returncode==code
     assert not list(tmp_path.iterdir())
 
 
 @pytest.mark.parametrize('kind', ['file', 'directory', 'dangling_symlink', 'missing_parent'])
 def test_unusable_output_rejected_before_browser_import_or_network(tmp_path, kind):
-    import os
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
     import threading
 
@@ -814,10 +806,8 @@ def test_unusable_output_rejected_before_browser_import_or_network(tmp_path, kin
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
-        run = subprocess.run([sys.executable, '-S', str(BROWSER_CAPTURE_CLI_SCRIPT),
-                              f'http://127.0.0.1:{server.server_port}/', '--output', str(output)],
-                             env={**os.environ, 'PYTHONPATH': str(tmp_path)},
-                             capture_output=True, text=True, timeout=10)
+        run = cli_args.run_cli(BROWSER_CAPTURE_CLI_SCRIPT, f'http://127.0.0.1:{server.server_port}/', '--output', output,
+                               python_options=('-S',), env=cli_args.build_env({'PYTHONPATH': str(tmp_path)}), timeout=10)
         assert run.returncode == 2
         assert ('output already exists' if kind != 'missing_parent' else 'output parent is not a directory') in run.stderr
         assert not marker.exists()
@@ -931,10 +921,8 @@ def test_cli_main_file_and_format(tmp_path: Path):
 
 def test_cli_main_python_m(tmp_path: Path):
     env = {"PYTHONPATH": str(SCRIPTS)}
-    done = subprocess.run(
-        [sys.executable, "-S", "-m", "element_overlay", "--format", "css", "--color", "#123456"],
-        input='[{"selector": "#a"}]', capture_output=True, text=True, env=env, timeout=10
-    )
+    done = cli_args.run_cli("element_overlay", "--format", "css", "--color", "#123456", python_options=("-S", "-m"),
+                            stdin='[{"selector": "#a"}]', env=env, timeout=10)
     assert done.returncode == 0
     assert "#a {" in done.stdout
     assert "#123456" in done.stdout
@@ -978,8 +966,9 @@ def test_svg_overlay_shape_uses_the_mark_drawer():
     elements = [{"x": 10, "y": 20, "width": 100, "height": 40, "name": "Login"}, {"x": 120, "y": 20, "width": 80, "height": 40, "name": "Cancel"}]
     svg = element_overlay.render_svg_overlay(elements, {"shape": "ellipse", "label_field": "name", "spotlight": True, "viewport": "400x300"})
     assert svg.count("<ellipse") == 2 and ">Login</text>" in svg and ">2</text>" in svg and 'fill-rule="evenodd"' in svg
-    run = subprocess.run([sys.executable, "-S", str(SCRIPTS / "element_overlay.py"), "--format", "svg", "--shape", "rect", "--viewport", "400x300"],
-                         input=json.dumps(elements[:1]), capture_output=True, text=True, check=True)
+    run = cli_args.run_cli(SCRIPTS / "element_overlay.py", "--format", "svg", "--shape", "rect", "--viewport", "400x300",
+                           python_options=("-S",), stdin=json.dumps(elements[:1]))
+    assert run.returncode == 0, run.stderr
     assert run.stdout.count("<rect") == 1 and "<circle" not in run.stdout              # one element: no number badge
 
 
@@ -1094,24 +1083,20 @@ def test_page_escapes_title_and_honors_lang() -> None:
 
 # --- CLI ------------------------------------------------------------------
 
-def run_cli_html_builder(*args: str) -> cli_args.CliResult:
-    return cli_args.run_cli(HTML_BUILDER_SCRIPT, *args, python_options=("-S",))
-
-
 def test_cli_renders_tags_and_folds_consecutive_li_into_one_ul() -> None:
-    done = run_cli_html_builder("h1:Title", "p:Hello world", "br", "li:a", "li:b")
+    done = cli_args.run_cli(HTML_BUILDER_SCRIPT, "h1:Title", "p:Hello world", "br", "li:a", "li:b", python_options=("-S",))
     assert done.returncode == 0, done.stderr
     assert done.stdout == "<h1>Title</h1>\n<p>Hello world</p>\n<br>\n<ul><li>a</li><li>b</li></ul>\n"
 
 
 def test_cli_bare_tag_with_no_colon_has_no_text() -> None:
-    done = run_cli_html_builder("hr", "p")
+    done = cli_args.run_cli(HTML_BUILDER_SCRIPT, "hr", "p", python_options=("-S",))
     assert done.returncode == 0, done.stderr
     assert done.stdout == "<hr>\n<p></p>\n"
 
 
 def test_cli_page_flag_wraps_output() -> None:
-    done = run_cli_html_builder("h1:Title", "p:Body", "--page", "My Page")
+    done = cli_args.run_cli(HTML_BUILDER_SCRIPT, "h1:Title", "p:Body", "--page", "My Page", python_options=("-S",))
     assert done.returncode == 0, done.stderr
     assert done.stdout == ('<!doctype html>\n<html lang="en"><head><meta charset="utf-8">'
                            "<title>My Page</title></head><body><h1>Title</h1>\n"
@@ -1119,20 +1104,19 @@ def test_cli_page_flag_wraps_output() -> None:
 
 
 def test_cli_requires_at_least_one_item() -> None:
-    done = run_cli_html_builder()
+    done = cli_args.run_cli(HTML_BUILDER_SCRIPT, python_options=("-S",))
     assert done.returncode == 2
     assert "usage" in done.stderr.lower()
 
 
 def test_cli_help_exits_zero_with_usage_on_stdout() -> None:
-    done = run_cli_html_builder("--help")
+    done = cli_args.run_cli(HTML_BUILDER_SCRIPT, "--help", python_options=("-S",))
     assert done.returncode == 0
     assert done.stdout.lower().startswith("usage")
 
 
 def test_module_help_via_dash_m_exits_zero_with_usage_on_stdout() -> None:
-    done = subprocess.run([sys.executable, "-S", "-m", "html_builder", "--help"], capture_output=True, text=True,
-                          encoding="utf-8", cwd=str(HTML_BUILDER_SCRIPT.parent))
+    done = cli_args.run_cli("html_builder", "--help", python_options=("-S", "-m"), cwd=HTML_BUILDER_SCRIPT.parent)
     assert done.returncode == 0, done.stderr
     assert done.stdout.lower().startswith("usage")
 

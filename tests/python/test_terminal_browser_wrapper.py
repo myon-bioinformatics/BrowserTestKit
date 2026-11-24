@@ -6,6 +6,7 @@ WRAPPER = ROOT / "tools" / "terminal_browser.py"
 
 sys.path.insert(0, str(ROOT / "tools"))
 import btk_events  # noqa: E402
+import cli_args  # noqa: E402
 
 
 def _fake_terminal_browser(tmp_path: Path, body: str) -> dict[str, str]:
@@ -24,7 +25,7 @@ def _events(stderr: str) -> list[dict[str, object]]:
 def test_unavailable_is_distinct(tmp_path):
     env = os.environ.copy()
     env["PATH"] = str(tmp_path)
-    result = subprocess.run([sys.executable, str(WRAPPER), "--check"], env=env, text=True, capture_output=True)
+    result = cli_args.run_cli(WRAPPER, "--check", env=env)
     assert result.returncode == 127
     assert result.stdout == ""
     assert '"event": "TERMINAL_BROWSER_UNAVAILABLE"' in result.stderr
@@ -39,12 +40,7 @@ def test_passthrough_and_log_keep_events_separate(tmp_path):
         "printf 'fake terminal-browser: %s\\n' \"$*\"\nprintf '{child-json-like-output}\\n'\n",
     )
     log = tmp_path / "tb.log"
-    result = subprocess.run(
-        [sys.executable, str(WRAPPER), "--log", str(log), "action", "--help"],
-        env=env,
-        text=True,
-        capture_output=True,
-    )
+    result = cli_args.run_cli(WRAPPER, "--log", str(log), "action", "--help", env=env)
     assert result.returncode == 0
     assert result.stdout == "fake terminal-browser: action --help\n{child-json-like-output}\n"
     assert log.read_text(encoding="utf-8") == result.stdout
@@ -65,12 +61,7 @@ def test_log_mode_tolerates_non_utf8_output(tmp_path):
     # instead of producing a log.
     env = _fake_terminal_browser(tmp_path, "printf 'bad: \\377 end\\n'\n")
     log = tmp_path / "bad.log"
-    result = subprocess.run(
-        [sys.executable, str(WRAPPER), "--log", str(log), "action"],
-        env=env,
-        text=True,
-        capture_output=True,
-    )
+    result = cli_args.run_cli(WRAPPER, "--log", str(log), "action", env=env)
     assert result.returncode == 0
     assert "bad: � end\n" == result.stdout
     assert log.read_text(encoding="utf-8") == result.stdout
@@ -78,12 +69,7 @@ def test_log_mode_tolerates_non_utf8_output(tmp_path):
 
 def test_double_dash_passes_top_level_child_flag_verbatim(tmp_path):
     env = _fake_terminal_browser(tmp_path, "printf '%s\\n' \"$*\"\n")
-    result = subprocess.run(
-        [sys.executable, str(WRAPPER), "--log", str(tmp_path / "version.log"), "--", "--version"],
-        env=env,
-        text=True,
-        capture_output=True,
-    )
+    result = cli_args.run_cli(WRAPPER, "--log", str(tmp_path / "version.log"), "--", "--version", env=env)
     assert result.returncode == 0
     assert result.stdout == "--version\n"
     start = next(event for event in _events(result.stderr) if event["event"] == "terminal_browser_start")
@@ -199,12 +185,7 @@ def test_default_mode_lets_child_finish_its_own_cleanup_after_sigint(tmp_path):
 
 def test_signal_exit_is_normalized(tmp_path):
     env = _fake_terminal_browser(tmp_path, "kill -TERM $$\n")
-    result = subprocess.run(
-        [sys.executable, str(WRAPPER), "action"],
-        env=env,
-        text=True,
-        capture_output=True,
-    )
+    result = cli_args.run_cli(WRAPPER, "action", env=env)
     assert result.returncode == 143
     events = _events(result.stderr)
     assert events[-1]["event"] == "terminal_browser_exit"
@@ -249,11 +230,6 @@ def test_fallback_without_btk_events(monkeypatch):
 
 def test_check_rejects_child_arguments(tmp_path):
     env = _fake_terminal_browser(tmp_path, "exit 0\n")
-    result = subprocess.run(
-        [sys.executable, str(WRAPPER), "--check", "action"],
-        env=env,
-        text=True,
-        capture_output=True,
-    )
+    result = cli_args.run_cli(WRAPPER, "--check", "action", env=env)
     assert result.returncode == 2
     assert "--check cannot be combined" in result.stderr

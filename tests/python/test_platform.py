@@ -1128,10 +1128,8 @@ def collect(engines: str | None) -> str:
     env.pop("BTK_BROWSER_ENGINES", None)
     if engines is not None:
         env["BTK_BROWSER_ENGINES"] = engines
-    done = subprocess.run(
-        [sys.executable, "-m", "pytest", "tests/python/test_platform.py", "--collect-only", "-q", "-m", "browser"],
-        cwd=ROOT, env=env, capture_output=True, text=True, timeout=120,
-    )
+    command = cli_args.pytest_command(["tests/python/test_platform.py"], quiet=True, extra=("--collect-only", "-m", "browser"))
+    done = cli_args.run_command(command, cwd=ROOT, env=env, timeout=120)
     assert done.returncode == 0, done.stderr
     return done.stdout
 

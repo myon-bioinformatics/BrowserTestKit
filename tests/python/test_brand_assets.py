@@ -1,5 +1,5 @@
 """Guard source-preserving branding and relative fixture icon references."""
-import importlib.util, json, subprocess, sys, unittest
+import importlib.util, json, sys, unittest
 from hashlib import sha256; from html.parser import HTMLParser; from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -133,10 +133,8 @@ def test_each_large_mark_has_its_documented_home():
 
 
 def test_brand_validation_without_site_packages():
-    result = subprocess.run(
-        [sys.executable, "-S", str(Path(__file__).resolve())],
-        cwd=ROOT, capture_output=True, text=True, check=False,
-    )
+    import cli_args  # from conftest.py; imported here because this file also runs alone under python -S (below)
+    result = cli_args.run_cli(Path(__file__).resolve(), python_options=("-S",), cwd=ROOT)
     assert result.returncode == 0, result.stdout + result.stderr
     assert result.stdout.strip() == "4 asset checks passed without site packages"
 

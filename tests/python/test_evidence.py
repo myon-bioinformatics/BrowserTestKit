@@ -135,12 +135,7 @@ def test_classify_terminal_browser_mapping():
 
 
 def test_help_runs_under_dash_s():
-    result = subprocess.run(
-        [sys.executable, "-S", "-m", "btk_events", "--help"],
-        cwd=str(ROOT / "tools"),
-        text=True,
-        capture_output=True,
-    )
+    result = cli_args.run_cli("btk_events", "--help", python_options=("-S", "-m"), cwd=ROOT / "tools")
     assert result.returncode == 0
     assert "btk-event/1" in result.stdout
 
@@ -178,16 +173,16 @@ def test_rejects_missing_iend() -> None:
 
 def test_check_png_cli_prints_dimensions(tmp_path):
     (tmp_path / "a.png").write_bytes(minimal_png())
-    done = subprocess.run([sys.executable, "-S", str(BTK), "check-png", str(tmp_path / "a.png")], capture_output=True, text=True)
+    done = cli_args.run_cli(BTK, "check-png", tmp_path / "a.png", python_options=("-S",))
     assert done.returncode == 0 and done.stdout.strip().endswith(": png 390x844 45 bytes")
-    assert subprocess.run([sys.executable, "-S", str(BTK), "check-png"], capture_output=True).returncode == 2
+    assert cli_args.run_cli(BTK, "check-png", python_options=("-S",)).returncode == 2
 
 
 @pytest.mark.parametrize("name,body,reason", [("missing.png", None, ""), ("bad.png", b"not an image", "not a valid PNG header")])
 def test_check_png_cli_reports_unreadable_or_invalid_file_without_traceback(tmp_path, name, body, reason):
     if body is not None:
         (tmp_path / name).write_bytes(body)
-    done = subprocess.run([sys.executable, "-S", str(BTK), "check-png", str(tmp_path / name)], capture_output=True, text=True)
+    done = cli_args.run_cli(BTK, "check-png", tmp_path / name, python_options=("-S",))
     assert done.returncode == 1 and done.stdout == ""
     assert done.stderr.startswith(f"{tmp_path / name}: ") and done.stderr.strip().endswith(reason)   # the OS words the missing file
     assert "Traceback" not in done.stderr and len(done.stderr.splitlines()) == 1
@@ -298,13 +293,13 @@ def test_missing_directory_reports_every_expected_project(tmp_path: Path) -> Non
 
 def test_cli_exit_codes_without_site_packages(tmp_path: Path) -> None:
     node_evidence(tmp_path, "chromium")
-    cli = [sys.executable, "-S", str(BTK), "check-evidence", str(tmp_path), "--expect"]
-    passed = subprocess.run([*cli, "chromium"], capture_output=True, text=True)
+    cli = [BTK, "check-evidence", tmp_path, "--expect"]
+    passed = cli_args.run_cli(*cli, "chromium", python_options=("-S",))
     assert passed.returncode == 0 and passed.stdout.startswith("ok chromium: ")
-    failed = subprocess.run([*cli, "chromium,firefox"], capture_output=True, text=True)
+    failed = cli_args.run_cli(*cli, "chromium,firefox", python_options=("-S",))
     assert failed.returncode == 1
     assert "error: missing complete evidence for project(s): firefox" in failed.stderr
-    usage = subprocess.run([*cli, " , "], capture_output=True, text=True)
+    usage = cli_args.run_cli(*cli, " , ", python_options=("-S",))
     assert usage.returncode == 2
 
 
@@ -439,16 +434,16 @@ def test_invalid_canonical_shape(tmp_path, canonical):
 def test_cli_without_site_packages_and_exit_codes(tmp_path):
     for project in ["chromium", "webkit"]:
         receipt(tmp_path, project)
-    args = [sys.executable, "-S", str(BTK), "check-capture-evidence", str(tmp_path), "--expect", "chromium,webkit",
+    args = [BTK, "check-capture-evidence", tmp_path, "--expect", "chromium,webkit",
             "--captures", ",".join(FILES), "--sha", SHA]
-    result = subprocess.run(args, capture_output=True, text=True)
+    result = cli_args.run_cli(*args, python_options=("-S",))
     assert result.returncode == 0 and "PASS" in result.stdout
     (tmp_path / "webkit" / FILES[0]).unlink()
-    assert subprocess.run(args, capture_output=True).returncode == 1
-    assert subprocess.run(args[:-1] + ["short"], capture_output=True).returncode == 2
+    assert cli_args.run_cli(*args, python_options=("-S",)).returncode == 1
+    assert cli_args.run_cli(*args[:-1], "short", python_options=("-S",)).returncode == 2
     canonical = tmp_path / "canonical.json"
     canonical.write_text("null")
-    result = subprocess.run(args + ["--canonical", str(canonical)], capture_output=True, text=True)
+    result = cli_args.run_cli(*args, "--canonical", canonical, python_options=("-S",))
     assert result.returncode == 1 and "must be an object" in result.stderr
 
 
@@ -471,11 +466,11 @@ def test_actual_bundle_can_be_sealed_and_all_four_corruptions_rejected(tmp_path,
     for name in names:
         (tmp_path / name).write_bytes(png())
     identity = ["--sha", SHA, "--run-id", "123", "--run-attempt", "2", "--captures", ",".join(names)]
-    writer = subprocess.run([sys.executable, "-S", str(BTK), "write-capture-evidence",
-        str(tmp_path), "--project", "bundle", "--stage", "complete", *identity], capture_output=True, text=True)
+    writer = cli_args.run_cli(BTK, "write-capture-evidence", tmp_path, "--project", "bundle", "--stage", "complete",
+                              *identity, python_options=("-S",))
     assert writer.returncode == 0, writer.stderr
-    probe = subprocess.run([sys.executable, "-S", str(BTK), "probe-capture-rejections",
-        str(tmp_path), "--expect", "bundle", *identity], capture_output=True, text=True)
+    probe = cli_args.run_cli(BTK, "probe-capture-rejections", tmp_path, "--expect", "bundle", *identity,
+                             python_options=("-S",))
     assert probe.returncode == 0, probe.stderr
     assert probe.stdout.count("correctly rejected:") == 4
     # Negative checks do not alter the source receipts/images.
@@ -486,14 +481,14 @@ def test_actual_bundle_can_be_sealed_and_all_four_corruptions_rejected(tmp_path,
 @pytest.mark.parametrize("stage", ["complete", "failed", "skipped"])
 def test_absent_images_never_cover_required_success_and_old_receipt_is_replaced(tmp_path, stage):
     (tmp_path / "evidence.json").write_text('{"stage":"complete"}')
-    writer = subprocess.run([sys.executable, "-S", str(BTK), "write-capture-evidence", str(tmp_path),
+    writer = cli_args.run_cli(BTK, "write-capture-evidence", tmp_path,
         "--project", "bundle", "--captures", "required.png", "--sha", SHA,
-        "--run-id", "123", "--run-attempt", "2", "--stage", stage], capture_output=True, text=True)
+        "--run-id", "123", "--run-attempt", "2", "--stage", stage, python_options=("-S",))
     assert (writer.returncode == 0) == (stage != "complete")
     assert json.loads((tmp_path / "evidence.json").read_text())["stage"] != "complete"
-    checker = subprocess.run([sys.executable, "-S", str(BTK), "check-capture-evidence", str(tmp_path),
+    checker = cli_args.run_cli(BTK, "check-capture-evidence", tmp_path,
         "--expect", "bundle", "--captures", "required.png", "--sha", SHA,
-        "--run-id", "123", "--run-attempt", "2"], capture_output=True, text=True)
+        "--run-id", "123", "--run-attempt", "2", python_options=("-S",))
     assert checker.returncode == 1
 
 
@@ -591,35 +586,31 @@ def test_render_markdown_is_a_table_and_notes_callouts(tmp_path):
     assert "**Result: FAIL**" in markdown
 
 
-def _run_cli(args, env=None):
-    return cli_args.run_cli(SCRIPTS / "evidence_board.py", *args, env=env)
-
-
 def test_cli_exit_codes(tmp_path):
     passing = tmp_path / "pass.jsonl"
     _write_jsonl(passing, [_event(status="passed")])
     failing = tmp_path / "fail.jsonl"
     _write_jsonl(failing, [_event(status="failed")])
 
-    ok = _run_cli([str(passing)])
+    ok = cli_args.run_cli(SCRIPTS / "evidence_board.py", str(passing))
     assert ok.returncode == 0
     assert "PASS" in ok.stdout
 
-    bad = _run_cli([str(failing)])
+    bad = cli_args.run_cli(SCRIPTS / "evidence_board.py", str(failing))
     assert bad.returncode == 1
     assert "FAIL" in bad.stdout
 
-    missing = _run_cli([str(tmp_path / "does-not-exist.jsonl")])
+    missing = cli_args.run_cli(SCRIPTS / "evidence_board.py", str(tmp_path / "does-not-exist.jsonl"))
     assert missing.returncode == 2
 
-    bad_allow = _run_cli([str(passing), "--allow", "not-a-status"])
+    bad_allow = cli_args.run_cli(SCRIPTS / "evidence_board.py", str(passing), "--allow", "not-a-status")
     assert bad_allow.returncode == 2
 
 
 def test_cli_json_output(tmp_path):
     path = tmp_path / "events.jsonl"
     _write_jsonl(path, [_event(status="passed")])
-    result = _run_cli([str(path), "--json"])
+    result = cli_args.run_cli(SCRIPTS / "evidence_board.py", str(path), "--json")
     assert result.returncode == 0
     payload = json.loads(result.stdout)
     assert payload["counts_by_status"] == {"passed": 1}
@@ -632,7 +623,7 @@ def test_cli_step_summary_appends_to_env_file(tmp_path):
     summary.write_text("existing content\n", encoding="utf-8")
     env = {"GITHUB_STEP_SUMMARY": str(summary), "PATH": os.environ.get("PATH", "")}
 
-    result = _run_cli([str(path), "--step-summary"], env=env)
+    result = cli_args.run_cli(SCRIPTS / "evidence_board.py", str(path), "--step-summary", env=env)
     assert result.returncode == 0
     text = summary.read_text(encoding="utf-8")
     assert text.startswith("existing content\n")
@@ -705,7 +696,7 @@ def test_setup_error_with_no_call_is_one_error_not_double_counted(tmp_path):
 def test_empty_input_exits_2_not_a_pass(tmp_path):
     path = tmp_path / "empty.jsonl"
     path.write_text("", encoding="utf-8")
-    result = _run_cli([str(path)])
+    result = cli_args.run_cli(SCRIPTS / "evidence_board.py", str(path))
     assert result.returncode == 2
     assert "no valid" in result.stderr.lower()
 
@@ -713,7 +704,7 @@ def test_empty_input_exits_2_not_a_pass(tmp_path):
 def test_all_malformed_lines_exits_2_not_a_pass(tmp_path):
     path = tmp_path / "junk.jsonl"
     path.write_text("not json\nalso not json\n", encoding="utf-8")
-    result = _run_cli([str(path)])
+    result = cli_args.run_cli(SCRIPTS / "evidence_board.py", str(path))
     assert result.returncode == 2
 
 
@@ -721,11 +712,11 @@ def test_malformed_line_fails_the_board_unless_allowed(tmp_path):
     path = tmp_path / "events.jsonl"
     path.write_text("not json\n" + json.dumps(_event(status="passed")) + "\n", encoding="utf-8")
 
-    result = _run_cli([str(path)])
+    result = cli_args.run_cli(SCRIPTS / "evidence_board.py", str(path))
     assert result.returncode == 1
     assert "**Result: FAIL**" in result.stdout
 
-    allowed = _run_cli([str(path), "--allow-malformed"])
+    allowed = cli_args.run_cli(SCRIPTS / "evidence_board.py", str(path), "--allow-malformed")
     assert allowed.returncode == 0
 
     stats = evidence_board.aggregate([path], allow=set())
@@ -735,12 +726,7 @@ def test_malformed_line_fails_the_board_unless_allowed(tmp_path):
 
 
 def test_help_runs_under_dash_s_evidence_board():
-    result = subprocess.run(
-        [sys.executable, "-S", "-m", "evidence_board", "--help"],
-        cwd=str(SCRIPTS),
-        text=True,
-        capture_output=True,
-    )
+    result = cli_args.run_cli("evidence_board", "--help", python_options=("-S", "-m"), cwd=SCRIPTS)
     assert result.returncode == 0
     assert "evidence" in result.stdout.lower()
     assert "--allow" in result.stdout
@@ -1082,8 +1068,7 @@ def test_no_records_is_exit_1_and_bad_show_is_exit_2() -> None:
 
 
 def test_cli_reads_stdin_without_site_packages() -> None:
-    done = subprocess.run([sys.executable, "-S", str(SCRIPT), "-", "--last", "1"], input="\n".join(lines(EVENTS)),
-                          capture_output=True, text=True, encoding="utf-8")
+    done = cli_args.run_cli(SCRIPT, "-", "--last", "1", python_options=("-S",), stdin="\n".join(lines(EVENTS)))
     assert done.returncode == 0, done.stderr
     assert done.stdout.startswith("-: 4 record(s)\n")
     assert done.stdout.rstrip().endswith("terminal_browser_exit: {\"returncode\":130,\"interrupted\":true}")
@@ -1215,8 +1200,8 @@ def test_pairs_respects_width_for_previews() -> None:
 
 
 def test_cli_pairs_on_stdin_without_site_packages() -> None:
-    done = subprocess.run([sys.executable, "-S", str(SCRIPT), "-", "--pairs", "--last", "0"],
-                          input="\n".join(lines(RPC_EVENTS)), capture_output=True, text=True, encoding="utf-8")
+    done = cli_args.run_cli(SCRIPT, "-", "--pairs", "--last", "0", python_options=("-S",),
+                            stdin="\n".join(lines(RPC_EVENTS)))
     assert done.returncode == 0, done.stderr
     assert "calls: 4 (2 errors, 1 unanswered), notifications: initialized 1, progress 2" in done.stdout
     assert "[0->1] tools/call name=search_web" in done.stdout
@@ -1286,8 +1271,8 @@ def test_num_with_no_numeric_values() -> None:
 
 
 def test_cli_where_bad_syntax_is_exit_2() -> None:
-    done = subprocess.run([sys.executable, "-S", str(SCRIPT), "-", "--where", "no-equals-sign"],
-                          input="\n".join(lines(TRACE_EVENTS)), capture_output=True, text=True, encoding="utf-8")
+    done = cli_args.run_cli(SCRIPT, "-", "--where", "no-equals-sign", python_options=("-S",),
+                            stdin="\n".join(lines(TRACE_EVENTS)))
     assert done.returncode == 2
     assert "error:" in done.stderr
 
@@ -1360,12 +1345,8 @@ def test_opt_in_writes_nothing_without_the_flag(tmp_path):
     test_file.write_text(FIXTURE_TESTS, encoding="utf-8")
     env = _env_with_scripts_on_path()
 
-    result = subprocess.run(
-        [sys.executable, "-m", "pytest", str(test_file), "-p", "pytest_btk_events", "-q"],
-        env=env,
-        text=True,
-        capture_output=True,
-    )
+    result = cli_args.run_command(
+        cli_args.pytest_command([str(test_file)], quiet=True, extra=("-p", "pytest_btk_events")), env=env)
 
     # The plugin loaded (no import error) and ran the tests normally: no
     # --btk-events path was given, so it must not write anywhere on its own.
@@ -1380,22 +1361,8 @@ def test_records_one_event_per_test_with_the_right_status_and_phase(tmp_path):
     events_path = tmp_path / "btk-events.jsonl"
     env = _env_with_scripts_on_path()
 
-    result = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "pytest",
-            str(test_file),
-            "-p",
-            "pytest_btk_events",
-            "--btk-events",
-            str(events_path),
-            "-q",
-        ],
-        env=env,
-        text=True,
-        capture_output=True,
-    )
+    result = cli_args.run_command(cli_args.pytest_command(
+        [str(test_file)], quiet=True, extra=("-p", "pytest_btk_events", "--btk-events", str(events_path))), env=env)
 
     assert result.returncode == 1, result.stdout + result.stderr  # test_fail + test_setup_error
     assert events_path.is_file()
@@ -1436,18 +1403,6 @@ def test_records_one_event_per_test_with_the_right_status_and_phase(tmp_path):
     assert summary["count_error"] == 1
 
 
-def _run_pytest(test_file, events_path, env, extra_args=()):
-    return subprocess.run(
-        [
-            sys.executable, "-m", "pytest", str(test_file),
-            "-p", "pytest_btk_events", "--btk-events", str(events_path), "-q", *extra_args,
-        ],
-        env=env,
-        text=True,
-        capture_output=True,
-    )
-
-
 def test_same_child_junit_xprobe_and_btk_bridge(tmp_path):
     """JUnit compact identity complements native phase evidence; neither is input."""
     vendor = ROOT / "tests" / "vendor" / "xprobe"
@@ -1480,19 +1435,13 @@ def test_same_child_junit_xprobe_and_btk_bridge(tmp_path):
     run_id = "controlled-bridge"
     env = _env_with_scripts_on_path()
     env.update(PYTEST_DISABLE_PLUGIN_AUTOLOAD="1", PYTEST_ADDOPTS="")
-    plain = subprocess.run(
-        [sys.executable, "-m", "pytest", "test_fixture.py", "--rootdir", str(tmp_path),
-         "-p", "pytest_btk_events", "--btk-events", str(tmp_path / "plain-events.jsonl"),
-         "--btk-events-project", repository, "--btk-events-run-id", run_id, "-q"],
-        cwd=tmp_path, env=env, text=True, capture_output=True, timeout=60,
-    )
-    result = subprocess.run(
-        [sys.executable, "-m", "pytest", "test_fixture.py", "--rootdir", str(tmp_path),
-         "-p", "pytest_btk_events", "--btk-events", str(events_path),
-         "--btk-events-project", repository, "--btk-events-run-id", run_id,
-         "--junitxml", str(junit_path), "-o", "junit_logging=all", "-q"],
-        cwd=tmp_path, env=env, text=True, capture_output=True, timeout=60,
-    )
+    plain = cli_args.run_command(cli_args.pytest_command(["test_fixture.py"], quiet=True, extra=(
+        "--rootdir", str(tmp_path), "-p", "pytest_btk_events", "--btk-events", str(tmp_path / "plain-events.jsonl"),
+        "--btk-events-project", repository, "--btk-events-run-id", run_id)), cwd=tmp_path, env=env, timeout=60)
+    result = cli_args.run_command(cli_args.pytest_command(["test_fixture.py"], quiet=True, extra=(
+        "--rootdir", str(tmp_path), "-p", "pytest_btk_events", "--btk-events", str(events_path),
+        "--btk-events-project", repository, "--btk-events-run-id", run_id,
+        "--junitxml", str(junit_path), "-o", "junit_logging=all")), cwd=tmp_path, env=env, timeout=60)
     (evidence / "exit.json").write_text(
         json.dumps({"without_junit": plain.returncode, "with_junit": result.returncode}),
         encoding="utf-8",
@@ -1537,10 +1486,7 @@ def test_same_child_junit_xprobe_and_btk_bridge(tmp_path):
         assert sentinel not in compact
     assert "Traceback" not in compact
 
-    board = subprocess.run(
-        [sys.executable, "-S", str(SCRIPTS / "evidence_board.py"), str(events_path), "--json"],
-        text=True, capture_output=True, timeout=60,
-    )
+    board = cli_args.run_cli(SCRIPTS / "evidence_board.py", events_path, "--json", python_options=("-S",), timeout=60)
     (evidence / "board.json").write_text(board.stdout, encoding="utf-8")
     assert board.returncode == 1, board.stdout + board.stderr
     stats = json.loads(board.stdout)
@@ -1561,7 +1507,8 @@ def test_btk_events_path_is_truncated_by_default(tmp_path):
     events_path.write_text("stale content from a previous run\n", encoding="utf-8")
     env = _env_with_scripts_on_path()
 
-    result = _run_pytest(test_file, events_path, env)
+    result = cli_args.run_command(cli_args.pytest_command(
+        [str(test_file)], quiet=True, extra=("-p", "pytest_btk_events", "--btk-events", str(events_path))), env=env)
 
     assert result.returncode == 0, result.stdout + result.stderr
     text = events_path.read_text(encoding="utf-8")
@@ -1576,9 +1523,11 @@ def test_btk_events_append_flag_keeps_appending(tmp_path):
     events_path = tmp_path / "btk-events.jsonl"
     env = _env_with_scripts_on_path()
 
-    first = _run_pytest(test_file, events_path, env, extra_args=["--btk-events-append"])
+    command = cli_args.pytest_command([str(test_file)], quiet=True, extra=(
+        "-p", "pytest_btk_events", "--btk-events", str(events_path), "--btk-events-append"))
+    first = cli_args.run_command(command, env=env)
     assert first.returncode == 0, first.stdout + first.stderr
-    second = _run_pytest(test_file, events_path, env, extra_args=["--btk-events-append"])
+    second = cli_args.run_command(command, env=env)
     assert second.returncode == 0, second.stdout + second.stderr
 
     events = _read_events(events_path)
@@ -1595,7 +1544,8 @@ def test_xfail_maps_to_skipped(tmp_path):
     events_path = tmp_path / "btk-events.jsonl"
     env = _env_with_scripts_on_path()
 
-    result = _run_pytest(test_file, events_path, env)
+    result = cli_args.run_command(cli_args.pytest_command(
+        [str(test_file)], quiet=True, extra=("-p", "pytest_btk_events", "--btk-events", str(events_path))), env=env)
 
     assert result.returncode == 0, result.stdout + result.stderr  # xfail does not fail the session
     events = _read_events(events_path)
@@ -1610,27 +1560,10 @@ def test_project_and_run_id_are_recorded_on_every_event(tmp_path):
     events_path = tmp_path / "btk-events.jsonl"
     env = _env_with_scripts_on_path()
 
-    subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "pytest",
-            str(test_file),
-            "-p",
-            "pytest_btk_events",
-            "--btk-events",
-            str(events_path),
-            "--btk-events-project",
-            "demo-project",
-            "--btk-events-run-id",
-            "run-123",
-            "-q",
-        ],
-        env=env,
-        text=True,
-        capture_output=True,
-        check=True,
-    )
+    result = cli_args.run_command(cli_args.pytest_command([str(test_file)], quiet=True, extra=(
+        "-p", "pytest_btk_events", "--btk-events", str(events_path),
+        "--btk-events-project", "demo-project", "--btk-events-run-id", "run-123")), env=env)
+    assert result.returncode == 0, result.stdout + result.stderr
 
     events = _read_events(events_path)
     assert all(event["project"] == "demo-project" for event in events)
@@ -1643,7 +1576,8 @@ def test_no_tests_collected_reports_session_summary_failed(tmp_path):
     events_path = tmp_path / "btk-events.jsonl"
     env = _env_with_scripts_on_path()
 
-    result = _run_pytest(test_file, events_path, env)
+    result = cli_args.run_command(cli_args.pytest_command(
+        [str(test_file)], quiet=True, extra=("-p", "pytest_btk_events", "--btk-events", str(events_path))), env=env)
 
     assert result.returncode == 5, result.stdout + result.stderr  # pytest: no tests collected
     events = _read_events(events_path)
@@ -1861,7 +1795,7 @@ def test_missing_pillow_min_cli_exit_two() -> None:
         raise SystemExit(mod.main([{repr(str(left))}, {repr(str(left))}]))
         """
     )
-    proc = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=ROOT)
+    proc = cli_args.run_command(cli_args.Command((sys.executable, "-c", code)), cwd=ROOT)
     assert proc.returncode == 2
     assert "pillow_min" in proc.stderr
 

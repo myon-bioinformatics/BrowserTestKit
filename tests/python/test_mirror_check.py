@@ -1,5 +1,5 @@
 """mirror_check: N-way consensus, normalization, split answers, stdlib xlsx reader."""
-import importlib.util, json, subprocess, sys, zipfile
+import importlib.util, json, zipfile
 from pathlib import Path
 
 import pytest
@@ -133,8 +133,7 @@ def test_incomparable_inputs_raise_and_cli_returns_2(case, documents, tmp_path):
         path = tmp_path / f"{i}.json"
         path.write_text(json.dumps(document), encoding="utf-8")
         files.append(str(path))
-    result = subprocess.run([sys.executable, "-S", str(SCRIPT), "compare", *files],
-                            capture_output=True, text=True)
+    result = cli_args.run_cli(SCRIPT, "compare", *files, python_options=("-S",))
     assert result.returncode == 2, (case, result.stdout, result.stderr)
     assert "all agree" not in result.stdout
     assert "Traceback" not in result.stderr

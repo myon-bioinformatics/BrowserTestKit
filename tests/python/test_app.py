@@ -3,7 +3,6 @@
 import hashlib
 import importlib.util
 import json
-import subprocess
 import sys
 from pathlib import Path
 
@@ -14,6 +13,7 @@ sys.path.insert(0, str(ROOT / 'tools'))
 
 import app_comparison as comparison
 import app_digest as digest
+import cli_args
 
 
 # ═══ · app comparison ════════════════════════════════════════════════════════════════════════════════════
@@ -234,9 +234,8 @@ def test_list_needs_no_ironmate_records_or_images(tmp_path, monkeypatch, capsys,
 @pytest.mark.parametrize('script', ['app_comparison.py', 'app_digest.py'])
 def test_list_runs_without_site_packages(tmp_path, script):
     directory = adapters(tmp_path / 'adapters')
-    result = subprocess.run([sys.executable, '-S', str(ROOT / 'tools' / script), str(tmp_path),
-                             '--adapters', str(directory), '--runners-json', '["ubuntu-24.04"]', '--list'],
-                            capture_output=True, text=True, encoding='utf-8')
+    result = cli_args.run_cli(ROOT / 'tools' / script, tmp_path, '--adapters', directory,
+                              '--runners-json', '["ubuntu-24.04"]', '--list', python_options=('-S',))
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout)['pages'] == ['flutter-home']
 
@@ -261,8 +260,8 @@ def test_rejects_changed_dom_before_blueprobe_import(tmp_path):
     path = tmp_path / 'dom.json'
     path.write_text(json.dumps({'schema': 'btk-browser-dom/1', 'source_kind': 'dom',
         'html': '<button>Add</button>', 'url': 'https://example.test/', 'html_sha256': '0' * 64}))
-    result = subprocess.run([sys.executable, '-S', str(SCRIPT), str(path),
-        '--blueprobe', str(tmp_path / 'must-not-be-opened.py')], capture_output=True, text=True, timeout=5)
+    result = cli_args.run_cli(SCRIPT, path, '--blueprobe', tmp_path / 'must-not-be-opened.py',
+                              python_options=('-S',), timeout=5)
     assert result.returncode == 2
     assert 'hash-verified' in result.stderr
     assert 'No such file' not in result.stderr
