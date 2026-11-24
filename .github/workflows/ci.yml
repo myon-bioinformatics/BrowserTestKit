@@ -4,12 +4,16 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   changes:
     name: Change detection
     uses: myon-bioinformatics/myon-bioinformatics/.github/workflows/reusable-change-detection.yml@1368174821fb03be258ecf3312ce0ea809f6ea22
 
   node-browserless:
+    timeout-minutes: 30
     name: Node document comparisons (no browser)
     needs: changes
     if: needs.changes.outputs.product_changed == 'true'
@@ -53,6 +57,7 @@ jobs:
           retention-days: 14
 
   node:
+    timeout-minutes: 30
     needs: [changes, python, node-browserless, vendor-locked]
     if: needs.changes.outputs.product_changed == 'true'
     runs-on: ubuntu-24.04
@@ -221,6 +226,7 @@ jobs:
         if: always()
         with: { name: node-browser-evidence, path: test-results, if-no-files-found: error }
   python:
+    timeout-minutes: 30
     permissions:
       contents: read
     needs: changes
@@ -308,6 +314,7 @@ jobs:
           retention-days: 14
 
   python-browser:
+    timeout-minutes: 30
     name: Python browser integration (Chromium)
     needs: [changes, python, node-browserless, vendor-locked]
     if: needs.changes.outputs.product_changed == 'true'
@@ -392,6 +399,7 @@ jobs:
           if-no-files-found: error
 
   python-browser-optional:
+    timeout-minutes: 30
     name: Python browser integration (Firefox and WebKit)
     needs: [changes, python, node-browserless, vendor-locked]
     if: needs.changes.outputs.product_changed == 'true'

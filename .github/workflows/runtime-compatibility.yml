@@ -8,8 +8,12 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   stdlib:
+    timeout-minutes: 30
     name: Stdlib and base package / Python ${{ matrix.python }}
     runs-on: ubuntu-24.04
     strategy:
@@ -41,6 +45,7 @@ jobs:
           python -c "from importlib.metadata import metadata; m = metadata('browser-test-kit-tools'); assert m['Requires-Python'] == '>=3.11'; assert m.get_all('Requires-Dist', []) == []"
 
   development-floor:
+    timeout-minutes: 30
     name: Images and development / Python 3.11
     runs-on: ubuntu-24.04
     steps:

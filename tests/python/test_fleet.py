@@ -14,7 +14,7 @@ _spec.loader.exec_module(fleet)
 PARENT_WORKFLOW_PIN = "1368174821fb03be258ecf3312ce0ea809f6ea22"
 ACCEPTED = {
     "vendor/py_launch.cjs": "de63762d8485e4d398a651715d34ebf4a04c23f2",
-    "vendor/fleet_check.py": "bc57f08a590ee1cb33a8bb37c1bb3b8f28a2f3c9",
+    "vendor/fleet_check.py": "20de01921e50e9339aa9271b0547a5be7649b3b3",
     "vendor/cli_args.py": "5ae22b1a1b808eca93e3c385a8db867fbeb8ee32",
 }
 
@@ -72,3 +72,7 @@ def test_vendored_launcher_contract():
 class ScriptsDescribeThemselves(unittest.TestCase):
     def test_every_script_has_a_description_and_declared_arguments(self):
         fleet.check_scripts(fleet.repo_root(__file__))
+
+    def test_pull_request_ci_stays_quick(self):
+        # ⏱ push limited to branches, superseded PR runs cancelled, every job timed (fleet_check.check_ci)
+        fleet.check_ci(fleet.repo_root(__file__))
