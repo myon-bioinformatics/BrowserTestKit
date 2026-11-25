@@ -61,3 +61,5 @@ All fixture icon paths are relative to `fixtures/index.html`, so they work for t
 existing local-file example as well as a locally served repository. No network
 request to an external asset host is introduced, and the fixture's visible body,
 styles, controls, and script are unchanged.
+
+♻️ The sheet and every crop now live in [CaChereCyCle](https://github.com/myon-bioinformatics/CaChereCyCle) (`BrowserTestKit.source-sheet`, `BrowserTestKit.<mark>.icon` / `.favicon`, the same bytes: `manifest.json` names each one under `store` with its SHA-256). Pages publishes Validation Buddy as `icon.png` / `favicon.png` and the other two marks under `marks/`. The fixture's 16/32/64 px and 180 px derivatives stay in `fixtures/icons/` as test inputs.

@@ -23,8 +23,13 @@ permissions:
 
 jobs:
   pages:
-    uses: myon-bioinformatics/myon-bioinformatics/.github/workflows/reusable-pages-static.yml@0778ede0c872d609bb2dc590f9f9898a39a18668
+    uses: myon-bioinformatics/myon-bioinformatics/.github/workflows/reusable-pages-static.yml@176e6c216bb517c0f882152d7f8da2838e4b9a89
     with:
       artifact_path: _site
       guide_page: docs/guide.page.json
-      guide_assets: docs/assets/brand/validation-buddy.png=icon.png docs/assets/brand/validation-buddy-favicon-source.png=favicon.png docs/evidence/browser.gif=demos/browser.gif
+      guide_assets: docs/evidence/browser.gif=demos/browser.gif
+      guide_brand: BrowserTestKit.validation-buddy   # ♻️ icon and favicon from CaChereCyCle (BrowserTestKit.validation-buddy.icon / .favicon)
+      # 🖼 the two documentation marks (docs/fast-init.md, docs/screenshot-evidence.md), from the same store checkout
+      build: >-
+        python3 -S .cacherecycle/cacherecycle.py sync camera-validation.png=BrowserTestKit.camera-validation.icon
+        pipeline-hub.png=BrowserTestKit.pipeline-hub.icon --cache _site/marks && rm -f _site/marks/.cacherecycle.json

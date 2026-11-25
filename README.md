@@ -2,7 +2,7 @@
 
 🌐 [GitHub Pages](https://myon-bioinformatics.github.io/BrowserTestKit/) · 🏠 [Portfolio](https://myon-bioinformatics.github.io/)
 
-<img src="docs/assets/brand/validation-buddy.png" alt="Validation Buddy: browser, desktop, and mobile inputs leading to screenshot validation" width="191" height="212">
+<img src="https://myon-bioinformatics.github.io/BrowserTestKit/icon.png" alt="Validation Buddy: browser, desktop, and mobile inputs leading to screenshot validation" width="191" height="212">
 
 Cross-browser testing reference kit for Playwright Node/Python, screenshots, mobile web, and GitHub Actions. Stagehand and Replay lanes are planned but not yet implemented.
 

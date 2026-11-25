@@ -1,7 +1,7 @@
 {
   "schema": "web-ui-page/1",
   "title": "BrowserTestKit 利用ガイド",
-  "theme": "auto",
+  "theme": "modern",
   "description": "Playwright（Node / Python）、スクリーンショット、モバイル Web、GitHub Actions のためのクロスブラウザテスト用リファレンスキット。",
   "icon": "./icon.png",
   "favicon": "./favicon.png",
