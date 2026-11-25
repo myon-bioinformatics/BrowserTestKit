@@ -1,5 +1,5 @@
 """Guard source-preserving branding and relative fixture icon references."""
-import importlib.util, json, sys, unittest
+import importlib.util, json, re, sys, unittest
 from hashlib import sha256; from html.parser import HTMLParser; from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -35,20 +35,15 @@ DERIVATIVE_BASELINES = {
 }
 
 
-def test_brand_source_and_lossless_crops():
-    source_path = ROOT / MANIFEST["source"]
-    assert sha256(source_path.read_bytes()).hexdigest() == MANIFEST["source_sha256"]
-    with Image.open(source_path) as source:
-        assert list(source.size) == MANIFEST["source_size"] == [1080, 720]
-        assert source.mode == MANIFEST["source_mode"] == "RGB"
-        for record in MANIFEST["crops"]:
-            path = ROOT / record["path"]
-            assert sha256(path.read_bytes()).hexdigest() == record["sha256"]
-            with Image.open(path) as actual:
-                expected = source.crop(record["crop_xyxy"])
-                assert actual.mode == expected.mode
-                assert list(actual.size) == record["size"]
-                assert actual.tobytes() == expected.tobytes()
+def test_brand_lives_in_the_store():
+    """♻️ The sheet and its crops live in CaChereCyCle (the same bytes: the store checks each sha256); no copy stays here."""
+    assert MANIFEST["source_store"] == "BrowserTestKit.source-sheet"
+    assert re.fullmatch(r"[0-9a-f]{64}", MANIFEST["source_sha256"])
+    for record in MANIFEST["crops"]:
+        assert re.fullmatch(r"BrowserTestKit\.[a-z-]+\.(icon|favicon)", record["store"]), record
+        assert re.fullmatch(r"[0-9a-f]{64}", record["sha256"]) and len(record["crop_xyxy"]) == 4
+        assert not (ROOT / record["path"]).exists(), record["path"]
+    assert not list(BRAND.glob("*.png"))
 
 
 def assert_derivative_pixels(actual, size, pixel_sha256):
@@ -67,7 +62,7 @@ def test_brand_derivatives_preserve_reviewed_pixels():
         source, size, pixel_sha256 = DERIVATIVE_BASELINES[record["path"]]
         assert record["source"] == source
         assert tuple(record["size"]) == size
-        assert source in {crop["path"] for crop in MANIFEST["crops"]}
+        assert source in {crop["path"] for crop in MANIFEST["crops"]}  # the reviewed crop, now in the store
         path = ROOT / record["path"]
         assert sha256(path.read_bytes()).hexdigest() == record["sha256"]
         with Image.open(path) as actual:
@@ -127,9 +122,10 @@ def test_fixture_icons_are_local_and_match_declared_dimensions():
 
 
 def test_each_large_mark_has_its_documented_home():
-    assert 'src="docs/assets/brand/validation-buddy.png"' in (ROOT / "README.md").read_text(encoding="utf-8")
-    assert 'src="assets/brand/camera-validation.png"' in (ROOT / "docs/screenshot-evidence.md").read_text(encoding="utf-8")
-    assert 'src="assets/brand/pipeline-hub.png"' in (ROOT / "docs/fast-init.md").read_text(encoding="utf-8")
+    # ♻️ published by Pages from CaChereCyCle (guide_brand and the marks/ build step)
+    assert 'src="https://myon-bioinformatics.github.io/BrowserTestKit/icon.png"' in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert 'src="https://myon-bioinformatics.github.io/BrowserTestKit/marks/camera-validation.png"' in (ROOT / "docs/screenshot-evidence.md").read_text(encoding="utf-8")
+    assert 'src="https://myon-bioinformatics.github.io/BrowserTestKit/marks/pipeline-hub.png"' in (ROOT / "docs/fast-init.md").read_text(encoding="utf-8")
 
 
 def test_brand_validation_without_site_packages():
@@ -140,7 +136,7 @@ def test_brand_validation_without_site_packages():
 
 
 if __name__ == "__main__":
-    test_brand_source_and_lossless_crops()
+    test_brand_lives_in_the_store()
     test_brand_derivatives_preserve_reviewed_pixels()
     test_fixture_icons_are_local_and_match_declared_dimensions()
     test_each_large_mark_has_its_documented_home()

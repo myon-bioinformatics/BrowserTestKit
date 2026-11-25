@@ -1,6 +1,7 @@
 {
   "source": "docs/assets/brand/source-sheet.png",
   "source_sha256": "5966f86b9f3f04a77825108feb6c31dbd9e6cf6c545fb038c9c0ccd993cbf720",
+  "source_store": "BrowserTestKit.source-sheet",
   "source_size": [
     1080,
     720
@@ -20,7 +21,8 @@
         191,
         212
       ],
-      "sha256": "ab512826dd72a9b0353d6f5216ddd06631fd5a1d5310d1a787b89486c32194ee"
+      "sha256": "ab512826dd72a9b0353d6f5216ddd06631fd5a1d5310d1a787b89486c32194ee",
+      "store": "BrowserTestKit.validation-buddy.icon"
     },
     {
       "path": "docs/assets/brand/camera-validation.png",
@@ -34,7 +36,8 @@
         195,
         212
       ],
-      "sha256": "e399b4eb6525923ec861f6c6672b074f05fcfe6fa518b8a011042f21021246e8"
+      "sha256": "e399b4eb6525923ec861f6c6672b074f05fcfe6fa518b8a011042f21021246e8",
+      "store": "BrowserTestKit.camera-validation.icon"
     },
     {
       "path": "docs/assets/brand/pipeline-hub.png",
@@ -48,7 +51,8 @@
         189,
         212
       ],
-      "sha256": "1b6d4f79490f6040a3ed1e5f8f84838d402d998139bd73e9f1f42d9a7ac60661"
+      "sha256": "1b6d4f79490f6040a3ed1e5f8f84838d402d998139bd73e9f1f42d9a7ac60661",
+      "store": "BrowserTestKit.pipeline-hub.icon"
     },
     {
       "path": "docs/assets/brand/validation-buddy-favicon-source.png",
@@ -62,7 +66,8 @@
         69,
         69
       ],
-      "sha256": "baaed98bd56555fef285f0cebce967c0f2ad4164d1c1c7e0bbd78ccc0a73856c"
+      "sha256": "baaed98bd56555fef285f0cebce967c0f2ad4164d1c1c7e0bbd78ccc0a73856c",
+      "store": "BrowserTestKit.validation-buddy.favicon"
     },
     {
       "path": "docs/assets/brand/camera-validation-favicon-source.png",
@@ -76,7 +81,8 @@
         70,
         70
       ],
-      "sha256": "483dbd168ffacabb1e070bd332c8dc7fedb2553079af3e917852d2d8540fef26"
+      "sha256": "483dbd168ffacabb1e070bd332c8dc7fedb2553079af3e917852d2d8540fef26",
+      "store": "BrowserTestKit.camera-validation.favicon"
     },
     {
       "path": "docs/assets/brand/pipeline-hub-favicon-source.png",
@@ -90,7 +96,8 @@
         70,
         70
       ],
-      "sha256": "20fe2562be3bd15a374d86026cfcf6d440e1b41843ce7ea225fe589a8e5c4a71"
+      "sha256": "20fe2562be3bd15a374d86026cfcf6d440e1b41843ce7ea225fe589a8e5c4a71",
+      "store": "BrowserTestKit.pipeline-hub.favicon"
     }
   ],
   "derivatives": [
