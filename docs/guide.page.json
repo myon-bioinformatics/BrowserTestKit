@@ -19,22 +19,6 @@
       "id": "guide",
       "tabs": [
         {
-          "label": "🎞 GIF デモ",
-          "blocks": [
-            {
-              "type": "card",
-              "title": "🧪 ブラウザテスト",
-              "blocks": [
-                {
-                  "type": "image",
-                  "src": "./demos/browser.gif",
-                  "alt": "ブラウザテストを実際の Chromium で動かした様子"
-                }
-              ]
-            }
-          ]
-        },
-        {
           "label": "🧩 機能一覧",
           "blocks": [
             {
@@ -87,6 +71,22 @@
                       "text": "$ python -S tools/btk.py js-search project-a --shared-with project-b --shared-with project-c"
                     }
                   ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "label": "🎞 GIF デモ",
+          "blocks": [
+            {
+              "type": "card",
+              "title": "🧪 ブラウザテスト",
+              "blocks": [
+                {
+                  "type": "image",
+                  "src": "./demos/browser.gif",
+                  "alt": "ブラウザテストを実際の Chromium で動かした様子"
                 }
               ]
             }
