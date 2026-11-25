@@ -88,7 +88,7 @@ def test_browser_contract_rejects_missing_pages_or_masked_tests():
 WORKFLOW = ROOT / ".github/workflows/ci.yml"
 COLLECTOR = (
     "myon-bioinformatics/myon-bioinformatics/.github/workflows/"
-    "reusable-junit-identity.yml@1368174821fb03be258ecf3312ce0ea809f6ea22"
+    "reusable-junit-identity.yml@0778ede0c872d609bb2dc590f9f9898a39a18668"
 )
 COMMAND = (
     'uv run --locked python -m pytest tests/python -q -m "not browser" '
@@ -213,7 +213,7 @@ BROWSER_TEST_KIT_VENDOR_AUTOMATION_WORKFLOW = '.github/workflows/ci.yml'
 TEST_JOB = 'python'
 LOCK = json.loads((ROOT / 'vendor.lock.json').read_text())
 SNAPSHOT = ['vendor.lock.json'] + [e['destination'] for e in LOCK['files']]
-PIN = '1368174821fb03be258ecf3312ce0ea809f6ea22'
+PIN = '0778ede0c872d609bb2dc590f9f9898a39a18668'
 
 
 def _workflow():
