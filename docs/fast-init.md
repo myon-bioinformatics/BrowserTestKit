@@ -8,7 +8,7 @@ It is not a wrapper around one product and it does not choose Node over Python. 
 
 ## Lanes
 
-<img src="assets/brand/pipeline-hub.png" alt="Pipeline Hub: several environment inputs converging on screenshot validation" width="189" height="212">
+<img src="https://myon-bioinformatics.github.io/BrowserTestKit/marks/pipeline-hub.png" alt="Pipeline Hub: several environment inputs converging on screenshot validation" width="189" height="212">
 
 The Pipeline Hub artwork is a visual mark, not a technical architecture or proof of lane coverage. The status table below is authoritative.
 
