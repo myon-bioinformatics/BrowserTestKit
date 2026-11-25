@@ -11,7 +11,7 @@ _spec = importlib.util.spec_from_file_location("browsertestkit_fleet_check", ROO
 fleet = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(fleet)
 
-PARENT_WORKFLOW_PIN = "176e6c216bb517c0f882152d7f8da2838e4b9a89"
+PARENT_WORKFLOW_PIN = "1cd621c8a46d18611a9135bdc8a0e9d46013d58d"
 ACCEPTED = {
     "vendor/py_launch.cjs": "de63762d8485e4d398a651715d34ebf4a04c23f2",
     "vendor/fleet_check.py": "20de01921e50e9339aa9271b0547a5be7649b3b3",
