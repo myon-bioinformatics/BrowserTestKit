@@ -77,6 +77,38 @@
           ]
         },
         {
+          "label": "🔬 検証ガイド",
+          "blocks": [
+            {
+              "type": "runbook",
+              "id": "verify",
+              "books": [
+                {
+                  "label": "⚡ そのまま",
+                  "intro": "📋 コピーして手元で試し、結果を記録できます。🤖 の手順は、Pages の公開で実際に動かした結果も載ります。",
+                  "runbook": {
+                    "key": "browsertestkit/verify",
+                    "steps": [
+                      {
+                        "id": "help",
+                        "title": "❓ ヘルプ",
+                        "command": "python3 -S tools/btk.py --help",
+                        "run": true
+                      },
+                      {
+                        "id": "operations",
+                        "title": "🧰 操作の一覧",
+                        "command": "python3 -S tools/btk.py operations",
+                        "run": true
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
           "label": "🎞 GIF デモ",
           "blocks": [
             {
@@ -108,10 +140,6 @@
             {
               "label": "📖 README",
               "href": "https://github.com/myon-bioinformatics/BrowserTestKit#readme"
-            },
-            {
-              "label": "🧰 全スクリプトの説明",
-              "href": "https://myon-bioinformatics.github.io/tools/projects/browsertestkit.html"
             },
             {
               "label": "📄 tools/btk.py",

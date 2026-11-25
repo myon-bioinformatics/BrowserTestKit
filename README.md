@@ -8,7 +8,7 @@ Cross-browser testing reference kit for Playwright Node/Python, screenshots, mob
 
 [Artwork and icon usage](docs/assets/brand/README.md) describes the supplied visual marks and their separate roles.
 
-🧰 [Every script, with its own description and `--help` usage](https://myon-bioinformatics.github.io/tools/projects/browsertestkit.html) — generated from the code at a recorded commit, so this README does not list them.
+🧰 How to run the scripts, and checks that really run them: the [GitHub Pages guide](https://myon-bioinformatics.github.io/BrowserTestKit/) (🧩 機能一覧 / 🔬 検証ガイド / 🎞 GIF デモ), so this README does not list them.
 
 ## Name origin
 
