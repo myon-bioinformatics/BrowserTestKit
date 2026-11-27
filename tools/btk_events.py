@@ -39,7 +39,7 @@ STATUSES = frozenset(NEVER_PASSING_STATUSES | {"passed", "skipped"})
 
 
 class EventError(ValueError):
-    """A btk-event/1 payload is missing a required field or has a bad status."""
+    """A btk-event/1 payload violates required fields, identity types or vocabulary."""
 
 
 def now_iso() -> str:
@@ -52,6 +52,10 @@ def validate(fields: dict) -> None:
     missing = [name for name in REQUIRED_FIELDS if not fields.get(name)]
     if missing:
         raise EventError(f"btk-event/1: missing required field(s): {', '.join(missing)}")
+    for name in ("source", "project", "run_id", "test_id"):
+        value = fields.get(name)
+        if value is not None and not isinstance(value, str):
+            raise EventError(f"btk-event/1: {name} must be a string")
     status = fields.get("status")
     if status is not None and status not in STATUSES:
         raise EventError(f"btk-event/1: unknown status {status!r}; expected one of {sorted(STATUSES)}")
@@ -70,8 +74,9 @@ def emit(stream: TextIO, **fields: Any) -> dict:
         btk_events.emit(sys.stderr, source="terminal-browser", event="terminal_browser_exit",
                          returncode=0, status="passed")
 
-    Raises :class:`EventError` if a required field is missing or ``status``
-    is not part of the vocabulary; nothing is written in that case.
+    Raises :class:`EventError` if a required field is missing, an identity
+    field has a non-string value, or ``status`` is not part of the vocabulary;
+    nothing is written in that case. Optional identity fields may be null.
     """
     payload = dict(fields)
     payload.setdefault("schema", SCHEMA)
@@ -104,8 +109,9 @@ def read(path_or_lines: Union[str, Path, Iterable[str], TextIO]) -> ReadResult:
     any iterable of lines (for example a list already split from a string).
     A line is malformed -- counted in ``malformed`` and left out of
     ``events`` -- if it is not valid JSON, is not a JSON object, or is
-    missing a required btk-event/1 field. Blank lines are skipped silently
-    and are not counted at all.
+    missing a required btk-event/1 field, or violates the known status/stage
+    vocabulary or identity-field types. Blank lines are skipped silently and
+    are not counted at all.
     """
     events: list = []
     malformed = 0

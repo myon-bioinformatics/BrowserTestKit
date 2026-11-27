@@ -94,15 +94,24 @@ uses `--required`, so a missing toolchain, failed proof or failed audit fails th
 lane. Optional local execution without this flag still reports a missing Lean
 toolchain as `unverified`, distinct from a successful proof.
 
-## Integration limits identified during the connection work
+## Execution identity and gate integration
 
-The current grouping by `test_id` alone can merge events with different
-`source`, `project` or `run_id`; a later passing call can then hide an earlier
-failing execution. The model assumes those executions have already been
-separated and does not prove that grouping is correct.
+The runtime groups test phases by `(source, project, run_id, test_id)`. Missing
+optional project/run fields remain `None`, preserving legacy grouping within
+one producer. Separate executions need distinct identities, and every phase of
+one execution must use consistent identity fields. A filename is not an
+identity: one execution may span several input files. Repeated attempts that
+reuse all four identity fields cannot be distinguished by the current schema.
 
-Separately, excluding session summaries from counts currently also excludes
-their blocking statuses from the board gate. A failed summary alone can
-therefore produce a zero exit code. The summary count theorem does not justify
-this exit-code behavior. Both integration boundaries require separate runtime
-regressions and fixes; neither is hidden inside the single-execution proof.
+Session summaries remain absent from per-test status counts, while their
+blocking statuses participate in the gate together with the test statuses.
+`--allow` applies to both. The producer supplies the validated `status`; the
+board retains `returncode` as metadata without independently reclassifying it.
+
+[`tests/stdlib/test_evidence_execution_identity.py`](../tests/stdlib/test_evidence_execution_identity.py)
+checks separation of source/project/run identities, legacy records, split files,
+failure detail retention, and summary gating without double counting.
+[`tests/python/test_evidence_board_sessions.py`](../tests/python/test_evidence_board_sessions.py)
+runs a real empty pytest session: pytest exits 5, the plugin emits a failed
+summary, and the real board CLI exits 1 while its per-test counts stay empty.
+These integration regressions do not extend the scope of the Lean proof.
