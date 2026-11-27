@@ -10,7 +10,7 @@ concurrency:
 jobs:
   changes:
     name: Change detection
-    uses: myon-bioinformatics/myon-bioinformatics/.github/workflows/reusable-change-detection.yml@1cd621c8a46d18611a9135bdc8a0e9d46013d58d
+    uses: myon-bioinformatics/myon-bioinformatics/.github/workflows/reusable-change-detection.yml@43cfe1df924ea96ca44f47a6771c18102c38f7f3
 
   node-browserless:
     timeout-minutes: 30
@@ -260,7 +260,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: myon-bioinformatics/myon-bioinformatics
-          ref: 1cd621c8a46d18611a9135bdc8a0e9d46013d58d
+          ref: 43cfe1df924ea96ca44f47a6771c18102c38f7f3
           path: .vendor-sync-tools
           persist-credentials: false
       - name: Verify checked-in vendor copies
@@ -524,7 +524,7 @@ jobs:
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         repository: myon-bioinformatics/myon-bioinformatics
-        ref: 1cd621c8a46d18611a9135bdc8a0e9d46013d58d
+        ref: 43cfe1df924ea96ca44f47a6771c18102c38f7f3
         path: .vendor-sync-tools
         persist-credentials: false
     - name: Verify checked-in vendor copies
@@ -590,7 +590,7 @@ jobs:
     permissions:
       contents: read
       actions: read
-    uses: myon-bioinformatics/myon-bioinformatics/.github/workflows/reusable-junit-identity.yml@1cd621c8a46d18611a9135bdc8a0e9d46013d58d
+    uses: myon-bioinformatics/myon-bioinformatics/.github/workflows/reusable-junit-identity.yml@43cfe1df924ea96ca44f47a6771c18102c38f7f3
     with:
       commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}
       expected-reports: '["junit-python-3.15/python-3.15.xml", "junit-controlled-python-3.15/junit.xml", "junit-node-browserless/browserless-node.xml", "junit-python-browser-3.15/python-browser-3.15.xml", "junit-python-browser-optional-3.15/python-browser-optional-3.15.xml"]'
