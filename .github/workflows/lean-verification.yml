@@ -1,0 +1,40 @@
+name: Lean verification
+
+on:
+  pull_request:
+    paths:
+      - "formal/**"
+      - "tools/evidence_board.py"
+      - "tools/btk_events.py"
+      - "tests/stdlib/test_formal_evidence_reduction.py"
+      - ".github/workflows/lean-verification.yml"
+  push:
+    branches: [main]
+    paths:
+      - "formal/**"
+      - "tools/evidence_board.py"
+      - "tools/btk_events.py"
+      - "tests/stdlib/test_formal_evidence_reduction.py"
+      - ".github/workflows/lean-verification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lean-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  evidence-reduction:
+    uses: myon-bioinformatics/myon-bioinformatics/.github/workflows/reusable-lean-verify.yml@6c2558c4251698c50bc07bad86fb49f902b2738f
+    with:
+      project-directory: formal
+      proof: EvidenceReduction.lean
+      theorems: |
+        BrowserTestKit.call_failure_priority
+        BrowserTestKit.phase_error_not_passed
+        BrowserTestKit.passed_requires_passed_phase
+        BrowserTestKit.missing_status_stays_missing
+        BrowserTestKit.session_summary_count_neutral
+        BrowserTestKit.failed_call_counted_once

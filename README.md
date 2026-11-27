@@ -61,6 +61,10 @@ uv run --group pages --group browser python tools/evidence_gif.py docs/evidence/
 
 ## Python support
 
+[Formal evidence checks](docs/formal-verification.md) pair Lean proofs of one
+test execution's phase reduction and status counting with the actual evidence
+board. They do not certify browser rendering or screenshot pixels.
+
 - Stdlib-only modules and the base package: **Python 3.11+**, with no runtime dependencies.
   Run a source script with `python -S tools/btk.py check-png --help`, or install the
   base package with `uv venv && uv pip install .` (an active virtual environment is required) and use `python -m btk --help`. Every tool lives
