@@ -58,6 +58,14 @@ Every event has all four:
 | `artifact` | string | Path to a file the event refers to (screenshot, log, trace, ...). |
 | `message` | string | Short human-readable detail, e.g. an exception summary. |
 
+Identity fields (`source`, `project`, `run_id`, `test_id`) must be strings.
+Optional identity fields may be omitted or set to JSON `null`; both represent
+legacy absence. Other JSON types are malformed, including numeric `1`, which
+is not coerced into the valid string ID `"1"`. Literal strings such as `"None"`
+or `"missing"` remain distinct from absent fields. The reader counts rejected
+records as malformed. They block the gate unless `--allow-malformed` is
+explicitly supplied; the CLI still requires at least one valid event.
+
 ## Status vocabulary
 
 `status` is optional (lifecycle events like `terminal_browser_found` carry no
@@ -119,10 +127,11 @@ this order:
   `"btk-event/1"`. A breaking change to a field's meaning ships as a new
   schema string (`"btk-event/2"`), not a silent redefinition.
 - New optional fields and new `event` names can be added freely. Two fields
-  are restricted, each when present: `status` to the seven-value vocabulary
+  have restricted vocabularies, each when present: `status` to the seven-value vocabulary
   above, and `stage` to the `FAILURE_LAYER_FLATTENING` layers listed in the
   optional fields table (`tools/btk_events.validate()` rejects either one
-  outside its vocabulary). `phase` is deliberately unconstrained.
+  outside its vocabulary). `phase` has no fixed vocabulary. The identity-field
+  type checks described above also apply to known identity fields.
 
 ## Using the board in CI
 
@@ -134,7 +143,30 @@ this order:
 
 `skipped` and `passed` never fail the board. `--allow unavailable` is the usual choice for a CI job where an optional tool such as terminal-browser is not installed; the board still reports those events in its callout line. `--allow-malformed` is for a producer/consumer version mismatch a project has explicitly decided to tolerate; by default any malformed line fails the board, since a truncated or corrupted JSONL file should not be able to slip through as a pass.
 
-`session_summary` events (written once per pytest session by `tools/pytest_btk_events.py`) are reported in their own table/notes, never folded into the Status counts: a session's own pass/fail rollup would otherwise double count every test already reflected in that session's `test_result` events. Similarly, a test whose `call` phase fails and whose `teardown` phase then also errors is counted once, as one `failed` test, with the teardown problem noted rather than counted as a second failure -- see "Aggregating pytest phases per test_id" in `tools/evidence_board.py`'s module docstring for the full per-`test_id` reduction rule.
+`session_summary` events are reported in their own table/notes and never
+folded into per-test Status counts. Their blocking statuses still participate
+in the board gate, including when no test-result events exist. For example, an
+empty pytest session emits `failed` with return code 5; the board exits 1 while
+its per-test counts remain empty. `--allow` applies to summary statuses as well
+as test statuses. The validated `status` drives the gate; `returncode` is
+retained as producer metadata without a second status classification.
+
+Test phases are grouped by `(source, project, run_id, test_id)`. A failed call
+plus a teardown error within one execution counts once as `failed`, with the
+teardown message retained. Different sources, projects or runs cannot overwrite
+one another just because their pytest nodeids match. Missing optional identity
+fields use `None` for legacy records; producers must use consistent fields
+within an execution and distinct run/project identities for separate attempts.
+Input filenames do not divide executions, so phases can be joined across files.
+Events without a nonempty `test_id` retain direct, per-event status counting.
+See "Aggregating pytest phases per execution" in `tools/evidence_board.py`.
+
+`test_failures` retains the raw test-id key when that ID is unambiguous. Shared
+IDs use a JSON-encoded full identity as the key; if a raw ID collides with one
+of those keys, all keys are encoded. Each failure value includes `source`,
+`project`, `run_id` and `test_id`, so consumers can read the identity fields
+without decoding display keys. Failure details from separate executions are
+retained independently.
 
 Two pytest-specific outcomes worth knowing when reading the board:
 

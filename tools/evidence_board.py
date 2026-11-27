@@ -10,7 +10,8 @@ the contract) and reports:
   counted;
 - ``session_summary`` events reported separately, never folded into the
   per-status counts (a session's own pass/fail rollup would otherwise double
-  count every test already reflected in its own ``test_result`` events);
+  count every test already reflected in its own ``test_result`` events), but
+  their blocking statuses still fail the board unless explicitly allowed;
 - counts per ``source``/``project`` (grouped as ``source`` alone, or
   ``source/project`` when the event carries a ``project``);
 - the first failure recorded for each ``stage``
@@ -18,7 +19,7 @@ the contract) and reports:
 - ``interrupted``/``unavailable`` counts, called out separately -- neither is
   ever folded into "passed".
 
-## Aggregating pytest phases per test_id
+## Aggregating pytest phases per execution
 
 A pytest test can emit more than one ``test_result`` event for the same
 ``test_id`` -- one per report phase (``phase``: ``setup``/``call``/
@@ -26,7 +27,13 @@ A pytest test can emit more than one ``test_result`` event for the same
 would double count a test whose ``call`` phase reports a status and whose
 ``teardown`` phase *also* reports one (a teardown that raises after the test
 body already ran). Events that carry a ``test_id`` are therefore buffered
-and reduced to exactly one status per ``test_id``, in this order:
+and reduced to exactly one status per ``(source, project, run_id, test_id)``,
+in this order. Missing optional project/run fields use ``None``, retaining
+legacy grouping within the same producer. Distinct executions must supply
+distinct run/project identities; filenames are not execution identities,
+because one execution's phases may be split across several files.
+Each execution is expected to have one call report; separate attempts need
+distinct execution identities.
 
 1. A ``call``-phase event with ``status: "failed"`` makes the whole test
    **failed**, even if ``teardown`` also reports ``"error"`` afterward --
@@ -59,6 +66,7 @@ Stdlib only; runs under ``python -S``.
 from __future__ import annotations
 
 import argparse, json, os, sys
+from collections import Counter
 from pathlib import Path; from typing import Union
 
 import btk_events
@@ -73,10 +81,10 @@ FAILING_STATUSES = frozenset({"failed", "error"})
 
 
 def _reduce_test_result(events: list) -> tuple:
-    """Reduce one ``test_id``'s buffered ``test_result`` events to one status.
+    """Reduce one execution's buffered ``test_result`` events to one status.
 
-    ``events`` is every ``test_result`` record seen for a single ``test_id``,
-    in the order read. See "Aggregating pytest phases per test_id" above for
+    ``events`` is every ``test_result`` record seen for a single execution,
+    in the order read. See "Aggregating pytest phases per execution" above for
     the rule. Returns ``(status, info)`` where ``info`` carries ``message``
     and, when a call failure was followed by a teardown error, a
     ``teardown_message`` noting it. Returns ``(None, {})`` if no event in the
@@ -114,7 +122,7 @@ def aggregate(paths: list, allow: set, allow_malformed: bool = False) -> dict:
     counts_by_group: dict = {}
     first_failure_by_stage: dict = {}
     session_summaries: list = []
-    tests_by_id: dict = {}
+    tests_by_execution: dict = {}
     malformed_lines = 0
     total_events = 0
 
@@ -135,6 +143,7 @@ def aggregate(paths: list, allow: set, allow_malformed: bool = False) -> dict:
                     "status": status,
                     "source": source,
                     "project": project,
+                    "run_id": record.get("run_id"),
                     "test_id": record.get("test_id"),
                     "time": record.get("time"),
                     "message": record.get("message"),
@@ -157,23 +166,38 @@ def aggregate(paths: list, allow: set, allow_malformed: bool = False) -> dict:
 
             test_id = record.get("test_id")
             if record.get("event") == "test_result" and test_id:
-                tests_by_id.setdefault(test_id, []).append(record)
+                identity = (source, project, record.get("run_id"), test_id)
+                tests_by_execution.setdefault(identity, []).append(record)
                 continue
 
             if status is None:
                 continue
             counts_by_status[status] = counts_by_status.get(status, 0) + 1
 
+    # Keep legacy failure keys for unambiguous test_ids. When IDs are shared
+    # across executions, encode the full identity and retain all failure details.
+    id_counts = Counter(identity[-1] for identity in tests_by_execution)
+    failure_keys = {identity: identity[-1] if id_counts[identity[-1]] == 1 else json.dumps(identity)
+                    for identity in tests_by_execution}
+    if len(set(failure_keys.values())) != len(failure_keys):
+        # A raw test_id could itself look like another execution's encoded key.
+        failure_keys = {identity: json.dumps(identity) for identity in tests_by_execution}
     test_failures: dict = {}
-    for test_id, events in tests_by_id.items():
+    for identity, events in tests_by_execution.items():
         status, info = _reduce_test_result(events)
         if status is None:
             continue
         counts_by_status[status] = counts_by_status.get(status, 0) + 1
         if status in FAILING_STATUSES:
-            test_failures[test_id] = {"status": status, **info}
+            source, project, run_id, test_id = identity
+            test_failures[failure_keys[identity]] = {
+                "status": status, **info, "source": source, "project": project,
+                "run_id": run_id, "test_id": test_id,
+            }
 
     present_blocking = {status for status in BLOCKING_STATUSES if counts_by_status.get(status, 0) > 0}
+    present_blocking.update(summary["status"] for summary in session_summaries
+                            if summary["status"] in BLOCKING_STATUSES)
     blocking = sorted(present_blocking - allow)
     malformed_blocking = bool(malformed_lines) and not allow_malformed
 
@@ -243,7 +267,12 @@ def render_markdown(stats: dict, paths: list) -> str:
             notes.append(f"{count} `{status}` event(s) (never counted as passed)")
     for test_id, info in sorted(stats["test_failures"].items()):
         if info.get("teardown_message"):
-            notes.append(f"`{test_id}` failed in call, then also errored in teardown: {info['teardown_message']}")
+            label = info.get("test_id", test_id)
+            if label != test_id:
+                context = "/".join(str(info[key]) for key in ("source", "project", "run_id")
+                                   if info.get(key) is not None)
+                label = f"{label} ({context})"
+            notes.append(f"`{label}` failed in call, then also errored in teardown: {info['teardown_message']}")
     if stats["session_summaries"]:
         notes.append(
             f"{len(stats['session_summaries'])} session_summary event(s) reported above, not counted in Status"
