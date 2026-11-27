@@ -74,7 +74,7 @@ CLI code 2. These are executable regression checks, not additional Lean proofs.
 [`formal/lean-toolchain`](../formal/lean-toolchain) fixes Lean 4.36.0. The proof
 uses Lean's standard library, without Mathlib. Normal Python execution does not
 require Lean. From the repository root, use the parent's shared
-[`lean_verify.py`](https://github.com/myon-bioinformatics/myon-bioinformatics/blob/6c2558c4251698c50bc07bad86fb49f902b2738f/lean_verify.py):
+[`lean_verify.py`](https://github.com/myon-bioinformatics/myon-bioinformatics/blob/27c46411c0a07d9b4d0f1ad5751ed1bb9e869b5c/lean_verify.py):
 
 ```sh
 python -S /path/to/myon-bioinformatics/lean_verify.py \
