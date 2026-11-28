@@ -9,6 +9,7 @@ from pathlib import Path
 TOOLS = Path(__file__).resolve().parents[2] / "tools"
 _spec = importlib.util.spec_from_file_location("cli_args", Path(__file__).resolve().parents[2] / "vendor" / "cli_args.py")
 cli_args = importlib.util.module_from_spec(_spec)
+sys.modules["cli_args"] = cli_args
 _spec.loader.exec_module(cli_args)
 sys.path.insert(0, str(TOOLS))
 from btk import js_search
