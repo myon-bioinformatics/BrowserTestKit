@@ -1893,4 +1893,4 @@ def test_vendored_pillow_min_matches_lock() -> None:
     data = PILLOW_MIN.read_bytes()
     import hashlib
     assert entry["sha256"] == hashlib.sha256(data).hexdigest()
-    assert entry["commit"] == "63a4e339927d32282b0d5a8378da6c982890b9e9"
+    assert entry["ref"] == "main"  # 🔁 own sources follow main

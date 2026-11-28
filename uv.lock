@@ -46,11 +46,11 @@ browser-test = [
 ]
 dev = [
     { name = "pip", marker = "python_full_version >= '3.11'", specifier = ">=26.2" },
-    { name = "pysaiyanweboo", marker = "python_full_version >= '3.11'", git = "https://github.com/myon-bioinformatics/PySaiyanWeBoo?rev=901b790f14ad7a04a4280409bfd274d8f6926fa7" },
+    { name = "pysaiyanweboo", marker = "python_full_version >= '3.11'", git = "https://github.com/myon-bioinformatics/PySaiyanWeBoo?rev=main" },
     { name = "pytest", marker = "python_full_version >= '3.11'", specifier = ">=9.0.3" },
     { name = "pyyaml", marker = "python_full_version >= '3.11'", specifier = ">=6.0.3" },
 ]
-pages = [{ name = "pysaiyanweboo", git = "https://github.com/myon-bioinformatics/PySaiyanWeBoo?rev=901b790f14ad7a04a4280409bfd274d8f6926fa7" }]
+pages = [{ name = "pysaiyanweboo", git = "https://github.com/myon-bioinformatics/PySaiyanWeBoo?rev=main" }]
 
 [[package]]
 name = "colorama"
@@ -236,7 +236,7 @@ wheels = [
 [[package]]
 name = "pysaiyanweboo"
 version = "0.1.0"
-source = { git = "https://github.com/myon-bioinformatics/PySaiyanWeBoo?rev=901b790f14ad7a04a4280409bfd274d8f6926fa7#901b790f14ad7a04a4280409bfd274d8f6926fa7" }
+source = { git = "https://github.com/myon-bioinformatics/PySaiyanWeBoo?rev=main#43335dfce36a2d5afa2beb29035db40abb8e7ee7" }
 
 [[package]]
 name = "pytest"

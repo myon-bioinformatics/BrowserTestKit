@@ -11,12 +11,12 @@ _spec = importlib.util.spec_from_file_location("browsertestkit_fleet_check", ROO
 fleet = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(fleet)
 
-PARENT_WORKFLOW_PIN = "27c46411c0a07d9b4d0f1ad5751ed1bb9e869b5c"
+PARENT_WORKFLOW_PIN = "main"  # 🔁 own sources follow main (2026-11-28)
 ACCEPTED = {
-    "vendor/py_launch.cjs": "de63762d8485e4d398a651715d34ebf4a04c23f2",
-    "vendor/fleet_check.py": "20de01921e50e9339aa9271b0547a5be7649b3b3",
-    "vendor/cli_args.py": "5ae22b1a1b808eca93e3c385a8db867fbeb8ee32",
-}
+    "vendor/py_launch.cjs",
+    "vendor/fleet_check.py",
+    "vendor/cli_args.py",
+}  # 🔁 locked destinations; they follow main
 
 
 def test_vendor_lock_matches_checked_in_bytes() -> None:
@@ -24,7 +24,7 @@ def test_vendor_lock_matches_checked_in_bytes() -> None:
 
 
 def test_launcher_pin_uses_canonical_first_parent_source():
-    rows = fleet.check_lock(ROOT, commits=ACCEPTED)
+    rows = fleet.check_lock(ROOT)
     for destination in ACCEPTED:
         owner = "myon-bioinformatics/cli_args" if destination == "vendor/cli_args.py" else fleet.PARENT
         assert (rows[destination]["repository"], rows[destination]["source"]) == (owner, Path(destination).name)
