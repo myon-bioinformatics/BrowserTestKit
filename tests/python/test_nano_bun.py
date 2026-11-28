@@ -15,6 +15,8 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 
+import cli_args
+
 
 # ═══ · nano bun ══════════════════════════════════════════════════════════════════════════════════════════
 # Offline contracts for the opt-in Bun installer; never launch a real installer.
@@ -556,8 +558,9 @@ class ResourceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             output = Path(tmp) / 'measurement.json'
             for code in (0, 7):
-                result = subprocess.run([sys.executable, '-S', resources.__file__, str(output), '--',
-                                         sys.executable, '-S', '-c', f'raise SystemExit({code})'])
+                result = cli_args.run_cli(resources.__file__, str(output), '--',
+                                          sys.executable, '-S', '-c', f'raise SystemExit({code})',
+                                          python_options=('-S',))
                 self.assertEqual(result.returncode, code)
                 data = json.loads(output.read_text())
                 self.assertEqual(data['returncode'], code)
@@ -582,10 +585,10 @@ class ResourceTests(unittest.TestCase):
     def test_remaining_adapter_help_through_meter(self):
         with tempfile.TemporaryDirectory() as tmp:
             output = Path(tmp) / 'm.json'
-            result = subprocess.run([sys.executable, '-S', resources.__file__,
+            result = cli_args.run_cli(resources.__file__,
                 '--cgroup', tmp, str(output), '--', sys.executable, '-S',
-                str(Path(resources.__file__).with_name('nano_bun.py')), '--help'],
-                capture_output=True, text=True)
+                str(Path(resources.__file__).with_name('nano_bun.py')), '--help',
+                python_options=('-S',))
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn('--prepared', result.stdout)
             report = json.loads(output.read_text())

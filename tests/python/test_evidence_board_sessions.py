@@ -6,6 +6,8 @@ from pathlib import Path
 import subprocess
 import sys
 
+import cli_args
+
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -28,9 +30,9 @@ def test_no_tests_collected_summary_fails_the_real_board_cli(tmp_path):
     assert not [record for record in records if record["event"] == "test_result"]
     summary, = [record for record in records if record["event"] == "session_summary"]
     assert summary["status"] == "failed" and summary["returncode"] == 5
-    board = subprocess.run(
-        [sys.executable, "-S", str(ROOT / "tools" / "evidence_board.py"), str(events), "--json"],
-        cwd=tmp_path, capture_output=True, text=True, timeout=30,
+    board = cli_args.run_cli(
+        ROOT / "tools" / "evidence_board.py", str(events), "--json",
+        python_options=("-S",), cwd=tmp_path, timeout=30,
     )
     assert board.returncode == 1, board.stdout + board.stderr
     stats = json.loads(board.stdout)
