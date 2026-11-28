@@ -1,8 +1,9 @@
 """Dependency-free support checks, run with python -S on Python 3.11+."""
-import base64, importlib, importlib.util, pathlib, subprocess, sys, unittest
+import base64, importlib, importlib.util, pathlib, sys, unittest
 
 _spec = importlib.util.spec_from_file_location("cli_args", pathlib.Path(__file__).resolve().parents[2] / "vendor" / "cli_args.py")
 cli_args = importlib.util.module_from_spec(_spec)
+sys.modules["cli_args"] = cli_args
 _spec.loader.exec_module(cli_args)
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
