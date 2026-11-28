@@ -1,5 +1,9 @@
 """Dependency-free support checks, run with python -S on Python 3.11+."""
-import base64, importlib, pathlib, subprocess, sys, unittest
+import base64, importlib, importlib.util, pathlib, subprocess, sys, unittest
+
+_spec = importlib.util.spec_from_file_location("cli_args", pathlib.Path(__file__).resolve().parents[2] / "vendor" / "cli_args.py")
+cli_args = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(cli_args)
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
@@ -33,9 +37,9 @@ class StdlibSupport(unittest.TestCase):
     def test_representative_cli_help(self):
         for name in ("btk", "page_text", "image_diff"):
             with self.subTest(module=name):
-                result = subprocess.run(
-                    [sys.executable, "-S", str(ROOT / "tools" / (name + ".py")), "--help"],
-                    capture_output=True, text=True, timeout=30,
+                result = cli_args.run_cli(
+                    ROOT / "tools" / (name + ".py"), "--help",
+                    python_options=("-S",), timeout=30,
                 )
                 self.assertEqual(result.returncode, 0, result.stderr)
 
