@@ -1,3 +1,4 @@
+import importlib.util
 import json
 import subprocess
 import sys
@@ -6,6 +7,10 @@ import unittest
 from pathlib import Path
 
 TOOLS = Path(__file__).resolve().parents[2] / "tools"
+_spec = importlib.util.spec_from_file_location("cli_args", Path(__file__).resolve().parents[2] / "vendor" / "cli_args.py")
+cli_args = importlib.util.module_from_spec(_spec)
+sys.modules["cli_args"] = cli_args
+_spec.loader.exec_module(cli_args)
 sys.path.insert(0, str(TOOLS))
 from btk import js_search
 
@@ -54,8 +59,9 @@ class JSSearchTests(unittest.TestCase):
                 (root / folder).mkdir()
                 for name in ("a.js", "b.cjs"):
                     (root / folder / name).write_text("hello", encoding="utf-8")
-            done = subprocess.run([sys.executable, "-S", str(TOOLS / "btk.py"), "js-search", directory,
-                                   "--limit", "1"], check=True, capture_output=True, text=True)
+            done = cli_args.run_cli(TOOLS / "btk.py", "js-search", directory,
+                                    "--limit", "1", python_options=("-S",))
+            self.assertEqual(done.returncode, 0, done.stderr)
             report = json.loads(done.stdout)
             self.assertEqual(report["counts"]["files"], 2)
             self.assertEqual(report["files"], [{"path": "dist/a.js", "bytes": 5}])
